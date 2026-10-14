@@ -251,19 +251,23 @@
       const ops = [];
       APP.colecciones.forEach(col => Object.entries(datos.colecciones[col] || {}).forEach(([id, d]) => { if (id && !id.includes('/') && d && typeof d === 'object') ops.push([col, id, d]); }));
       if (!ops.length) return toast('La copia no tiene registros.');
-      const resumen = APP.colecciones.map(c => `${Object.keys(datos.colecciones[c] || {}).length} ${c}`).join(' y ');
+      const actualizar = datos.modo === 'actualizar';
+      const resumen = APP.colecciones.filter(c => !actualizar || Object.keys(datos.colecciones[c] || {}).length).map(c => `${Object.keys(datos.colecciones[c] || {}).length} ${c}`).join(' y ');
       const hacer = async () => {
         try {
           for (let i = 0; i < ops.length; i += 400) {
             const b = F.writeBatch(fs);
-            ops.slice(i, i + 400).forEach(([col, id, d]) => b.set(F.doc(fs, ...ruta(col), id), d));
+            ops.slice(i, i + 400).forEach(([col, id, d]) => { if (actualizar) b.set(F.doc(fs, ...ruta(col), id), d, { merge: true }); else b.set(F.doc(fs, ...ruta(col), id), d); });
             await Promise.race([b.commit(), new Promise(r => setTimeout(r, 4000))]);
             toast(`Importando… ${Math.min(i + 400, ops.length)} de ${ops.length}`);
           }
           toast(`Copia importada: ${ops.length} registros`);
         } catch (e) { toast('No se pudo importar: ' + (mapError(e).code === 'permission_denied' ? 'la base de datos lo rechazó.' : e.message)); }
       };
-      if (typeof window.confirmar === 'function') window.confirmar('Importar copia', `Se cargan ${resumen} del archivo "${file.name}". Los registros con el mismo código se reemplazan por los de la copia, para todos. Esto no se puede deshacer. Recomendado: descarga primero una copia de lo actual.`, 'Importar', hacer);
+      const texto = actualizar
+        ? `Se actualizan ${resumen} con los datos del archivo "${file.name}". Solo cambian las columnas que trae el archivo; lo demás (correo, observaciones, etc.) se conserva. Los que no existan se crean. Esto no se puede deshacer. Recomendado: descarga primero una copia de lo actual.`
+        : `Se cargan ${resumen} del archivo "${file.name}". Los registros con el mismo código se reemplazan por los de la copia, para todos. Esto no se puede deshacer. Recomendado: descarga primero una copia de lo actual.`;
+      if (typeof window.confirmar === 'function') window.confirmar(actualizar ? 'Actualizar datos' : 'Importar copia', texto, actualizar ? 'Actualizar' : 'Importar', hacer, 'ok');
       else if (confirm('¿Importar la copia? Reemplaza los registros con el mismo código.')) hacer();
     },
     cambiarNombre() {
