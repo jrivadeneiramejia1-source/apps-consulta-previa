@@ -1,35 +1,6 @@
-/* Guarda la app en el teléfono para que abra rápido y sin internet.
-   Páginas propias: primero internet (para recibir actualizaciones) y si no hay, la copia guardada.
-   Librerías y fuentes externas: primero la copia guardada. Firestore no pasa por aquí. */
-const VERSION = 'cp-v1';
-const BASICOS = ['./', './index.html', './nube.js', './config.js',
-  './evidencias/', './evidencias/index.html', './evidencias/manifest.webmanifest',
-  './equipos/', './equipos/index.html', './equipos/manifest.webmanifest',
-  './iconos/evidencias-192.png', './iconos/equipos-192.png'];
-const EXTERNOS = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];
-
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => Promise.all(BASICOS.map(u => c.add(u).catch(() => {})))));
-  self.skipWaiting();
-});
+/* Versión anterior: este archivo solo se borra a sí mismo. Cada app ahora tiene su propio sw.js en su carpeta. */
+self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
-});
-self.addEventListener('fetch', e => {
-  const req = e.request;
-  if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.origin === self.location.origin) {
-    e.respondWith(fetch(req).then(r => {
-      if (r.ok) { const copia = r.clone(); caches.open(VERSION).then(c => c.put(req, copia)); }
-      return r;
-    }).catch(() => caches.match(req, { ignoreSearch: true }).then(r => r || caches.match('./index.html'))));
-    return;
-  }
-  if (EXTERNOS.includes(url.hostname) && !url.pathname.includes('/google.firestore')) {
-    e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
-      if (r.ok || r.type === 'opaque') { const copia = r.clone(); caches.open(VERSION).then(c => c.put(req, copia)); }
-      return r;
-    })));
-  }
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('cp-')).map(k => caches.delete(k))))
+    .then(() => self.registration.unregister()));
 });

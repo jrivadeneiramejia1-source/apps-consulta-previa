@@ -2,36 +2,17 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0d6b5b">
-<title>Apps Consulta Previa</title>
-<link rel="icon" type="image/png" href="iconos/evidencias-192.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Consulta Previa</title>
 <style>
-:root { --bg: #f3f5f2; --surface: #fff; --line: #d3dad2; --fg: #18211d; --muted: #5b6862; --accent: #0d6b5b; --accent-soft: #d6ebe5; }
-@media (prefers-color-scheme: dark) { :root { --bg: #101513; --surface: #182019; --line: #2f3a33; --fg: #e7eee9; --muted: #9aa8a0; --accent: #46c2a6; --accent-soft: #173a31; color-scheme: dark; } }
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--fg); font-family: "Atkinson Hyperlegible", system-ui, sans-serif; line-height: 1.45; }
-main { max-width: 560px; margin: 0 auto; padding: max(32px, env(safe-area-inset-top)) 16px 32px; display: flex; flex-direction: column; gap: 16px; }
-h1 { font-family: "Archivo", system-ui, sans-serif; font-weight: 800; font-size: 1.7rem; margin: 0; letter-spacing: -.01em; }
-p { margin: 0; color: var(--muted); }
-a.app { display: flex; gap: 14px; align-items: center; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; text-decoration: none; color: inherit; }
-a.app:active { transform: scale(.99); }
-a.app img { width: 60px; height: 60px; border-radius: 15px; flex: 0 0 auto; }
-a.app b { display: block; font-family: "Archivo", system-ui, sans-serif; font-size: 1.1rem; }
-a.app span { color: var(--muted); font-size: .9rem; }
-.nota { font-size: .85rem; background: var(--accent-soft); border-radius: 12px; padding: 12px 14px; color: var(--fg); }
+:root { color-scheme: light dark; }
+body { margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: system-ui, sans-serif; background: #f3f5f2; color: #18211d; padding: 16px; text-align: center; }
+@media (prefers-color-scheme: dark) { body { background: #101513; color: #e7eee9; } }
+p { max-width: 360px; color: #5b6862; }
 </style>
 </head>
 <body>
-<main>
-  <h1>Apps Consulta Previa</h1>
-  <p>Escoge la app. La primera vez te pide la clave de acceso y tu nombre.</p>
-  <a class="app" href="evidencias/"><img src="iconos/evidencias-192.png" alt=""><div><b>Evidencias</b><span>Fotos y videos por comunidad y etapa</span></div></a>
-  <a class="app" href="equipos/"><img src="iconos/equipos-192.png" alt=""><div><b>Equipos</b><span>Equipos recibidos, mantenimiento y backup</span></div></a>
-  <div class="nota"><b>Para tenerla como app en el teléfono:</b> abre la que vas a usar y toca <b>Instalar</b>. En iPhone: botón Compartir y luego <b>Agregar a inicio</b>.</div>
-</main>
+<p>Abre la app con el enlace que te enviaron.</p>
 </body>
 </html>
