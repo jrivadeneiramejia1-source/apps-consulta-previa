@@ -1,0 +1,945 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d6b5b">
+<meta name="description" content="Hojas de entrega y devolución escaneadas">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="../iconos/entregas-192.png">
+<link rel="apple-touch-icon" href="../iconos/entregas-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Entregas">
+<title>Entregas Consulta Previa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Diseño: herramienta de bolsillo. Encabezado fijo + una columna de tarjetas + barra inferior con 3 secciones. */
+:root {
+  --bg: #f3f5f2;
+  --surface: #ffffff;
+  --surface-2: #e9ede8;
+  --line: #d3dad2;
+  --fg: #18211d;
+  --muted: #5b6862;
+  --accent: #0d6b5b;
+  --accent-ink: #ffffff;
+  --accent-soft: #d6ebe5;
+  --pend: #8a948f;  --pend-bg: #eceeed;
+  --org: #9a5b00;   --org-bg: #fbecd2;
+  --listo: #1f5fae; --listo-bg: #dde8f7;
+  --disco: #157046; --disco-bg: #d8efe1;
+  --warn: #8a5a00;  --warn-bg: #fff3d4;
+  --danger: #b3261e; --danger-bg: #fbe3e1;
+  --shadow: 0 10px 30px rgba(20, 35, 28, .18);
+  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101513; --surface: #182019; --surface-2: #212a24; --line: #2f3a33;
+    --fg: #e7eee9; --muted: #9aa8a0; --accent: #46c2a6; --accent-ink: #062019; --accent-soft: #173a31;
+    --pend: #8f9a94; --pend-bg: #252d28;
+    --org: #f2b552; --org-bg: #3a2c12;
+    --listo: #7fb0f0; --listo-bg: #182a43;
+    --disco: #5fd394; --disco-bg: #143323;
+    --warn: #f2c25a; --warn-bg: #352a10;
+    --danger: #ff8a80; --danger-bg: #3d1916;
+    --shadow: 0 10px 30px rgba(0,0,0,.5);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101513; --surface: #182019; --surface-2: #212a24; --line: #2f3a33;
+  --fg: #e7eee9; --muted: #9aa8a0; --accent: #46c2a6; --accent-ink: #062019; --accent-soft: #173a31;
+  --pend: #8f9a94; --pend-bg: #252d28;
+  --org: #f2b552; --org-bg: #3a2c12;
+  --listo: #7fb0f0; --listo-bg: #182a43;
+  --disco: #5fd394; --disco-bg: #143323;
+  --warn: #f2c25a; --warn-bg: #352a10;
+  --danger: #ff8a80; --danger-bg: #3d1916;
+  --shadow: 0 10px 30px rgba(0,0,0,.5);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 16px; line-height: 1.45;
+  margin: 0; padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; opacity: .65; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.num, .mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+
+.top {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: var(--bg); border-bottom: 1px solid var(--line);
+  padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.top-in { max-width: 760px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { min-width: 0; }
+.brand h1 { font-family: var(--f-display); font-weight: 800; font-size: 1.15rem; letter-spacing: -.01em; margin: 0; line-height: 1.1; }
+.brand p { margin: 2px 0 0; font-size: .8rem; color: var(--muted); }
+.conn { font-size: .75rem; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 6px; }
+.conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--pend); display: inline-block; }
+.conn[data-s="vivo"] i { background: var(--disco); }
+.conn[data-s="cargando"] i { background: var(--listo); }
+.conn[data-s="off"] i { background: var(--org); }
+
+main {
+  max-width: 760px; margin: 0 auto; padding-block: 14px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.view { display: flex; flex-direction: column; gap: 14px; }
+
+.note { font-size: .82rem; color: var(--muted); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.note b { color: var(--fg); }
+.aviso { font-size: .85rem; border-radius: 10px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.aviso.warn { color: var(--warn); background: var(--warn-bg); }
+.aviso.info { color: var(--listo); background: var(--listo-bg); }
+
+.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.sum { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.sum .num { font-size: 1.35rem; font-weight: 500; display: block; }
+.sum span:last-child { font-size: .75rem; color: var(--muted); }
+.bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
+.bar span { display: block; height: 100%; }
+.bar .s-pend { background: var(--pend); } .bar .s-org { background: var(--org); } .bar .s-listo { background: var(--listo); } .bar .s-disco { background: var(--disco); }
+.progress { display: flex; flex-direction: column; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.progress .row { font-size: .78rem; color: var(--muted); gap: 4px 14px; }
+.progress .row b { color: var(--fg); font-family: var(--f-mono); font-weight: 500; }
+
+.search { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 16px; }
+.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+.chips::-webkit-scrollbar { display: none; }
+.chip { flex: 0 0 auto; border: 1px solid var(--line); background: var(--surface); padding: 7px 12px; border-radius: 999px; font-size: .85rem; }
+.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+
+.list { display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; text-align: left; width: 100%; display: flex; flex-direction: column; gap: 10px; }
+button.card:active { transform: scale(.995); }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.card-title { font-family: var(--f-display); font-weight: 800; font-size: 1.05rem; letter-spacing: .01em; min-width: 0; }
+.card-title small { font-family: var(--f-mono); font-weight: 500; color: var(--muted); font-size: .8rem; margin-right: 6px; }
+.meta { font-size: .82rem; color: var(--muted); }
+.count { font-size: .8rem; color: var(--muted); }
+
+/* Fila de etapas: cuadro vacío = sin reunión; relleno = color del estado */
+.dots { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
+.dot { height: 14px; border-radius: 4px; border: 1.5px dashed var(--line); }
+.dot.s-pend { background: var(--pend); border: 0; }
+.dot.s-org { background: var(--org); border: 0; }
+.dot.s-listo { background: var(--listo); border: 0; }
+.dot.s-disco { background: var(--disco); border: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .75rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+.pill { display: inline-flex; align-items: center; font-size: .75rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.pill.s-pend { color: var(--pend); background: var(--pend-bg); }
+.pill.s-org { color: var(--org); background: var(--org-bg); }
+.pill.s-listo { color: var(--listo); background: var(--listo-bg); }
+.pill.s-disco { color: var(--disco); background: var(--disco-bg); }
+.pill.none { color: var(--muted); background: transparent; border: 1px dashed var(--line); font-weight: 400; }
+.pill.rev { color: var(--warn); background: var(--warn-bg); }
+.tag-shared { font-size: .75rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
+.warn { font-size: .8rem; color: var(--warn); background: var(--warn-bg); border-radius: 8px; padding: 6px 9px; }
+
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 14px; border-radius: 10px; font-weight: 700; font-size: .9rem; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.danger { background: var(--danger-bg); border-color: transparent; color: var(--danger); }
+.btn.ghost { background: transparent; }
+.btn.small { padding: 6px 10px; font-size: .8rem; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row.between { justify-content: space-between; }
+body.ro .solo-editar { display: none !important; }
+
+.section-label { font-family: var(--f-display); font-weight: 600; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 6px 0 -4px; }
+
+/* Detalle */
+.detail-head h2 { font-family: var(--f-display); font-weight: 800; font-size: 1.5rem; margin: 0; text-wrap: balance; }
+.fields { display: grid; gap: 12px; }
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field label, .field .lbl { font-size: .8rem; font-weight: 700; color: var(--muted); }
+.field input, .field select, .field textarea { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; }
+.field textarea { resize: vertical; min-height: 70px; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.stage { padding: 12px 14px; gap: 6px; }
+.stage .card-title { font-size: .98rem; }
+.stage.empty { background: transparent; border-style: dashed; }
+.stage.empty .card-title { color: var(--muted); font-weight: 600; }
+.facts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .85rem; }
+.facts b { font-weight: 700; }
+.obs { font-size: .85rem; color: var(--muted); border-left: 3px solid var(--line); padding-left: 8px; white-space: pre-wrap; }
+
+/* Evidencias */
+.month { font-family: var(--f-mono); font-size: .8rem; color: var(--muted); padding: 4px 0; border-bottom: 1px solid var(--line); }
+.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.filters select { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 16px; min-width: 0; }
+
+/* Base de datos */
+.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 12px; padding: 4px; gap: 4px; }
+.seg button { border: 0; background: transparent; padding: 9px; border-radius: 9px; font-weight: 700; font-size: .9rem; color: var(--muted); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+table { border-collapse: collapse; font-size: .85rem; min-width: 100%; }
+th, td { padding: 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
+th { background: var(--surface-2); font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
+td input, td select { width: 100%; min-width: 80px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); font-size: 15px; }
+td input.n { min-width: 64px; width: 70px; }
+td input.w { min-width: 190px; }
+td .cell { min-width: 150px; font-size: .8rem; }
+.icon-btn { border: 0; background: var(--danger-bg); color: var(--danger); border-radius: 8px; padding: 7px 10px; font-weight: 700; }
+.tev td:first-child, .tev th:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 2px 0 0 var(--line); }
+.tev th:first-child { background: var(--surface-2); z-index: 2; }
+/* Tabla de comunidades: la columna Comunidad queda fija al deslizar */
+.tcom .stk1 input { min-width: 56px; width: 60px; }
+.tcom .stk2 { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 2px 0 0 var(--line); }
+.tcom .stk2 input { min-width: 0; width: 112px; font-weight: 700; font-size: 14px; padding-inline: 6px; }
+.tcom th.stk2 { background: var(--surface-2); z-index: 2; }
+.tcom .g0 { border-left: 2px solid var(--line); }
+.tcom th.grp { text-align: left; color: var(--fg); font-family: var(--f-display); font-size: .78rem; }
+.tcom td select { min-width: 150px; }
+.grp-lbl { position: sticky; left: 140px; display: inline-block; padding-inline: 4px; }
+.cellnote { font-size: .72rem; color: var(--muted); margin-top: 3px; white-space: nowrap; }
+.shared-mini { color: var(--accent); font-weight: 700; }
+.rev-mini { color: var(--warn); font-weight: 700; }
+.sinreu { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 260px; padding: 4px; }
+.mini { border: 1px dashed var(--accent); color: var(--accent); background: transparent; border-radius: 8px; padding: 5px 9px; font-weight: 700; font-size: .8rem; }
+body.ro .mini { display: none; }
+
+/* Barra inferior */
+.tabs {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line);
+  padding-top: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px));
+}
+.tabs-in { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tab { border: 0; background: transparent; padding: 8px 4px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: .78rem; font-weight: 700; color: var(--muted); }
+.tab svg { width: 22px; height: 22px; }
+.tab[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
+
+/* Hoja inferior (formularios) */
+.backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(8, 14, 11, .55); display: flex; align-items: flex-end; justify-content: center; }
+.sheet {
+  background: var(--surface); width: 100%; max-width: 620px; max-height: 92vh; overflow-y: auto;
+  border-radius: 18px 18px 0 0; box-shadow: var(--shadow);
+  padding-top: 16px; padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-direction: column; gap: 12px;
+}
+.sheet h3 { font-family: var(--f-display); font-weight: 800; margin: 0; font-size: 1.2rem; }
+.sheet .sub { margin: -6px 0 0; color: var(--muted); font-size: .85rem; }
+.grab { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: -4px auto 2px; }
+.checks { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; overscroll-behavior: contain; }
+.check { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: 0 0 auto; }
+.err { color: var(--danger); font-size: .85rem; }
+.sheet-actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; position: sticky; bottom: calc(-18px - env(safe-area-inset-bottom, 0px)); background: var(--surface); padding-block: 10px; border-top: 1px solid var(--line); }
+.sheet-actions .row { margin-left: auto; }
+.confirm .sheet { max-width: 460px; }
+
+.toast {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 60;
+  background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-size: .85rem; font-weight: 700; max-width: calc(100% - 32px); text-align: center;
+}
+.empty-state { text-align: center; padding: 28px 16px; color: var(--muted); }
+.empty-state b { display: block; color: var(--fg); font-family: var(--f-display); font-size: 1.05rem; margin-bottom: 4px; }
+@media (min-width: 640px) {
+  .backdrop { align-items: center; }
+  .sheet { border-radius: 18px; }
+  .fields.cols { grid-template-columns: 1fr 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+[hidden] { display: none !important; }
+/* --- Equipos --- */
+.task select, .task input[type=date] { padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; min-width: 0; }
+.task select { flex: 1 1 130px; font-weight: 700; }
+.task input[type=date] { flex: 1 1 150px; }
+.btn.big { padding: 14px; font-size: 1rem; border-radius: 12px; }
+.cab { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.cab-t { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.cab-t .meta { overflow: hidden; text-overflow: ellipsis; }
+.ico { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); }
+.ico svg { width: 22px; height: 22px; }
+.grupo .ico { width: 28px; height: 28px; border-radius: 8px; }
+.grupo .ico svg { width: 17px; height: 17px; }
+.i-gps { background: var(--listo-bg); color: var(--listo); }
+.i-cel, .i-tablet { background: var(--org-bg); color: var(--org); }
+.i-imp, .i-esc { background: var(--pend-bg); color: var(--fg); }
+.i-vb, .i-ant { background: var(--disco-bg); color: var(--disco); }
+.card.rec { border-left-width: 5px; }
+.card.st-espera { border-left-color: var(--org); }
+.card.st-parcial { border-left-color: var(--listo); }
+.card.st-listo { border-left-color: var(--disco); }
+.card.st-pasado { border-left-color: var(--line); opacity: .8; }
+.espera { font-size: .78rem; font-weight: 700; color: var(--muted); }
+.espera.larga { color: var(--danger); }
+.prog { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.prog span { display: block; height: 100%; background: var(--disco); transition: width .3s; }
+.acc-mini { font-size: .8rem; color: var(--muted); }
+.acc { display: flex; flex-wrap: wrap; gap: 6px; }
+.acc .chip:disabled { opacity: .6; }
+.hist { display: flex; flex-direction: column; gap: 6px; }
+.hist-it { display: flex; flex-direction: column; gap: 4px; text-align: left; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 9px 11px; width: 100%; }
+.card-head .pill { align-self: flex-start; }
+.grupo { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-family: var(--f-display); font-weight: 800; font-size: .95rem; padding: 10px 2px 4px; border-bottom: 2px solid var(--accent); margin-top: 4px; }
+.grupo .num { font-family: var(--f-mono); font-weight: 500; font-size: .78rem; color: var(--muted); }
+#fOrden { padding: 10px 12px; }
+.tabs-in { grid-template-columns: repeat(3, 1fr); }
+.badge { background: var(--org); color: #fff; font-family: var(--f-mono); font-size: .7rem; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; margin-left: 4px; }
+.tab-lbl { display: inline-flex; align-items: center; }
+.task { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.task .tl { font-size: .85rem; font-weight: 700; min-width: 96px; }
+.seg3 { display: inline-grid; grid-template-columns: repeat(3, auto); background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 3px; }
+.seg3 button { border: 0; background: transparent; padding: 7px 10px; border-radius: 8px; font-size: .8rem; font-weight: 700; color: var(--muted); }
+.seg3 button[aria-pressed="true"].v-pend { background: var(--org-bg); color: var(--org); }
+.seg3 button[aria-pressed="true"].v-hecho { background: var(--disco-bg); color: var(--disco); }
+.seg3 button[aria-pressed="true"].v-na { background: var(--pend-bg); color: var(--fg); }
+.seg3 button:disabled { opacity: .55; }
+.tfecha { font-size: .75rem; color: var(--muted); font-family: var(--f-mono); }
+.viejo { color: var(--warn); font-weight: 700; }
+.sinfecha { color: var(--danger); font-weight: 700; }
+.card.pasado { opacity: .75; }
+.card-top { background: transparent; border: 0; padding: 0; text-align: left; width: 100%; display: flex; flex-direction: column; gap: 6px; }
+.serial { font-family: var(--f-mono); font-weight: 500; letter-spacing: .02em; }
+.tcom .stk1, .teq .stk1 { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 2px 0 0 var(--line); }
+.teq th.stk1 { background: var(--surface-2); z-index: 2; }
+.teq td.stk1 { font-family: var(--f-mono); font-size: .82rem; font-weight: 500; white-space: nowrap; padding-inline: 8px; }
+.teq td input[type=date] { min-width: 140px; }
+.teq td input.m { min-width: 120px; }
+.btn.ok { background: var(--disco-bg); color: var(--disco); border-color: transparent; }
+
+/* --- Entregas --- */
+label.subir { text-align: center; cursor: pointer; }
+.card.hoja { flex-direction: row; align-items: flex-start; gap: 12px; }
+.mini-hoja { width: 64px; height: 88px; object-fit: cover; object-position: top; border-radius: 6px; border: 1px solid var(--line); flex: 0 0 auto; background: #fff; }
+.mini-hoja.vacia { display: block; background: var(--surface-2); }
+.hoja-t { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.pill.t-entrega { color: var(--listo); background: var(--listo-bg); }
+.pill.t-devolucion { color: var(--disco); background: var(--disco-bg); }
+.pill.t-otro { color: var(--pend); background: var(--pend-bg); }
+.card.pag { gap: 10px; }
+.card.pag.fuera { opacity: .5; }
+.card.pag.unida { border-left: 5px solid var(--accent); }
+.pag-cab { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
+.pag-img { width: 100%; max-height: 360px; object-fit: contain; object-position: top; background: #fff; border-radius: 8px; border: 1px solid var(--line); cursor: zoom-in; }
+.sub-acciones { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; justify-content: flex-end; background: var(--bg); padding: 10px 0; border-top: 1px solid var(--line); z-index: 5; }
+.sub-acciones .btn { flex: 1; padding: 13px; }
+.paginas { display: flex; flex-direction: column; gap: 10px; }
+.pagina { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 6px; display: flex; flex-direction: column; gap: 4px; cursor: zoom-in; }
+.pagina img { width: 100%; border-radius: 6px; background: #fff; }
+.pagina img.borrosa { filter: blur(3px); max-height: 220px; object-fit: cover; object-position: top; }
+.visor { position: fixed; inset: 0; z-index: 80; background: #000; display: flex; flex-direction: column; }
+.visor-barra { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top)); color: #fff; font-size: .85rem; }
+.visor-cuerpo { flex: 1; overflow: auto; touch-action: pan-x pan-y pinch-zoom; }
+.visor-cuerpo img { width: 100%; min-width: 100%; display: block; background: #fff; }
+@media (min-width: 900px) { .visor-cuerpo img { width: 900px; margin: 0 auto; } }
+</style>
+
+<header class="top">
+  <div class="top-in">
+    <div class="brand">
+      <h1>Entregas Consulta Previa</h1>
+      <p id="subtitulo">Hojas de entrega y devolución escaneadas</p>
+    </div>
+    <div class="conn" id="conn" data-s="cargando"><i></i><span>Conectando…</span></div>
+  </div>
+</header>
+
+<main>
+  <div class="aviso warn" id="avisoRo" hidden><span>Solo lectura: en este teléfono no se puede editar.</span></div>
+  <div class="aviso warn" id="avisoOff" hidden><span id="avisoOffTxt"></span></div>
+  <div class="aviso info" id="avisoPend" hidden><span id="avisoPendTxt"></span><button class="btn small" type="button" id="btnReintentar">Reintentar ahora</button></div>
+
+  <!-- SECCIÓN 1: HOJAS GUARDADAS -->
+  <section class="view" id="vEnt">
+    <div class="summary" id="sumEnt"></div>
+    <input class="search" id="qEnt" type="search" placeholder="Buscar nombre, cédula o serial" autocomplete="off" aria-label="Buscar">
+    <div class="chips" id="chipsEnt" role="group" aria-label="Filtrar"></div>
+    <div class="count" id="entCount"></div>
+    <div class="list" id="entList"></div>
+  </section>
+
+  <!-- SECCIÓN 2: SUBIR -->
+  <section class="view" id="vSub" hidden>
+    <div class="note">Sube el PDF escaneado o fotos de las hojas. Cada página sale aparte: escribe a quién pertenece y guárdala. Si una persona tiene dos páginas, marca <b>Unir con la anterior</b>. Los datos los escribes tú; la app no lee la letra.</div>
+    <label class="btn primary big solo-editar subir">Escoger PDF o fotos<input type="file" id="archivo" accept="application/pdf,image/*" multiple hidden></label>
+    <div class="meta" id="subEstado"></div>
+    <div class="list" id="subList"></div>
+    <div class="sub-acciones" id="subAcciones" hidden>
+      <button class="btn" type="button" id="subCancelar">Descartar</button>
+      <button class="btn primary" type="button" id="subGuardar">Guardar</button>
+    </div>
+  </section>
+
+  <!-- SECCIÓN 3: BASE DE DATOS -->
+  <section class="view" id="vDb" hidden>
+    <div class="note">Tabla directa de la base de datos. Lo que cambies o borres aquí cambia para todos. Desliza la tabla hacia los lados para ver todas las columnas.</div>
+    <input class="search" id="qDb" type="search" placeholder="Buscar en la tabla" autocomplete="off" aria-label="Buscar en la tabla">
+    <div class="count" id="dbCount"></div>
+    <div class="table-wrap" id="dbTable"></div>
+    <div class="row">
+      <button class="btn" id="btnExcel" type="button" hidden>Descargar Excel</button>
+    </div>
+    <div class="card nube-card">
+      <div class="card-title">Copia de seguridad y acceso</div>
+      <div class="meta" id="nubeInfo"></div>
+      <div class="meta">La copia incluye las hojas escaneadas, así que puede pesar bastante.</div>
+      <div class="row">
+        <button class="btn" type="button" onclick="nube.exportar()">Descargar copia (JSON)</button>
+        <label class="btn solo-editar">Importar copia<input type="file" accept=".json,application/json" hidden onchange="nube.importar(this)"></label>
+      </div>
+      <div class="row">
+        <button class="btn" type="button" onclick="nube.cambiarNombre()">Cambiar mi nombre</button>
+        <button class="btn danger" type="button" onclick="nube.salir()">Salir de este teléfono</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<nav class="tabs" aria-label="Secciones">
+  <div class="tabs-in">
+    <button class="tab" id="tabEnt" type="button" aria-current="page">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M8 13h8M8 17h5"/></svg>
+      Hojas
+    </button>
+    <button class="tab" id="tabSub" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4"/><path d="m6 10 6-6 6 6"/><path d="M4 20h16"/></svg>
+      Subir
+    </button>
+    <button class="tab" id="tabDb" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
+      Base de datos
+    </button>
+  </div>
+</nav>
+
+<!-- HOJA: REGISTRO -->
+<div class="backdrop" id="enSheet" hidden>
+  <form class="sheet" id="enForm" novalidate>
+    <div class="grab"></div>
+    <h3 id="enTitle"></h3>
+    <p class="sub" id="enSub"></p>
+    <div class="paginas" id="enPaginas"></div>
+    <button class="btn ok" type="button" id="enPdf">Descargar PDF</button>
+    <div class="fields cols">
+      <div class="field"><label for="enNombre">Nombre</label><input id="enNombre" type="text" list="dlNombres" autocomplete="off"></div>
+      <div class="field"><label for="enCedula">Cédula</label><input id="enCedula" type="text" inputmode="numeric" autocomplete="off"></div>
+    </div>
+    <div class="fields cols">
+      <div class="field"><label for="enFecha">Fecha de la hoja</label><input id="enFecha" type="date"></div>
+      <div class="field"><label for="enTipo">Tipo</label><select id="enTipo"></select></div>
+    </div>
+    <div class="field"><label for="enSeriales">Seriales de los equipos</label><input id="enSeriales" type="text" autocomplete="off" placeholder="Ej: MP21CWB4, 5CD511220K"></div>
+    <div class="field"><label for="enNota">Nota</label><textarea id="enNota" placeholder="Ej: entregó con cargador y mouse"></textarea></div>
+    <div class="meta" id="enEditado"></div>
+    <div class="err" id="enErr" hidden></div>
+    <div class="sheet-actions">
+      <button class="btn danger solo-editar" type="button" id="enDel">Eliminar</button>
+      <div class="row">
+        <button class="btn" type="button" id="enCancel">Cerrar</button>
+        <button class="btn primary solo-editar" type="submit" id="enGuardar">Guardar</button>
+      </div>
+    </div>
+  </form>
+</div>
+
+<!-- VISOR GRANDE -->
+<div class="visor" id="visor" hidden>
+  <div class="visor-barra"><span id="visorTxt"></span><button class="btn small" type="button" id="visorCerrar">Cerrar</button></div>
+  <div class="visor-cuerpo"><img id="visorImg" alt="Hoja escaneada"></div>
+</div>
+
+<!-- CONFIRMACIÓN -->
+<div class="backdrop confirm" id="cfSheet" hidden>
+  <div class="sheet" role="alertdialog" aria-labelledby="cfTitle" aria-describedby="cfText">
+    <h3 id="cfTitle">¿Seguro?</h3>
+    <p id="cfText" style="margin:0;white-space:pre-line"></p>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn" type="button" id="cfNo">Cancelar</button>
+      <button class="btn danger" type="button" id="cfYes">Eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+<datalist id="dlNombres"></datalist>
+
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png"};</script>
+<script src="../config.js"></script>
+<script src="../nube.js"></script>
+<script>
+/* ================= CONSTANTES ================= */
+const COL = 'entregas', COL_A = 'archivos';
+const CACHE_KEY = 'ent_cache_v1', PEND_KEY = 'ent_pendientes_v1', UI_KEY = 'ent_ui_v1';
+const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDFLIB_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
+const TIPOS = [{ k: 'entrega', n: 'Entrega' }, { k: 'devolucion', n: 'Devolución' }, { k: 'otro', n: 'Otro' }];
+const ANCHO = 1700, CALIDAD = 0.8, TROZO = 700000, MAX_PAGINAS = 40;
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+/* ================= ESTADO ================= */
+let ENT = new Map();
+let DB = null, USER = null, DL = null, miId = null, soloLectura = false;
+let listo = false, conexion = 'cargando', fechaCache = null;
+let pendientes = lsGet(PEND_KEY) || [];
+let vista = 'ent', filtro = 'todos', enActual = null, renderPendiente = false;
+let lote = [];          // páginas que se están subiendo
+const ui = lsGet(UI_KEY) || {};
+
+/* ================= UTILIDADES ================= */
+const $ = id => document.getElementById(id);
+function esc(v) { return String(v ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function sinTildes(t) { return String(t ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+const esperar = ms => new Promise(r => setTimeout(r, ms));
+function hoyIso() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+function fechaBonita(f) { if (!/^\d{4}-\d{2}-\d{2}$/.test(f || '')) return f || 'Sin fecha'; const [y, m, d] = f.split('-'); return `${d}/${m}/${y}`; }
+function mesDe(f) { return /^\d{4}-\d{2}/.test(f || '') ? `${MESES[Number(f.slice(5, 7)) - 1]} ${f.slice(0, 4)}` : 'Sin fecha'; }
+function hace(iso) {
+  const t = Date.parse(iso); if (!t) return '';
+  const s = Math.round((Date.now() - t) / 1000);
+  if (s < 60) return 'hace un momento';
+  if (s < 3600) return `hace ${Math.round(s / 60)} min`;
+  if (s < 86400) return `hace ${Math.round(s / 3600)} h`;
+  return new Date(t).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 2600); }
+function nuevoId(p) { return p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function sello() { return { actualizado: new Date().toISOString(), por: miId || '' }; }
+const tipoNombre = k => (TIPOS.find(t => t.k === k) || TIPOS[0]).n;
+const lista = () => [...ENT.entries()].map(([id, e]) => Object.assign({ id }, e));
+function cargarScript(src) { return new Promise((ok, mal) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = () => mal(new Error('No se pudo cargar ' + src)); document.head.appendChild(s); }); }
+
+/* ================= RENDER PROGRAMADO ================= */
+function escribiendo() { const a = document.activeElement; return !!(a && a.closest && a.closest('main') && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && a.type !== 'search'); }
+function pedirRender() { if (escribiendo()) { renderPendiente = true; return; } renderPendiente = false; render(); }
+document.addEventListener('focusout', () => setTimeout(() => { if (renderPendiente && !escribiendo()) pedirRender(); }, 0));
+
+/* ================= BASE DE DATOS ================= */
+const colas = new Map();
+function enCola(clave, fn) { const p = (colas.get(clave) || Promise.resolve()).then(fn, fn); colas.set(clave, p.catch(() => {})); return p; }
+function aplicarLocal(op) {
+  if (op.col !== COL) return;
+  if (op.tipo === 'set') ENT.set(op.id, JSON.parse(JSON.stringify(op.data)));
+  else if (op.tipo === 'update') { if (ENT.has(op.id)) ENT.set(op.id, Object.assign({}, ENT.get(op.id), op.data)); }
+  else if (op.tipo === 'delete') ENT.delete(op.id);
+}
+function guardarPendiente(op) {
+  const i = pendientes.findIndex(p => p.col === op.col && p.id === op.id);
+  if (i >= 0) { const prev = pendientes[i]; if (op.tipo === 'update' && (prev.tipo === 'update' || prev.tipo === 'set')) prev.data = Object.assign({}, prev.data, op.data); else pendientes[i] = op; }
+  else pendientes.push(op);
+  lsSet(PEND_KEY, pendientes); pintarAvisos();
+}
+async function ejecutar(op) {
+  const ref = DB.collection(op.col).doc(op.id);
+  if (op.tipo === 'set') return ref.set(op.data);
+  if (op.tipo === 'update') return ref.update(op.data);
+  return ref.delete();
+}
+async function escribir(op) {
+  if (soloLectura) { toast('Solo lectura.'); return false; }
+  aplicarLocal(op); guardarCacheLuego(); pedirRender();
+  if (!DB) { guardarPendiente(op); return false; }
+  const clave = op.col + '/' + op.id;
+  try { await enCola(clave, () => ejecutar(op)); return true; }
+  catch (e) {
+    const code = e && e.code;
+    if (code === 'unavailable' || code === 'resource_exhausted') {
+      await esperar(500 + Math.random() * 900);
+      try { await enCola(clave, () => ejecutar(op)); return true; }
+      catch (e2) { guardarPendiente(op); toast('Sin conexión: el cambio se guardará cuando vuelva la señal.'); return false; }
+    }
+    if (code === 'invalid_argument') { toast('No se pudo guardar: ese registro ya no existe.'); return false; }
+    if (code === 'permission_denied') { toast('La base de datos rechazó el cambio. Revisa la clave.'); return false; }
+    if (code === 'quota_exceeded') { toast('La base de datos llegó a su límite.'); return false; }
+    guardarPendiente(op); marcarDesconectado(); return false;
+  }
+}
+async function reintentarPendientes() {
+  if (!DB || !pendientes.length || soloLectura) return;
+  for (const op of pendientes.slice()) {
+    try { await enCola(op.col + '/' + op.id, () => ejecutar(op)); pendientes = pendientes.filter(p => p !== op); }
+    catch (e) { if (e && e.code === 'invalid_argument') pendientes = pendientes.filter(p => p !== op); else break; }
+  }
+  lsSet(PEND_KEY, pendientes); pintarAvisos();
+}
+function marcarDesconectado() { conexion = 'off'; pintarConexion(); pintarAvisos(); }
+let tCache = null;
+function guardarCacheLuego() { clearTimeout(tCache); tCache = setTimeout(() => { if (listo) lsSet(CACHE_KEY, { e: [...ENT].map(([id, x]) => [id, Object.assign({}, x, { miniatura: '' })]), t: Date.now() }); }, 1200); }
+const subs = [];
+function suscribir() {
+  subs.splice(0).forEach(u => { try { u(); } catch (e) {} });
+  subs.push(DB.collection(COL).limit(5000).onSnapshot(s => {
+    ENT = new Map(s.docs.map(d => [d.id, Object.assign({}, d.data())])); listo = true;
+    pendientes.forEach(aplicarLocal); conexion = 'vivo'; guardarCacheLuego(); pintarConexion(); pintarAvisos(); pedirRender();
+  }, e => { marcarDesconectado(); if (e && e.code === 'unavailable') setTimeout(suscribir, 5000); }));
+}
+
+/* ================= AVISOS ================= */
+function pintarConexion() {
+  const el = $('conn'); el.dataset.s = conexion;
+  el.querySelector('span').textContent = conexion === 'vivo' ? 'En vivo' : conexion === 'cargando' ? 'Conectando…' : 'Sin conexión';
+  $('subtitulo').textContent = ENT.size ? `${ENT.size} ${ENT.size === 1 ? 'hoja guardada' : 'hojas guardadas'}` : 'Hojas de entrega y devolución escaneadas';
+}
+function pintarAvisos() {
+  document.body.classList.toggle('ro', soloLectura);
+  $('avisoRo').hidden = !soloLectura;
+  const off = conexion === 'off' || (!DB && conexion !== 'cargando');
+  $('avisoOff').hidden = !off;
+  if (off) $('avisoOffTxt').textContent = ENT.size ? `No hay conexión con la base de datos. Estás viendo la última copia guardada en este teléfono${fechaCache ? ' (' + hace(new Date(fechaCache).toISOString()) + ')' : ''}.` : 'No hay conexión con la base de datos. Revisa tu internet y vuelve a abrir la app.';
+  $('avisoPend').hidden = !pendientes.length;
+  $('avisoPendTxt').textContent = pendientes.length === 1 ? '1 cambio todavía no se ha enviado.' : `${pendientes.length} cambios todavía no se han enviado.`;
+}
+
+/* ================= NAVEGACIÓN ================= */
+function ir(v) {
+  vista = v;
+  $('vEnt').hidden = v !== 'ent'; $('vSub').hidden = v !== 'sub'; $('vDb').hidden = v !== 'db';
+  [['tabEnt', 'ent'], ['tabSub', 'sub'], ['tabDb', 'db']].forEach(([id, k]) => { if (k === v) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current'); });
+  render(); window.scrollTo(0, 0);
+}
+function render() {
+  pintarConexion(); actualizarNombres();
+  if (vista === 'ent') renderEnt();
+  if (vista === 'db') renderDb();
+}
+function actualizarNombres() {
+  const n = [...new Set(lista().map(e => (e.nombre || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+  const sig = n.join('|'); if (actualizarNombres.sig === sig) return; actualizarNombres.sig = sig;
+  $('dlNombres').innerHTML = n.map(v => `<option value="${esc(v)}"></option>`).join('');
+}
+
+/* ================= HOJAS GUARDADAS ================= */
+const FILTROS = [{ k: 'todos', n: 'Todas' }, { k: 'entrega', n: 'Entregas' }, { k: 'devolucion', n: 'Devoluciones' }, { k: 'otro', n: 'Otras' }, { k: 'sindatos', n: 'Sin nombre o fecha' }];
+const textoDe = e => sinTildes([e.nombre, e.cedula, e.seriales, e.nota, e.origen].join(' '));
+function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'sindatos') return !e.nombre || !e.fecha; return (e.tipo || 'entrega') === f; }
+function renderEnt() {
+  const todos = lista(), mes = hoyIso().slice(0, 7);
+  const personas = new Set(todos.map(e => sinTildes(e.nombre)).filter(Boolean)).size;
+  $('sumEnt').innerHTML = `
+    <div class="sum"><span class="num">${todos.length}</span><span>Hojas guardadas</span></div>
+    <div class="sum"><span class="num">${todos.filter(e => (e.fecha || '').startsWith(mes)).length}</span><span>De este mes</span></div>
+    <div class="sum"><span class="num">${personas}</span><span>Personas</span></div>`;
+  $('chipsEnt').innerHTML = FILTROS.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtro === f.k}">${f.n}${f.k === 'sindatos' ? ` (${todos.filter(e => pasaFiltro(e, 'sindatos')).length})` : ''}</button>`).join('');
+  const q = sinTildes($('qEnt').value.trim());
+  const ver = todos.filter(e => pasaFiltro(e, filtro) && (!q || textoDe(e).includes(q)))
+    .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || String(b.subido || '').localeCompare(String(a.subido || '')));
+  $('entCount').textContent = todos.length ? `Mostrando ${ver.length} de ${todos.length} hojas` : '';
+  if (!todos.length) {
+    $('entList').innerHTML = conexion === 'cargando' ? '<div class="empty-state"><b>Cargando…</b></div>'
+      : !DB ? '<div class="empty-state"><b>No se pudo abrir la base de datos</b>Revisa tu internet y vuelve a abrir la app.</div>'
+      : '<div class="empty-state"><b>Todavía no hay hojas</b>Ve a <b>Subir</b> para guardar el primer PDF.</div>';
+    return;
+  }
+  let html = '', grupo = null;
+  ver.forEach(e => {
+    const g = mesDe(e.fecha);
+    if (g !== grupo) { grupo = g; html += `<div class="month">${esc(g)}</div>`; }
+    const n = (e.paginas || []).length;
+    html += `<button type="button" class="card hoja" data-en="${esc(e.id)}">
+      ${e.miniatura ? `<img class="mini-hoja" src="${esc(e.miniatura)}" alt="" loading="lazy">` : '<span class="mini-hoja vacia"></span>'}
+      <span class="hoja-t">
+        <span class="card-head"><span class="card-title">${esc(e.nombre || 'Sin nombre')}</span><span class="pill t-${esc(e.tipo || 'entrega')}">${tipoNombre(e.tipo)}</span></span>
+        <span class="facts"><span class="mono">${fechaBonita(e.fecha)}</span>${e.cedula ? `<span>CC ${esc(e.cedula)}</span>` : ''}<span>${n} ${n === 1 ? 'página' : 'páginas'}</span></span>
+        ${e.seriales ? `<span class="meta mono">${esc(e.seriales)}</span>` : ''}
+        ${!e.nombre || !e.fecha ? '<span class="pill rev">Falta completar datos</span>' : ''}
+      </span>
+    </button>`;
+  });
+  $('entList').innerHTML = html || '<div class="note">No hay hojas con ese filtro o búsqueda.</div>';
+}
+
+/* ================= SUBIR ================= */
+function aBase64(blob) { return new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1]); r.onerror = mal; r.readAsDataURL(blob); }); }
+function canvasA(c, tipo, q) { return new Promise(ok => c.toBlob(ok, tipo, q)); }
+function escalar(fuente, w, h, maxAncho) {
+  const k = Math.min(1, maxAncho / w), c = document.createElement('canvas');
+  c.width = Math.round(w * k); c.height = Math.round(h * k);
+  const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(fuente, 0, 0, c.width, c.height);
+  return c;
+}
+async function prepararPagina(canvas, origen) {
+  const blob = await canvasA(canvas, 'image/jpeg', CALIDAD);
+  const mini = escalar(canvas, canvas.width, canvas.height, 220).toDataURL('image/jpeg', 0.6);
+  const vista = escalar(canvas, canvas.width, canvas.height, 700).toDataURL('image/jpeg', 0.75);
+  return { blob, mini, vista, ancho: canvas.width, alto: canvas.height, origen, incluir: true, unir: false, nombre: '', cedula: '', fecha: '', tipo: 'entrega', seriales: '', nota: '' };
+}
+async function leerArchivos(files) {
+  const nuevas = [];
+  for (const f of files) {
+    if (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) {
+      $('subEstado').textContent = 'Abriendo el PDF…';
+      if (!window.pdfjsLib) { await cargarScript(PDFJS_URL); window.pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS_WORKER; }
+      const pdf = await window.pdfjsLib.getDocument({ data: new Uint8Array(await f.arrayBuffer()) }).promise;
+      const total = Math.min(pdf.numPages, MAX_PAGINAS - lote.length - nuevas.length);
+      if (pdf.numPages > total) toast(`Solo se cargan ${MAX_PAGINAS} páginas a la vez.`);
+      for (let i = 1; i <= total; i++) {
+        $('subEstado').textContent = `Preparando página ${i} de ${total} de "${f.name}"…`;
+        const pag = await pdf.getPage(i), v1 = pag.getViewport({ scale: 1 });
+        const vp = pag.getViewport({ scale: Math.min(3, ANCHO / v1.width) });
+        const c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+        const ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height);
+        await pag.render({ canvasContext: ctx, viewport: vp }).promise;
+        nuevas.push(await prepararPagina(c, `${f.name} · pág. ${i}`));
+      }
+    } else if (f.type.startsWith('image/')) {
+      if (lote.length + nuevas.length >= MAX_PAGINAS) break;
+      $('subEstado').textContent = `Preparando "${f.name}"…`;
+      const img = await createImageBitmap(f);
+      nuevas.push(await prepararPagina(escalar(img, img.width, img.height, ANCHO), f.name));
+    } else toast(`"${f.name}" no es PDF ni foto.`);
+  }
+  return nuevas;
+}
+function renderSub() {
+  $('subAcciones').hidden = !lote.length;
+  const reg = gruposLote();
+  $('subGuardar').textContent = reg.length === 1 ? 'Guardar 1 hoja' : `Guardar ${reg.length} hojas`;
+  $('subGuardar').disabled = !reg.length;
+  $('subList').innerHTML = lote.map((p, i) => `<div class="card pag ${p.incluir ? '' : 'fuera'} ${p.unir ? 'unida' : ''}" data-i="${i}">
+      <div class="pag-cab"><b>Página ${i + 1}</b><span class="meta">${esc(p.origen)}</span></div>
+      <img class="pag-img" src="${p.vista}" alt="Página ${i + 1}" data-ver="${i}">
+      <div class="row">
+        <label class="check"><input type="checkbox" data-k="incluir" ${p.incluir ? 'checked' : ''}> Guardar esta página</label>
+        ${i > 0 ? `<label class="check"><input type="checkbox" data-k="unir" ${p.unir ? 'checked' : ''}> Unir con la anterior</label>` : ''}
+      </div>
+      ${p.unir ? '<div class="meta">Se guarda junto con la página anterior, con los mismos datos.</div>' : `
+      <div class="fields cols">
+        <div class="field"><label>Nombre</label><input type="text" data-k="nombre" list="dlNombres" value="${esc(p.nombre)}" autocomplete="off"></div>
+        <div class="field"><label>Cédula</label><input type="text" data-k="cedula" inputmode="numeric" value="${esc(p.cedula)}" autocomplete="off"></div>
+      </div>
+      <div class="fields cols">
+        <div class="field"><label>Fecha de la hoja</label><input type="date" data-k="fecha" value="${esc(p.fecha)}"></div>
+        <div class="field"><label>Tipo</label><select data-k="tipo">${TIPOS.map(t => `<option value="${t.k}" ${p.tipo === t.k ? 'selected' : ''}>${t.n}</option>`).join('')}</select></div>
+      </div>
+      <div class="field"><label>Seriales de los equipos</label><input type="text" data-k="seriales" value="${esc(p.seriales)}" autocomplete="off" placeholder="Opcional"></div>
+      <div class="field"><label>Nota</label><input type="text" data-k="nota" value="${esc(p.nota)}" autocomplete="off" placeholder="Opcional"></div>`}
+    </div>`).join('');
+}
+function gruposLote() {
+  const g = [];
+  lote.forEach(p => { if (!p.incluir) return; if (p.unir && g.length) g[g.length - 1].paginas.push(p); else g.push({ datos: p, paginas: [p] }); });
+  return g;
+}
+async function guardarLote() {
+  if (soloLectura || !DB) { toast(DB ? 'Solo lectura.' : 'No hay conexión con la base de datos.'); return; }
+  const grupos = gruposLote(); if (!grupos.length) return;
+  const sinNombre = grupos.filter(g => !g.datos.nombre.trim()).length;
+  const hacer = async () => {
+    $('subGuardar').disabled = true; $('subCancelar').disabled = true;
+    let hechos = 0;
+    try {
+      for (const g of grupos) {
+        const id = nuevoId('e'), paginas = [];
+        for (let pi = 0; pi < g.paginas.length; pi++) {
+          const p = g.paginas[pi], b64 = await aBase64(p.blob), n = Math.ceil(b64.length / TROZO);
+          for (let c = 0; c < n; c++) {
+            $('subEstado').textContent = `Subiendo hoja ${hechos + 1} de ${grupos.length}…`;
+            await DB.collection(COL_A).doc(`${id}_${pi}_${c}`).set({ e: id, p: pi, c, n, d: b64.slice(c * TROZO, (c + 1) * TROZO) });
+          }
+          paginas.push({ trozos: n, ancho: p.ancho, alto: p.alto, bytes: p.blob.size, origen: p.origen });
+        }
+        const d = g.datos;
+        await escribir({ tipo: 'set', col: COL, id, data: Object.assign({
+          nombre: d.nombre.trim().replace(/\s+/g, ' '), cedula: d.cedula.trim(), fecha: d.fecha, tipo: d.tipo,
+          seriales: d.seriales.trim().toUpperCase(), nota: d.nota.trim(), paginas, miniatura: g.paginas[0].mini,
+          origen: g.paginas.map(p => p.origen).join(' + '), subido: new Date().toISOString()
+        }, sello()) });
+        hechos++;
+      }
+      toast(hechos === 1 ? '1 hoja guardada' : `${hechos} hojas guardadas`);
+      lote = []; $('subEstado').textContent = ''; renderSub(); ir('ent');
+    } catch (e) {
+      toast('Se cortó la subida: ' + (e && (e.message || e.code) || e) + '. Lo ya guardado quedó guardado.');
+      lote = lote.slice(0); renderSub();
+    } finally { $('subGuardar').disabled = false; $('subCancelar').disabled = false; }
+  };
+  if (sinNombre) confirmar('Hay hojas sin nombre', `${sinNombre} ${sinNombre === 1 ? 'hoja no tiene' : 'hojas no tienen'} nombre. Se guardan igual y quedan en el filtro "Sin nombre o fecha" para completarlas después.`, 'Guardar igual', hacer, 'ok');
+  else hacer();
+}
+
+/* ================= VER / EDITAR ================= */
+async function cargarPagina(id, pi, n) {
+  const partes = await Promise.all(Array.from({ length: n }, (_, c) => DB.collection(COL_A).doc(`${id}_${pi}_${c}`).get()));
+  if (partes.some(x => !x)) throw new Error('falta una parte del archivo');
+  return partes.map(x => x.d).join('');
+}
+const cacheImg = new Map();
+async function imagenDe(id, pi) {
+  const k = id + '_' + pi; if (cacheImg.has(k)) return cacheImg.get(k);
+  const e = ENT.get(id); const b64 = await cargarPagina(id, pi, e.paginas[pi].trozos);
+  cacheImg.set(k, b64); return b64;
+}
+function abrirEn(id) {
+  const e = ENT.get(id); if (!e) { toast('Esa hoja ya no existe.'); return; }
+  enActual = id;
+  $('enTitle').textContent = e.nombre || 'Sin nombre';
+  $('enSub').textContent = `${tipoNombre(e.tipo)} · ${fechaBonita(e.fecha)} · ${(e.paginas || []).length} ${(e.paginas || []).length === 1 ? 'página' : 'páginas'}`;
+  $('enTipo').innerHTML = TIPOS.map(t => `<option value="${t.k}">${t.n}</option>`).join('');
+  $('enNombre').value = e.nombre || ''; $('enCedula').value = e.cedula || ''; $('enFecha').value = e.fecha || '';
+  $('enTipo').value = e.tipo || 'entrega'; $('enSeriales').value = e.seriales || ''; $('enNota').value = e.nota || '';
+  $('enErr').hidden = true;
+  $('enEditado').textContent = e.actualizado ? `Subida ${hace(e.subido)}${e.por ? ' por ' + e.por : ''}. Origen: ${e.origen || '—'}.` : '';
+  $('enForm').querySelectorAll('input, select, textarea').forEach(x => { x.disabled = soloLectura; });
+  $('enPaginas').innerHTML = (e.paginas || []).map((p, i) => `<button type="button" class="pagina" data-pv="${i}"><img src="${esc(e.miniatura)}" alt="" class="borrosa" data-pi="${i}"><span class="meta">Cargando página ${i + 1}…</span></button>`).join('');
+  $('enSheet').hidden = false;
+  (e.paginas || []).forEach(async (p, i) => {
+    const caja = $('enPaginas').querySelector(`[data-pv="${i}"]`);
+    try {
+      const b64 = await imagenDe(id, i); if (enActual !== id) return;
+      caja.innerHTML = `<img src="data:image/jpeg;base64,${b64}" alt="Página ${i + 1}"><span class="meta">Página ${i + 1} · toca para ampliar</span>`;
+    } catch (err) { if (enActual === id) caja.querySelector('.meta').textContent = 'No se pudo cargar esta página. Revisa tu internet.'; }
+  });
+}
+function cerrarEn() { $('enSheet').hidden = true; enActual = null; }
+function guardarEn(ev) {
+  ev.preventDefault(); if (soloLectura || !enActual) return cerrarEn();
+  const e0 = ENT.get(enActual); if (!e0) return cerrarEn();
+  const datos = { nombre: $('enNombre').value.trim().replace(/\s+/g, ' '), cedula: $('enCedula').value.trim(), fecha: $('enFecha').value, tipo: $('enTipo').value, seriales: $('enSeriales').value.trim().toUpperCase(), nota: $('enNota').value.trim() };
+  const cambios = {}; Object.keys(datos).forEach(k => { if (datos[k] !== (e0[k] ?? '')) cambios[k] = datos[k]; });
+  if (Object.keys(cambios).length) { escribir({ tipo: 'update', col: COL, id: enActual, data: Object.assign(cambios, sello()) }); toast('Cambios guardados'); }
+  cerrarEn();
+}
+function borrarEn(id) {
+  const e = ENT.get(id); if (!e) return;
+  confirmar('Eliminar hoja', `Se borra la hoja de ${e.nombre || 'sin nombre'} (${fechaBonita(e.fecha)}) con ${(e.paginas || []).length === 1 ? 'su página escaneada' : 'sus ' + (e.paginas || []).length + ' páginas escaneadas'}, para todos. No se puede deshacer. Si la necesitas, descarga antes el PDF.`, 'Eliminar', async () => {
+    cerrarEn();
+    await escribir({ tipo: 'delete', col: COL, id });
+    for (const [pi, p] of (e.paginas || []).entries()) for (let c = 0; c < p.trozos; c++) DB.collection(COL_A).doc(`${id}_${pi}_${c}`).delete().catch(() => {});
+    toast('Hoja eliminada');
+  });
+}
+async function descargarPdf(id) {
+  const e = ENT.get(id); if (!e || !DL) return;
+  const btn = $('enPdf'); btn.disabled = true; btn.textContent = 'Preparando PDF…';
+  try {
+    if (!window.PDFLib) await cargarScript(PDFLIB_URL);
+    const doc = await window.PDFLib.PDFDocument.create();
+    for (let i = 0; i < (e.paginas || []).length; i++) {
+      const b64 = await imagenDe(id, i), bytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+      const img = await doc.embedJpg(bytes), w = 595.28, h = w * img.height / img.width;
+      doc.addPage([w, h]).drawImage(img, { x: 0, y: 0, width: w, height: h });
+    }
+    const nombre = `${tipoNombre(e.tipo)} ${e.nombre || 'sin nombre'} ${e.fecha || ''}`.trim().replace(/[\\/:*?"<>|]/g, '');
+    await DL.save({ filename: nombre + '.pdf', data: new Blob([await doc.save()], { type: 'application/pdf' }) });
+  } catch (err) { toast('No se pudo preparar el PDF: ' + (err.message || err)); }
+  finally { btn.disabled = false; btn.textContent = 'Descargar PDF'; }
+}
+function verGrande(src, txt) { $('visorImg').src = src; $('visorTxt').textContent = txt; $('visor').hidden = false; }
+
+let cfAccion = null;
+function confirmar(titulo, texto, boton, accion, estilo) {
+  $('cfTitle').textContent = titulo; $('cfText').textContent = texto; $('cfYes').textContent = boton;
+  $('cfYes').className = 'btn ' + (estilo === 'ok' ? 'primary' : 'danger');
+  cfAccion = accion; $('cfSheet').hidden = false; $('cfNo').focus();
+}
+
+/* ================= BASE DE DATOS ================= */
+function renderDb() {
+  const q = sinTildes($('qDb').value.trim()), ro = soloLectura ? 'disabled' : '';
+  const ver = lista().filter(e => !q || textoDe(e).includes(q)).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+  $('dbCount').textContent = `${ver.length} de ${ENT.size} filas`;
+  const inp = (e, f, cls, lbl, t) => `<td><input type="${t || 'text'}" class="${cls || ''}" data-f="${f}" value="${esc(e[f])}" ${ro} aria-label="${lbl}"></td>`;
+  $('dbTable').innerHTML = `<table class="teq"><thead><tr><th class="stk1">Nombre</th><th>Cédula</th><th>Fecha</th><th>Tipo</th><th>Seriales</th><th>Nota</th><th>Páginas</th><th>Origen</th><th class="solo-editar"></th></tr></thead><tbody>${ver.map(e => `<tr data-id="${esc(e.id)}">
+    <td class="stk1"><input type="text" class="m" data-f="nombre" value="${esc(e.nombre)}" ${ro} aria-label="Nombre" list="dlNombres"></td>
+    ${inp(e, 'cedula', 'm', 'Cédula')}${inp(e, 'fecha', '', 'Fecha', 'date')}
+    <td><select data-f="tipo" ${ro} aria-label="Tipo">${TIPOS.map(t => `<option value="${t.k}" ${(e.tipo || 'entrega') === t.k ? 'selected' : ''}>${t.n}</option>`).join('')}</select></td>
+    ${inp(e, 'seriales', 'w', 'Seriales')}${inp(e, 'nota', 'w', 'Nota')}
+    <td class="num">${(e.paginas || []).length}</td><td><div class="cell">${esc(e.origen)}</div></td>
+    <td class="solo-editar"><button type="button" class="icon-btn" data-del="${esc(e.id)}">Borrar</button></td>
+  </tr>`).join('') || '<tr><td colspan="9">Sin filas</td></tr>'}</tbody></table>`;
+}
+function editarCelda(el) {
+  if (soloLectura) return;
+  const tr = el.closest('tr'); const e = tr && ENT.get(tr.dataset.id); if (!e) return;
+  const f = el.dataset.f; let v = el.value.trim(); if (f === 'seriales') v = v.toUpperCase();
+  if ((e[f] ?? '') === v) return;
+  escribir({ tipo: 'update', col: COL, id: tr.dataset.id, data: Object.assign({ [f]: v }, sello()) }); toast('Guardado');
+}
+async function descargarExcel() {
+  if (!DL) return;
+  const filas = [['NOMBRE', 'CÉDULA', 'FECHA', 'TIPO', 'SERIALES', 'NOTA', 'PÁGINAS', 'ARCHIVO DE ORIGEN', 'SUBIDA POR', 'FECHA DE SUBIDA']]
+    .concat(lista().sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || ''))).map(e => [e.nombre || '', e.cedula || '', fechaBonita(e.fecha), tipoNombre(e.tipo), e.seriales || '', e.nota || '', (e.paginas || []).length, e.origen || '', e.por || '', e.subido ? e.subido.slice(0, 10) : '']));
+  try {
+    if (!window.XLSX) { try { await cargarScript(XLSX_URL); } catch (e) {} }
+    let data, filename = `Entregas Consulta Previa ${hoyIso()}`;
+    if (window.XLSX) {
+      const X = window.XLSX, wb = X.utils.book_new(), ws = X.utils.aoa_to_sheet(filas);
+      ws['!cols'] = [32, 14, 12, 12, 30, 30, 9, 34, 18, 14].map(w => ({ wch: w }));
+      X.utils.book_append_sheet(wb, ws, 'Entregas');
+      data = new Blob([X.write(wb, { bookType: 'xlsx', type: 'array', compression: true })]); filename += '.xlsx';
+    } else { data = '﻿' + filas.map(f => f.map(v => { const s = String(v ?? ''); return /[";\n,]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';')).join('\r\n'); filename += '.csv'; }
+    await DL.save({ filename, data }); toast('Archivo listo');
+  } catch (e) { toast('No se pudo preparar el archivo.'); }
+}
+
+/* ================= EVENTOS ================= */
+$('tabEnt').onclick = () => ir('ent'); $('tabSub').onclick = () => { ir('sub'); renderSub(); }; $('tabDb').onclick = () => ir('db');
+$('qEnt').oninput = renderEnt;
+$('chipsEnt').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { filtro = b.dataset.f; renderEnt(); } };
+$('entList').onclick = e => { const b = e.target.closest('[data-en]'); if (b) abrirEn(b.dataset.en); };
+$('archivo').onchange = async e => {
+  const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
+  try { const nuevas = await leerArchivos(files); lote = lote.concat(nuevas); $('subEstado').textContent = lote.length ? `${lote.length} ${lote.length === 1 ? 'página lista' : 'páginas listas'}. Escribe los datos de cada una y toca Guardar.` : ''; }
+  catch (err) { $('subEstado').textContent = ''; toast('No se pudo abrir el archivo: ' + (err.message || err)); }
+  renderSub();
+};
+$('subList').addEventListener('input', e => {
+  const k = e.target.dataset.k, card = e.target.closest('[data-i]'); if (!k || !card) return;
+  const p = lote[Number(card.dataset.i)]; if (e.target.type !== 'checkbox') p[k] = e.target.value;
+});
+$('subList').addEventListener('change', e => {
+  const k = e.target.dataset.k, card = e.target.closest('[data-i]'); if (!k || !card) return;
+  const p = lote[Number(card.dataset.i)];
+  if (e.target.type === 'checkbox') { p[k] = e.target.checked; renderSub(); } else p[k] = e.target.value;
+});
+$('subList').onclick = e => { const v = e.target.closest('[data-ver]'); if (v) { const i = Number(v.dataset.ver); verGrande(lote[i].vista, `Página ${i + 1}`); } };
+$('subGuardar').onclick = guardarLote;
+$('subCancelar').onclick = () => confirmar('Descartar', 'Se quitan las páginas que no has guardado. Lo ya guardado no se toca.', 'Descartar', () => { lote = []; $('subEstado').textContent = ''; renderSub(); });
+$('enForm').onsubmit = guardarEn; $('enCancel').onclick = cerrarEn; $('enDel').onclick = () => borrarEn(enActual);
+$('enPdf').onclick = () => descargarPdf(enActual);
+$('enPaginas').onclick = e => { const b = e.target.closest('[data-pv]'); const img = b && b.querySelector('img:not(.borrosa)'); if (img) verGrande(img.src, `${$('enTitle').textContent} · página ${Number(b.dataset.pv) + 1}`); };
+$('enSheet').onclick = e => { if (e.target === $('enSheet')) cerrarEn(); };
+$('visorCerrar').onclick = () => { $('visor').hidden = true; $('visorImg').src = ''; };
+$('cfNo').onclick = () => { $('cfSheet').hidden = true; cfAccion = null; };
+$('cfYes').onclick = () => { $('cfSheet').hidden = true; const a = cfAccion; cfAccion = null; if (a) a(); };
+$('qDb').oninput = renderDb;
+$('dbTable').addEventListener('change', e => { if (e.target.dataset.f) editarCelda(e.target); });
+$('dbTable').onclick = e => { const b = e.target.closest('[data-del]'); if (b) borrarEn(b.dataset.del); };
+$('btnExcel').onclick = descargarExcel;
+$('btnReintentar').onclick = () => { if (!DB) { toast('Todavía no hay conexión.'); return; } reintentarPendientes(); };
+window.addEventListener('online', reintentarPendientes);
+setInterval(() => { if (pendientes.length) reintentarPendientes(); }, 30000);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { if (!$('visor').hidden) { $('visor').hidden = true; return; } cerrarEn(); $('cfSheet').hidden = true; } });
+window.addEventListener('beforeunload', e => { if (lote.length) { e.preventDefault(); e.returnValue = ''; } });
+
+/* ================= ARRANQUE ================= */
+async function iniciar() {
+  const cache = lsGet(CACHE_KEY);
+  if (cache && Array.isArray(cache.e)) { ENT = new Map(cache.e); fechaCache = cache.t || null; pendientes.forEach(aplicarLocal); }
+  pintarConexion(); pintarAvisos(); ir('ent');
+  if (!window.claude || typeof window.claude.use !== 'function') { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
+  const usar = n => window.claude.use(n).catch(() => null);
+  const [db, user, dl] = await Promise.all([usar('db'), usar('user'), usar('downloads')]);
+  DB = db; USER = user; DL = dl;
+  $('btnExcel').hidden = !DL;
+  if (USER) { try { miId = await USER.id(); } catch (e) {} }
+  if (!DB) { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
+  pintarAvisos(); suscribir(); reintentarPendientes();
+}
+iniciar();
+</script>
+</body>
+</html>

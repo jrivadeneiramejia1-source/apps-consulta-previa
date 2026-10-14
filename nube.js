@@ -79,7 +79,8 @@
             return {
               set: data => esperar(F.setDoc(d, data)),
               update: data => esperar(F.updateDoc(d, data)),
-              delete: () => esperar(F.deleteDoc(d))
+              delete: () => esperar(F.deleteDoc(d)),
+              get: async () => { try { const x = await F.getDoc(d); return x.exists() ? x.data() : null; } catch (e) { throw mapError(e); } }
             };
           }
         };

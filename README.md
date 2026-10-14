@@ -1,9 +1,10 @@
 # Apps Consulta Previa
 
-Dos apps web instalables (PWA) que funcionan en el teléfono y en el computador, sin cuenta de Claude:
+Tres apps web instalables (PWA) que funcionan en el teléfono y en el computador, sin cuenta de Claude:
 
 - **Evidencias** (`evidencias/`): fotos y videos por comunidad y etapa.
 - **Equipos** (`equipos/`): equipos recibidos, mantenimiento y backup.
+- **Entregas** (`entregas/`): hojas de entrega y devolución escaneadas (PDF o fotos).
 
 Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** la primera vez; todos los que usen la misma clave ven los mismos datos.
 
@@ -19,7 +20,7 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /espacios/{espacio}/{coleccion}/{id} {
       allow read, write: if espacio.size() == 40
-        && coleccion in ['comunidades', 'evidencias', 'equipos', 'recibidos'];
+        && coleccion in ['comunidades', 'evidencias', 'equipos', 'recibidos', 'entregas', 'archivos'];
     }
   }
 }
