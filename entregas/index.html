@@ -339,8 +339,12 @@ label.subir { text-align: center; cursor: pointer; }
 .eq-info { grid-column: 1 / -1; font-size: .78rem; color: var(--muted); margin-top: -2px; }
 .eq-info.nuevo { color: var(--warn); }
 .eq-info b { color: var(--fg); }
-.eq-nuevo { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.eq-nuevo input { text-transform: none; font-family: var(--f-body); }
+.eq-det { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
+.eq-det input { text-transform: none; font-family: var(--f-body); }
+.eq-det label { display: flex; flex-direction: column; gap: 3px; font-size: .72rem; font-weight: 700; color: var(--muted); min-width: 0; }
+.eq-det label.ancho { grid-column: 1 / -1; }
+.eq-det input { width: 100%; padding: 10px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; min-width: 0; color: var(--fg); font-weight: 400; }
+.eqs .eq-fila:last-child .eq-det { border-bottom: 0; padding-bottom: 0; }
 .enlace { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
 .sync { font-size: .82rem; border-radius: 10px; padding: 8px 10px; background: var(--disco-bg); color: var(--disco); }
 .sync.no { background: var(--surface-2); color: var(--muted); }
@@ -456,7 +460,8 @@ label.subir { text-align: center; cursor: pointer; }
       <div class="field"><label for="enFecha">Fecha de la hoja</label><input id="enFecha" type="date"></div>
       <div class="field"><label for="enTipo">Tipo</label><select id="enTipo"></select></div>
     </div>
-    <div class="field"><span class="lbl">Equipos (tipo y serial)</span><div class="eqs" id="enEqs"></div><button type="button" class="btn-mas solo-editar" id="enAddEq">+ Agregar otro equipo</button></div>
+    <div class="field"><label for="enProyecto">Proyecto</label><input id="enProyecto" type="text" list="dlProyectos" autocomplete="off" placeholder="Ej: Consulta Previa"></div>
+    <div class="field"><span class="lbl">Equipos</span><div class="eqs" id="enEqs"></div><button type="button" class="btn-mas solo-editar" id="enAddEq">+ Agregar otro equipo</button></div>
     <div class="field"><label for="enNota">Nota</label><textarea id="enNota" placeholder="Ej: entregó con cargador y mouse"></textarea></div>
     <div class="meta" id="enEditado"></div>
     <div class="err" id="enErr" hidden></div>
@@ -489,7 +494,7 @@ label.subir { text-align: center; cursor: pointer; }
 </div>
 
 <div class="toast" id="toast" hidden></div>
-<datalist id="dlNombres"></datalist><datalist id="dlSerEq"></datalist>
+<datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
 <script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}]};</script>
 <script src="../config.js?v=6"></script>
@@ -511,15 +516,15 @@ function equiposDe(e) {
   return String(e.seriales || '').split(/[,;\n]+/).map(x => x.trim()).filter(Boolean).map(serial => ({ tipo: '', serial }));
 }
 function limpiarEquipos(eqs) {
+  const vistos = new Set();
   return eqs.map(q => {
     const o = { tipo: q.tipo || '', serial: String(q.serial || '').trim().toUpperCase().replace(/\s+/g, '') };
-    if (String(q.marca || '').trim()) o.marca = String(q.marca).trim();
-    if (String(q.modelo || '').trim()) o.modelo = String(q.modelo).trim();
+    ['marca', 'modelo', 'obs'].forEach(k => { const v = String(q[k] || '').trim().replace(/\s+/g, ' '); if (v) o[k] = v; });
     return o;
-  }).filter(q => q.serial);
+  }).filter(q => { const k = idSerial(q.serial); if (!k || vistos.has(k)) return false; vistos.add(k); return true; });   // sin seriales vacíos ni repetidos
 }
 const textoSeriales = eqs => eqs.map(q => q.serial).join(', ');
-const textoEquipos = eqs => eqs.map(q => (q.tipo ? q.tipo + ': ' : '') + q.serial).join('; ');
+const textoEquipos = eqs => eqs.map(q => (q.tipo ? q.tipo + ': ' : '') + q.serial + ([q.marca, q.modelo].filter(Boolean).length ? ` (${[q.marca, q.modelo].filter(Boolean).join(' ')})` : '') + (q.obs ? ` — ${q.obs}` : '')).join('; ');
 function filasEquipos(eqs, ro) {
   const lst = eqs.length ? eqs : [eqVacio()];
   return lst.map((q, i) => `<div class="eq-fila" data-eq-i="${i}">
@@ -529,31 +534,40 @@ function filasEquipos(eqs, ro) {
       ${infoFila(q, ro)}
     </div>`).join('');
 }
-// Debajo de cada serial: qué dice la app de Equipos de ese equipo. Si no existe, pide marca y modelo.
-function infoFila(q, ro) {
+// Debajo de cada serial: qué dice la app de Equipos de ese equipo, y los mismos campos que pide Equipos.
+function textoInfo(q) {
   const id = idSerial(q.serial), eq = EQ.get(id);
-  const nuevo = !!(EQDB && id && !eq);
-  let txt = '';
-  if (EQDB && id) txt = eq ? `<b>${esc([eq.marca, eq.modelo].filter(Boolean).join(' ') || eq.tipo)}</b> · ahora: ${esc(eq.asignado || 'sin asignar')}${pendienteEq(id) ? ' · ya está pendiente en Recibidos' : ''}` : 'No está en Equipos: escribe marca y modelo para agregarlo.';
+  if (!EQDB || !id) return { txt: '', nuevo: false };
+  if (!eq) return { txt: 'No está en Equipos: se agrega con la marca y el modelo que escribas.', nuevo: true };
+  return { txt: `En Equipos · asignado ahora a: <b>${esc(eq.asignado || 'nadie')}</b>${pendienteEq(id) ? ' · ya está pendiente en Recibidos' : ''}`, nuevo: false };
+}
+function infoFila(q, ro) {
+  const { txt, nuevo } = textoInfo(q), dis = ro ? 'disabled' : '';
   return `<div class="eq-info ${nuevo ? 'nuevo' : ''}" data-eq-info ${txt ? '' : 'hidden'}>${txt}</div>
-      <div class="eq-nuevo" data-eq-nuevo ${nuevo ? '' : 'hidden'}><input type="text" data-eq-k="marca" value="${esc(q.marca || '')}" placeholder="Marca" autocomplete="off" ${ro ? 'disabled' : ''}><input type="text" data-eq-k="modelo" value="${esc(q.modelo || '')}" placeholder="Modelo" autocomplete="off" ${ro ? 'disabled' : ''}></div>`;
+      <div class="eq-det">
+        <label>Marca<input type="text" data-eq-k="marca" value="${esc(q.marca || '')}" placeholder="Ej: Dell" list="dlMarcas" autocomplete="off" ${dis}></label>
+        <label>Modelo<input type="text" data-eq-k="modelo" value="${esc(q.modelo || '')}" placeholder="Ej: Latitude 3420" autocomplete="off" ${dis}></label>
+        <label class="ancho">Observaciones del equipo<input type="text" data-eq-k="obs" value="${esc(q.obs || '')}" placeholder="Opcional. Ej: con cargador, pantalla rayada" autocomplete="off" ${dis}></label>
+      </div>`;
 }
 // Al escribir un serial: actualiza el aviso de la fila y pone el tipo que tiene en Equipos.
 function refrescarFila(fila, guardarEn, soloInfo) {
-  const q = { tipo: fila.querySelector('[data-eq-k=tipo]').value, serial: fila.querySelector('[data-eq-k=serial]').value,
-    marca: fila.querySelector('[data-eq-k=marca]').value, modelo: fila.querySelector('[data-eq-k=modelo]').value };
+  const val = k => fila.querySelector(`[data-eq-k=${k}]`);
+  const q = { tipo: val('tipo').value, serial: val('serial').value };
   const eq = EQ.get(idSerial(q.serial));
-  if (eq && eq.tipo && !soloInfo) {
-    const t = EQ_A_TIPO[eq.tipo] || eq.tipo, sel = fila.querySelector('[data-eq-k=tipo]');
-    if (![...sel.options].some(o => o.value === t)) sel.add(new Option(t, t));
-    if (sel.value !== t) { sel.value = t; q.tipo = t; if (guardarEn) guardarEn.tipo = t; }
+  if (eq && !soloInfo) {
+    if (eq.tipo) {
+      const t = EQ_A_TIPO[eq.tipo] || eq.tipo, sel = val('tipo');
+      if (![...sel.options].some(o => o.value === t)) sel.add(new Option(t, t));
+      if (sel.value !== t) { sel.value = t; if (guardarEn) guardarEn.tipo = t; }
+    }
+    // Trae marca y modelo de Equipos si aún no los escribiste.
+    ['marca', 'modelo'].forEach(k => { if (!val(k).value.trim() && eq[k]) { val(k).value = eq[k]; if (guardarEn) guardarEn[k] = eq[k]; } });
   }
-  const tmp = document.createElement('div'); tmp.innerHTML = infoFila(q, false);
-  const [info, nuevo] = tmp.children;
-  const i0 = fila.querySelector('[data-eq-info]'), n0 = fila.querySelector('[data-eq-nuevo]');
-  i0.className = info.className; i0.innerHTML = info.innerHTML; i0.hidden = info.hidden; n0.hidden = nuevo.hidden;
+  const { txt, nuevo } = textoInfo(q), i0 = fila.querySelector('[data-eq-info]');
+  i0.className = 'eq-info' + (nuevo ? ' nuevo' : ''); i0.innerHTML = txt; i0.hidden = !txt;
 }
-function leerFilas(caja) { return [...caja.querySelectorAll('.eq-fila')].map(f => ({ tipo: f.querySelector('[data-eq-k=tipo]').value, serial: f.querySelector('[data-eq-k=serial]').value, marca: f.querySelector('[data-eq-k=marca]').value, modelo: f.querySelector('[data-eq-k=modelo]').value })); }
+function leerFilas(caja) { return [...caja.querySelectorAll('.eq-fila')].map(f => { const v = k => f.querySelector(`[data-eq-k=${k}]`).value; return { tipo: v('tipo'), serial: v('serial'), marca: v('marca'), modelo: v('modelo'), obs: v('obs') }; }); }
 const ANCHO = 1700, CALIDAD = 0.8, TROZO = 700000, MAX_PAGINAS = 40;
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -698,7 +712,7 @@ function actualizarNombres() {
 
 /* ================= HOJAS GUARDADAS ================= */
 const FILTROS = [{ k: 'todos', n: 'Todas' }, { k: 'entrega', n: 'Entregas' }, { k: 'devolucion', n: 'Devoluciones' }, { k: 'otro', n: 'Otras' }, { k: 'sindatos', n: 'Sin nombre o fecha' }];
-const textoDe = e => sinTildes([e.nombre, e.cedula, e.seriales, e.nota, e.origen].join(' '));
+const textoDe = e => sinTildes([e.nombre, e.cedula, e.seriales, e.proyecto, textoEquipos(equiposDe(e)), e.nota, e.origen].join(' '));
 function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'sindatos') return !e.nombre || !e.fecha; return (e.tipo || 'entrega') === f; }
 function renderEnt() {
   pintarAvisoEnlace();
@@ -750,7 +764,7 @@ async function prepararPagina(canvas, origen) {
   const blob = await canvasA(canvas, 'image/jpeg', CALIDAD);
   const mini = escalar(canvas, canvas.width, canvas.height, 220).toDataURL('image/jpeg', 0.6);
   const vista = escalar(canvas, canvas.width, canvas.height, 700).toDataURL('image/jpeg', 0.75);
-  return { blob, mini, vista, ancho: canvas.width, alto: canvas.height, origen, incluir: true, unir: false, nombre: '', cedula: '', fecha: '', tipo: 'entrega', equipos: [eqVacio()], nota: '' };
+  return { blob, mini, vista, ancho: canvas.width, alto: canvas.height, origen, incluir: true, unir: false, nombre: '', cedula: '', fecha: '', tipo: 'entrega', proyecto: '', equipos: [eqVacio()], nota: '' };
 }
 async function leerArchivos(files) {
   const nuevas = [];
@@ -800,7 +814,8 @@ function renderSub() {
         <div class="field"><label>Fecha de la hoja</label><input type="date" data-k="fecha" value="${esc(p.fecha)}"></div>
         <div class="field"><label>Tipo</label><select data-k="tipo">${TIPOS.map(t => `<option value="${t.k}" ${p.tipo === t.k ? 'selected' : ''}>${t.n}</option>`).join('')}</select></div>
       </div>
-      <div class="field"><span class="lbl">Equipos (tipo y serial)</span><div class="eqs">${filasEquipos(p.equipos, false)}</div><button type="button" class="btn-mas" data-add-eq>+ Agregar otro equipo</button></div>
+      <div class="field"><label>Proyecto</label><input type="text" data-k="proyecto" list="dlProyectos" value="${esc(p.proyecto)}" autocomplete="off" placeholder="Ej: Consulta Previa"></div>
+      <div class="field"><span class="lbl">Equipos</span><div class="eqs">${filasEquipos(p.equipos, false)}</div><button type="button" class="btn-mas" data-add-eq>+ Agregar otro equipo</button></div>
       <div class="field"><label>Nota</label><input type="text" data-k="nota" value="${esc(p.nota)}" autocomplete="off" placeholder="Opcional"></div>`}
     </div>`).join('');
 }
@@ -830,7 +845,7 @@ async function guardarLote() {
         const d = g.datos;
         const datosHoja = {
           nombre: d.nombre.trim().replace(/\s+/g, ' '), cedula: d.cedula.trim(), fecha: d.fecha, tipo: d.tipo,
-          equipos: limpiarEquipos(d.equipos), seriales: textoSeriales(limpiarEquipos(d.equipos)), nota: d.nota.trim(), paginas, miniatura: g.paginas[0].mini,
+          proyecto: (d.proyecto || '').trim(), equipos: limpiarEquipos(d.equipos), seriales: textoSeriales(limpiarEquipos(d.equipos)), nota: d.nota.trim(), paginas, miniatura: g.paginas[0].mini,
           origen: g.paginas.map(p => p.origen).join(' + '), subido: new Date().toISOString()
         };
         await escribir({ tipo: 'set', col: COL, id, data: Object.assign(datosHoja, sello()) });
@@ -858,6 +873,9 @@ function suscribirEquipos() {
   let primeroE = true;
   EQDB.collection('equipos').limit(1000).onSnapshot(s => {
     EQ = new Map(s.docs.map(d => [d.id, d.data()])); if (primeroE) { primeroE = false; if (++eqListos === 2) eqListo(); }
+    const uniq = a => [...new Set(a.filter(Boolean).map(x => String(x).trim()))].sort((x, y) => cmpTxt(x, y));
+    $('dlMarcas').innerHTML = uniq([...EQ.values()].map(e => e.marca)).map(v => `<option value="${esc(v)}"></option>`).join('');
+    $('dlProyectos').innerHTML = uniq([...EQ.values()].map(e => e.proyecto).concat(lista().map(e => e.proyecto))).map(v => `<option value="${esc(v)}"></option>`).join('');
     $('dlSerEq').innerHTML = [...EQ.values()].sort((a, b) => cmpTxt(a.serial, b.serial)).map(e => `<option value="${esc(e.serial)}">${esc([e.tipo, e.marca, e.modelo, e.asignado].filter(Boolean).join(' · '))}</option>`).join('');
     document.querySelectorAll('.eq-fila').forEach(f => refrescarFila(f, null, true));
   }, () => {});
@@ -878,23 +896,29 @@ async function enviarAEquipos(h) {
   if (!EQDB || (h.tipo !== 'entrega' && h.tipo !== 'devolucion')) return '';
   const eqs = limpiarEquipos(equiposDe(h)); if (!eqs.length) return '';
   await Promise.race([eqListoP, esperar(8000)]);   // espera a tener la lista de Equipos antes de decidir
-  const r = { asig: 0, nuevos: 0, pend: 0, yaPend: 0, igual: 0, sinNombre: 0 };
+  const r = { asig: 0, nuevos: 0, pend: 0, yaPend: 0, igual: 0, sinNombre: 0, datos: 0 };
   const s = { actualizado: new Date().toISOString(), por: miId || '' };
   for (const q of eqs) {
     const id = idSerial(q.serial); if (!id) continue;
     const eq = EQ.get(id);
     if (h.tipo === 'entrega') {
       const persona = (h.nombre || '').trim(); if (!persona) { r.sinNombre++; continue; }
-      if (eq) {
-        if (eq.asignado === persona) { r.igual++; continue; }
-        await EQDB.collection('equipos').doc(id).update(Object.assign({ asignado: persona }, s));
-        EQ.set(id, Object.assign({}, eq, { asignado: persona })); r.asig++;
-      } else if (await EQDB.collection('equipos').doc(id).get().catch(() => null)) {
-        // Existe en Equipos aunque la lista no había cargado: solo se cambia el asignado, nunca se reemplaza.
-        await EQDB.collection('equipos').doc(id).update(Object.assign({ asignado: persona }, s)); r.asig++;
+      const actual = eq || await EQDB.collection('equipos').doc(id).get().catch(() => null);
+      if (actual) {
+        // Solo se cambia lo que trae la hoja; nunca se reemplaza el equipo completo.
+        const cambios = {};
+        if (actual.asignado !== persona) cambios.asignado = persona;
+        if (h.proyecto && actual.proyecto !== h.proyecto) cambios.proyecto = h.proyecto;
+        if (q.marca && actual.marca !== q.marca) cambios.marca = q.marca;
+        if (q.modelo && actual.modelo !== q.modelo) cambios.modelo = q.modelo;
+        if (q.obs && !String(actual.obs || '').includes(q.obs)) cambios.obs = [actual.obs, `${fechaBonita(h.fecha || hoyIso())} entrega: ${q.obs}`].filter(Boolean).join(' · ');
+        if (!Object.keys(cambios).length) { r.igual++; continue; }
+        await EQDB.collection('equipos').doc(id).update(Object.assign(cambios, s));
+        EQ.set(id, Object.assign({}, actual, cambios));
+        if (cambios.asignado) r.asig++; else r.datos++;
       } else {
         const n = Math.max(0, ...[...EQ.values()].map(x => Number(x.n) || 0)) + 1;
-        const nuevo = Object.assign({ serial: q.serial, tipo: TIPO_A_EQ[q.tipo] || q.tipo || '', marca: q.marca || '', modelo: q.modelo || '', asignado: persona, mail: '', cliente: 'Petrobras', proyecto: 'Consulta Previa', departamento: 'Guajira', municipio: 'Riohacha', fechaMtto: '', obs: 'Agregado desde Entregas', n }, s);
+        const nuevo = Object.assign({ serial: q.serial, tipo: TIPO_A_EQ[q.tipo] || q.tipo || '', marca: q.marca || '', modelo: q.modelo || '', asignado: persona, mail: '', cliente: 'Petrobras', proyecto: h.proyecto || 'Consulta Previa', departamento: 'Guajira', municipio: 'Riohacha', fechaMtto: '', obs: ['Agregado desde Entregas', q.obs].filter(Boolean).join(' · '), n }, s);
         await EQDB.collection('equipos').doc(id).set(nuevo); EQ.set(id, nuevo); r.nuevos++;
       }
     } else {
@@ -902,10 +926,10 @@ async function enviarAEquipos(h) {
       const rid = 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const rec = Object.assign({
         serial: eq ? eq.serial : q.serial, fechaIngreso: h.fecha || hoyIso(),
-        tipo: eq ? (eq.tipo || '') : (TIPO_A_EQ[q.tipo] || q.tipo || ''), marca: eq ? (eq.marca || '') : (q.marca || ''), modelo: eq ? (eq.modelo || '') : (q.modelo || ''),
-        persona: 'Bodega Riohacha', proyecto: eq ? (eq.proyecto || '') : '',
+        tipo: eq ? (eq.tipo || '') : (TIPO_A_EQ[q.tipo] || q.tipo || ''), marca: q.marca || (eq && eq.marca) || '', modelo: q.modelo || (eq && eq.modelo) || '',
+        persona: 'Bodega Riohacha', proyecto: h.proyecto || (eq && eq.proyecto) || '',
         mtto: 'pend', mttoFecha: '', backup: 'pend', backupFecha: '',
-        obs: `Devuelto por ${h.nombre || 'sin nombre'} el ${fechaBonita(h.fecha)} (hoja de Entregas)`, acc: [], cerrado: false, cerradoEn: '', origen: 'entregas'
+        obs: [`Devuelto por ${h.nombre || 'sin nombre'} el ${fechaBonita(h.fecha)} (hoja de Entregas)`, q.obs].filter(Boolean).join(' · '), acc: [], cerrado: false, cerradoEn: '', origen: 'entregas'
       }, s);
       await EQDB.collection('recibidos').doc(rid).set(rec); EQR.set(rid, rec); r.pend++;
     }
@@ -913,10 +937,11 @@ async function enviarAEquipos(h) {
   const t = [];
   if (r.asig) t.push(`${r.asig} ${r.asig === 1 ? 'equipo asignado' : 'equipos asignados'} a ${h.nombre}`);
   if (r.nuevos) t.push(`${r.nuevos} ${r.nuevos === 1 ? 'equipo nuevo agregado' : 'equipos nuevos agregados'}`);
+  if (r.datos) t.push(`${r.datos} ${r.datos === 1 ? 'equipo actualizado' : 'equipos actualizados'} (modelo, marca, proyecto u observaciones)`);
   if (r.igual) t.push(`${r.igual} ya ${r.igual === 1 ? 'estaba asignado' : 'estaban asignados'} a esa persona`);
   if (r.pend) t.push(`${r.pend} ${r.pend === 1 ? 'quedó pendiente' : 'quedaron pendientes'} en Recibidos`);
   if (r.yaPend) t.push(`${r.yaPend} ya ${r.yaPend === 1 ? 'estaba pendiente' : 'estaban pendientes'} en Recibidos`);
-  if (r.sinNombre) t.push('falta el nombre para asignar');
+  if (r.sinNombre) t.push(`falta el nombre para asignar ${r.sinNombre === 1 ? 'el equipo' : r.sinNombre + ' equipos'}: no se cambió nada en Equipos`);
   return t.join(' · ');
 }
 async function enviarYMarcar(id) {
@@ -937,8 +962,9 @@ function pintarAvisoEnlace() {
     box.hidden = false;
     box.innerHTML = `<span><b>No está conectada con Equipos.</b> ${n ? `${n} ${n === 1 ? 'hoja de entrega o devolución no se ha enviado' : 'hojas de entrega o devolución no se han enviado'} a Equipos.` : 'Las hojas no actualizan la lista de equipos.'}</span><button class="btn small" type="button" onclick="nube.enlazar('equipos')">Conectar</button>`;
   } else if (n) {
+    const sinN = lista().filter(e => faltaEnviar(e) && e.tipo === 'entrega' && !(e.nombre || '').trim()).length;
     box.hidden = false;
-    box.innerHTML = `<span><b>${n} ${n === 1 ? 'hoja no se ha enviado' : 'hojas no se han enviado'} a Equipos.</b></span><button class="btn small primary solo-editar" type="button" id="btnEnviarTodas">Enviar ahora</button>`;
+    box.innerHTML = `<span><b>${n} ${n === 1 ? 'hoja no se ha enviado' : 'hojas no se han enviado'} a Equipos.</b>${sinN ? ` ${sinN} ${sinN === 1 ? 'es una entrega sin nombre' : 'son entregas sin nombre'}: escríbele el nombre y se envía sola.` : ''}</span><button class="btn small primary solo-editar" type="button" id="btnEnviarTodas">Enviar ahora</button>`;
   } else box.hidden = true;
 }
 async function enviarTodas() {
@@ -977,7 +1003,7 @@ function abrirEn(id) {
   $('enSub').textContent = `${tipoNombre(e.tipo)} · ${fechaBonita(e.fecha)} · ${(e.paginas || []).length} ${(e.paginas || []).length === 1 ? 'página' : 'páginas'}`;
   $('enTipo').innerHTML = TIPOS.map(t => `<option value="${t.k}">${t.n}</option>`).join('');
   $('enNombre').value = e.nombre || ''; $('enCedula').value = e.cedula || ''; $('enFecha').value = e.fecha || '';
-  $('enTipo').value = e.tipo || 'entrega'; $('enEqs').innerHTML = filasEquipos(equiposDe(e), soloLectura); $('enNota').value = e.nota || '';
+  $('enTipo').value = e.tipo || 'entrega'; $('enProyecto').value = e.proyecto || ''; $('enEqs').innerHTML = filasEquipos(equiposDe(e), soloLectura); $('enNota').value = e.nota || '';
   $('enErr').hidden = true;
   pintarSync(e);
   $('enEditado').textContent = e.actualizado ? `Subida ${hace(e.subido)}${e.por ? ' por ' + e.por : ''}. Origen: ${e.origen || '—'}.` : '';
@@ -996,7 +1022,7 @@ function cerrarEn() { $('enSheet').hidden = true; enActual = null; }
 function guardarEn(ev) {
   ev.preventDefault(); if (soloLectura || !enActual) return cerrarEn();
   const e0 = ENT.get(enActual); if (!e0) return cerrarEn();
-  const datos = { nombre: $('enNombre').value.trim().replace(/\s+/g, ' '), cedula: $('enCedula').value.trim(), fecha: $('enFecha').value, tipo: $('enTipo').value, nota: $('enNota').value.trim() };
+  const datos = { nombre: $('enNombre').value.trim().replace(/\s+/g, ' '), cedula: $('enCedula').value.trim(), fecha: $('enFecha').value, tipo: $('enTipo').value, proyecto: $('enProyecto').value.trim(), nota: $('enNota').value.trim() };
   const eqs = limpiarEquipos(leerFilas($('enEqs')));
   const cambios = {}; Object.keys(datos).forEach(k => { if (datos[k] !== (e0[k] ?? '')) cambios[k] = datos[k]; });
   if (JSON.stringify(eqs) !== JSON.stringify(limpiarEquipos(equiposDe(e0))) || !Array.isArray(e0.equipos)) { cambios.equipos = eqs; cambios.seriales = textoSeriales(eqs); }
@@ -1005,7 +1031,8 @@ function guardarEn(ev) {
   cerrarEn();
   // Si la hoja no se había enviado completa a Equipos (por ejemplo, le faltaba el nombre), se envía ahora.
   const e1 = ENT.get(id);
-  if (EQDB && e1 && Object.keys(cambios).length && !(e1.equiposSync && e1.equiposSync.completo)) enviarYMarcar(id).then(t => { if (t) toast('Equipos: ' + t); });
+  const afecta = ['nombre', 'tipo', 'proyecto', 'fecha', 'equipos'].some(k => k in cambios);
+  if (EQDB && e1 && (afecta || !(e1.equiposSync && e1.equiposSync.completo))) enviarYMarcar(id).then(t => { if (t) toast('Equipos: ' + t); });
 }
 function borrarEn(id) {
   const e = ENT.get(id); if (!e) return;
@@ -1047,14 +1074,14 @@ function renderDb() {
   const ver = lista().filter(e => !q || textoDe(e).includes(q)).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
   $('dbCount').textContent = `${ver.length} de ${ENT.size} filas`;
   const inp = (e, f, cls, lbl, t) => `<td><input type="${t || 'text'}" class="${cls || ''}" data-f="${f}" value="${esc(e[f])}" ${ro} aria-label="${lbl}"></td>`;
-  $('dbTable').innerHTML = `<table class="teq"><thead><tr><th class="stk1">Nombre</th><th>Cédula</th><th>Fecha</th><th>Tipo</th><th>Equipos</th><th>Nota</th><th>Páginas</th><th>Origen</th><th class="solo-editar"></th></tr></thead><tbody>${ver.map(e => `<tr data-id="${esc(e.id)}">
+  $('dbTable').innerHTML = `<table class="teq"><thead><tr><th class="stk1">Nombre</th><th>Cédula</th><th>Fecha</th><th>Tipo</th><th>Proyecto</th><th>Equipos</th><th>Nota</th><th>Páginas</th><th>Origen</th><th class="solo-editar"></th></tr></thead><tbody>${ver.map(e => `<tr data-id="${esc(e.id)}">
     <td class="stk1"><input type="text" class="m" data-f="nombre" value="${esc(e.nombre)}" ${ro} aria-label="Nombre" list="dlNombres"></td>
     ${inp(e, 'cedula', 'm', 'Cédula')}${inp(e, 'fecha', '', 'Fecha', 'date')}
     <td><select data-f="tipo" ${ro} aria-label="Tipo">${TIPOS.map(t => `<option value="${t.k}" ${(e.tipo || 'entrega') === t.k ? 'selected' : ''}>${t.n}</option>`).join('')}</select></td>
-    <td><div class="cell mono">${esc(textoEquipos(equiposDe(e))) || '—'}</div></td>${inp(e, 'nota', 'w', 'Nota')}
+    ${inp(e, 'proyecto', 'm', 'Proyecto')}<td><div class="cell mono">${esc(textoEquipos(equiposDe(e))) || '—'}</div></td>${inp(e, 'nota', 'w', 'Nota')}
     <td class="num">${(e.paginas || []).length}</td><td><div class="cell">${esc(e.origen)}</div></td>
     <td class="solo-editar"><button type="button" class="icon-btn" data-del="${esc(e.id)}">Borrar</button></td>
-  </tr>`).join('') || '<tr><td colspan="9">Sin filas</td></tr>'}</tbody></table>`;
+  </tr>`).join('') || '<tr><td colspan="10">Sin filas</td></tr>'}</tbody></table>`;
 }
 function editarCelda(el) {
   if (soloLectura) return;
@@ -1065,14 +1092,14 @@ function editarCelda(el) {
 }
 async function descargarExcel() {
   if (!DL) return;
-  const filas = [['NOMBRE', 'CÉDULA', 'FECHA', 'TIPO', 'EQUIPOS', 'NOTA', 'PÁGINAS', 'ARCHIVO DE ORIGEN', 'SUBIDA POR', 'FECHA DE SUBIDA']]
-    .concat(lista().sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || ''))).map(e => [e.nombre || '', e.cedula || '', fechaBonita(e.fecha), tipoNombre(e.tipo), textoEquipos(equiposDe(e)), e.nota || '', (e.paginas || []).length, e.origen || '', e.por || '', e.subido ? e.subido.slice(0, 10) : '']));
+  const filas = [['NOMBRE', 'CÉDULA', 'FECHA', 'TIPO', 'PROYECTO', 'EQUIPOS', 'NOTA', 'PÁGINAS', 'ARCHIVO DE ORIGEN', 'SUBIDA POR', 'FECHA DE SUBIDA']]
+    .concat(lista().sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || ''))).map(e => [e.nombre || '', e.cedula || '', fechaBonita(e.fecha), tipoNombre(e.tipo), e.proyecto || '', textoEquipos(equiposDe(e)), e.nota || '', (e.paginas || []).length, e.origen || '', e.por || '', e.subido ? e.subido.slice(0, 10) : '']));
   try {
     if (!window.XLSX) { try { await cargarScript(XLSX_URL); } catch (e) {} }
     let data, filename = `Entregas Consulta Previa ${hoyIso()}`;
     if (window.XLSX) {
       const X = window.XLSX, wb = X.utils.book_new(), ws = X.utils.aoa_to_sheet(filas);
-      ws['!cols'] = [32, 14, 12, 12, 30, 30, 9, 34, 18, 14].map(w => ({ wch: w }));
+      ws['!cols'] = [32, 14, 12, 12, 18, 50, 30, 9, 34, 18, 14].map(w => ({ wch: w }));
       X.utils.book_append_sheet(wb, ws, 'Entregas');
       data = new Blob([X.write(wb, { bookType: 'xlsx', type: 'array', compression: true })]); filename += '.xlsx';
     } else { data = '﻿' + filas.map(f => f.map(v => { const s = String(v ?? ''); return /[";\n,]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';')).join('\r\n'); filename += '.csv'; }
