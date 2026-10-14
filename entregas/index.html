@@ -375,6 +375,7 @@ label.subir { text-align: center; cursor: pointer; }
 
   <!-- SECCIÓN 1: HOJAS GUARDADAS -->
   <section class="view" id="vEnt">
+    <div class="aviso warn" id="entEnlace" hidden></div>
     <div class="summary" id="sumEnt"></div>
     <input class="search" id="qEnt" type="search" placeholder="Buscar nombre, cédula o serial" autocomplete="off" aria-label="Buscar">
     <div class="chips" id="chipsEnt" role="group" aria-label="Filtrar"></div>
@@ -491,8 +492,8 @@ label.subir { text-align: center; cursor: pointer; }
 <datalist id="dlNombres"></datalist><datalist id="dlSerEq"></datalist>
 
 <script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}]};</script>
-<script src="../config.js"></script>
-<script src="../nube.js"></script>
+<script src="../config.js?v=6"></script>
+<script src="../nube.js?v=6"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -564,6 +565,7 @@ let pendientes = lsGet(PEND_KEY) || [];
 let vista = 'ent', filtro = 'todos', enActual = null, renderPendiente = false;
 let lote = [];          // páginas que se están subiendo
 let EQDB = null, EQ = new Map(), EQR = new Map();   // conexión con la app de Equipos
+let eqListos = 0, eqListo; const eqListoP = new Promise(res => { eqListo = res; });
 const TIPO_A_EQ = { 'Portátil': 'PC Portátil', 'Impresora': 'Impresora Portátil', 'Video beam': 'Video Beam' };
 const EQ_A_TIPO = { 'PC Portátil': 'Portátil', 'Impresora Portátil': 'Impresora', 'Video Beam': 'Video beam', 'Escaner': 'Otro', 'Antena Starlink': 'Otro' };
 const idSerial = x => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
@@ -699,6 +701,7 @@ const FILTROS = [{ k: 'todos', n: 'Todas' }, { k: 'entrega', n: 'Entregas' }, { 
 const textoDe = e => sinTildes([e.nombre, e.cedula, e.seriales, e.nota, e.origen].join(' '));
 function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'sindatos') return !e.nombre || !e.fecha; return (e.tipo || 'entrega') === f; }
 function renderEnt() {
+  pintarAvisoEnlace();
   const todos = lista(), mes = hoyIso().slice(0, 7);
   const personas = new Set(todos.map(e => sinTildes(e.nombre)).filter(Boolean)).size;
   $('sumEnt').innerHTML = `
@@ -838,6 +841,8 @@ async function guardarLote() {
       }
       toast((hechos === 1 ? '1 hoja guardada' : `${hechos} hojas guardadas`) + (resumenEq.length ? ' y Equipos actualizado' : ''));
       if (resumenEq.length) confirmar('Equipos actualizado', resumenEq.join('\n'), 'Listo', null, 'ok');
+      else if (!EQDB && grupos.some(g => (g.datos.tipo === 'entrega' || g.datos.tipo === 'devolucion') && limpiarEquipos(g.datos.equipos).length))
+        confirmar('No se envió a Equipos', 'Las hojas se guardaron, pero esta app no está conectada con Equipos, así que no se asignó nada ni quedó pendiente en Recibidos. Toca Conectar, escribe la clave de Equipos y luego "Enviar ahora".', 'Conectar', () => nube.enlazar('equipos'), 'ok');
       lote = []; $('subEstado').textContent = ''; renderSub(); ir('ent');
     } catch (e) {
       toast('Se cortó la subida: ' + (e && (e.message || e.code) || e) + '. Lo ya guardado quedó guardado.');
@@ -850,12 +855,14 @@ async function guardarLote() {
 
 /* ================= CONEXIÓN CON EQUIPOS ================= */
 function suscribirEquipos() {
+  let primeroE = true;
   EQDB.collection('equipos').limit(1000).onSnapshot(s => {
-    EQ = new Map(s.docs.map(d => [d.id, d.data()]));
+    EQ = new Map(s.docs.map(d => [d.id, d.data()])); if (primeroE) { primeroE = false; if (++eqListos === 2) eqListo(); }
     $('dlSerEq').innerHTML = [...EQ.values()].sort((a, b) => cmpTxt(a.serial, b.serial)).map(e => `<option value="${esc(e.serial)}">${esc([e.tipo, e.marca, e.modelo, e.asignado].filter(Boolean).join(' · '))}</option>`).join('');
     document.querySelectorAll('.eq-fila').forEach(f => refrescarFila(f, null, true));
   }, () => {});
-  EQDB.collection('recibidos').limit(1000).onSnapshot(s => { EQR = new Map(s.docs.map(d => [d.id, d.data()])); }, () => {});
+  let primeroR = true;
+  EQDB.collection('recibidos').limit(1000).onSnapshot(s => { EQR = new Map(s.docs.map(d => [d.id, d.data()])); if (primeroR) { primeroR = false; if (++eqListos === 2) eqListo(); } }, () => {});
 }
 const cmpTxt = (a, b) => String(a || '').localeCompare(String(b || ''), 'es', { numeric: true });
 function pintarEnlace() {
@@ -870,6 +877,7 @@ function pintarEnlace() {
 async function enviarAEquipos(h) {
   if (!EQDB || (h.tipo !== 'entrega' && h.tipo !== 'devolucion')) return '';
   const eqs = limpiarEquipos(equiposDe(h)); if (!eqs.length) return '';
+  await Promise.race([eqListoP, esperar(8000)]);   // espera a tener la lista de Equipos antes de decidir
   const r = { asig: 0, nuevos: 0, pend: 0, yaPend: 0, igual: 0, sinNombre: 0 };
   const s = { actualizado: new Date().toISOString(), por: miId || '' };
   for (const q of eqs) {
@@ -881,6 +889,9 @@ async function enviarAEquipos(h) {
         if (eq.asignado === persona) { r.igual++; continue; }
         await EQDB.collection('equipos').doc(id).update(Object.assign({ asignado: persona }, s));
         EQ.set(id, Object.assign({}, eq, { asignado: persona })); r.asig++;
+      } else if (await EQDB.collection('equipos').doc(id).get().catch(() => null)) {
+        // Existe en Equipos aunque la lista no había cargado: solo se cambia el asignado, nunca se reemplaza.
+        await EQDB.collection('equipos').doc(id).update(Object.assign({ asignado: persona }, s)); r.asig++;
       } else {
         const n = Math.max(0, ...[...EQ.values()].map(x => Number(x.n) || 0)) + 1;
         const nuevo = Object.assign({ serial: q.serial, tipo: TIPO_A_EQ[q.tipo] || q.tipo || '', marca: q.marca || '', modelo: q.modelo || '', asignado: persona, mail: '', cliente: 'Petrobras', proyecto: 'Consulta Previa', departamento: 'Guajira', municipio: 'Riohacha', fechaMtto: '', obs: 'Agregado desde Entregas', n }, s);
@@ -916,10 +927,33 @@ async function enviarYMarcar(id) {
     return txt;
   } catch (e) { toast('No se pudo actualizar Equipos: ' + (e.message || e.code || e)); return ''; }
 }
+// Hojas de entrega o devolución con seriales que todavía no llegaron completas a Equipos.
+const aplicaEquipos = e => (e.tipo === 'entrega' || e.tipo === 'devolucion') && limpiarEquipos(equiposDe(e)).length > 0;
+const faltaEnviar = e => aplicaEquipos(e) && !(e.equiposSync && e.equiposSync.completo);
+function pintarAvisoEnlace() {
+  const box = $('entEnlace'); if (!DB) { box.hidden = true; return; }
+  const n = lista().filter(faltaEnviar).length;
+  if (!EQDB) {
+    box.hidden = false;
+    box.innerHTML = `<span><b>No está conectada con Equipos.</b> ${n ? `${n} ${n === 1 ? 'hoja de entrega o devolución no se ha enviado' : 'hojas de entrega o devolución no se han enviado'} a Equipos.` : 'Las hojas no actualizan la lista de equipos.'}</span><button class="btn small" type="button" onclick="nube.enlazar('equipos')">Conectar</button>`;
+  } else if (n) {
+    box.hidden = false;
+    box.innerHTML = `<span><b>${n} ${n === 1 ? 'hoja no se ha enviado' : 'hojas no se han enviado'} a Equipos.</b></span><button class="btn small primary solo-editar" type="button" id="btnEnviarTodas">Enviar ahora</button>`;
+  } else box.hidden = true;
+}
+async function enviarTodas() {
+  const ids = lista().filter(faltaEnviar).map(e => e.id); if (!ids.length) return;
+  const btn = $('btnEnviarTodas'); if (btn) { btn.disabled = true; btn.textContent = 'Enviando…'; }
+  const res = [];
+  for (const id of ids) { const h = ENT.get(id); const t = await enviarYMarcar(id); if (t) res.push(`${h.nombre || 'Sin nombre'}: ${t}`); }
+  confirmar('Equipos actualizado', res.join('\n') || 'No había nada que cambiar en Equipos.', 'Listo', null, 'ok');
+  pintarAvisoEnlace();
+}
 function pintarSync(e) {
-  const box = $('enSync'), aplica = e.tipo === 'entrega' || e.tipo === 'devolucion';
-  if (!EQDB || !aplica || !limpiarEquipos(equiposDe(e)).length) { box.hidden = true; return; }
+  const box = $('enSync');
+  if (!aplicaEquipos(e)) { box.hidden = true; return; }
   box.hidden = false;
+  if (!EQDB) { box.className = 'sync no'; box.innerHTML = `<b>No se envió a Equipos:</b> esta app no está conectada. <button type="button" class="btn small primary" onclick="nube.enlazar('equipos')">Conectar</button>`; return; }
   if (e.equiposSync) { box.className = 'sync'; box.innerHTML = `Enviada a Equipos ${esc(hace(e.equiposSync.fecha))}: ${esc(e.equiposSync.texto)}. <button type="button" class="btn small solo-editar" id="enReenviar">Enviar otra vez</button>`; }
   else { box.className = 'sync no'; box.innerHTML = `Todavía no se ha enviado a Equipos. <button type="button" class="btn small primary solo-editar" id="enReenviar">Enviar a Equipos</button>`; }
 }
@@ -1089,6 +1123,7 @@ $('enAddEq').onclick = () => {
   const ins = $('enEqs').querySelectorAll('[data-eq-k=serial]'); ins[ins.length - 1].focus();
 };
 $('enEqs').addEventListener('input', e => { if (e.target.dataset.eqK === 'serial') refrescarFila(e.target.closest('.eq-fila')); });
+$('entEnlace').onclick = e => { if (e.target.closest('#btnEnviarTodas')) enviarTodas(); };
 $('enSync').onclick = async e => {
   if (!e.target.closest('#enReenviar') || !enActual) return;
   const id = enActual; e.target.disabled = true;
@@ -1128,9 +1163,9 @@ async function iniciar() {
   if (USER) { try { miId = await USER.id(); } catch (e) {} }
   if (!DB) { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
   pintarAvisos(); suscribir(); reintentarPendientes();
-  EQDB = window.nube ? window.nube.enlace('equipos') : null;
+  EQDB = window.nube && typeof window.nube.enlace === 'function' ? window.nube.enlace('equipos') : null;
   if (EQDB) suscribirEquipos();
-  pintarEnlace();
+  pintarEnlace(); pintarAvisoEnlace();
 }
 iniciar();
 </script>
