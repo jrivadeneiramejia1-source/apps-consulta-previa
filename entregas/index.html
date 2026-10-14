@@ -978,7 +978,11 @@ async function enviarTodas() {
 }
 function pintarSync(e) {
   const box = $('enSync');
-  if (!aplicaEquipos(e)) { box.hidden = true; return; }
+  if (!aplicaEquipos(e)) {
+    const sinSerial = (e.tipo === 'entrega' || e.tipo === 'devolucion') && !limpiarEquipos(equiposDe(e)).length;
+    box.hidden = !sinSerial; if (sinSerial) { box.className = 'sync no'; box.textContent = 'No se envía a Equipos porque esta hoja no tiene ningún serial escrito. Agrégalo abajo en Equipos y guarda.'; }
+    return;
+  }
   box.hidden = false;
   if (!EQDB) { box.className = 'sync no'; box.innerHTML = `<b>No se envió a Equipos:</b> esta app no está conectada. <button type="button" class="btn small primary" onclick="nube.enlazar('equipos')">Conectar</button>`; return; }
   if (e.equiposSync) { box.className = 'sync'; box.innerHTML = `Enviada a Equipos ${esc(hace(e.equiposSync.fecha))}: ${esc(e.equiposSync.texto)}. <button type="button" class="btn small solo-editar" id="enReenviar">Enviar otra vez</button>`; }

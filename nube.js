@@ -347,7 +347,7 @@
     claveTmp = null;
     if (!DB && errorFirebase) console.warn('Firebase:', errorFirebase);
     const info = document.getElementById('nubeInfo');
-    if (info) info.textContent = DB ? `Estás como ${nombre || 'sin nombre'}. Los datos se guardan en Firebase y se ven en todos los teléfonos que usen la misma clave.` : 'No se pudo conectar con la base de datos.';
+    if (info) info.textContent = (DB ? `Estás como ${nombre || 'sin nombre'}. Los datos se guardan en Firebase y se ven en todos los teléfonos que usen la misma clave.` : 'No se pudo conectar con la base de datos.') + ` Versión ${APP.v || '?'}.`;
     soltar();
   }
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
