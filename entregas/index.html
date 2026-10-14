@@ -331,6 +331,12 @@ label.subir { text-align: center; cursor: pointer; }
 .card.pag.unida { border-left: 5px solid var(--accent); }
 .pag-cab { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
 .pag-img { width: 100%; max-height: 360px; object-fit: contain; object-position: top; background: #fff; border-radius: 8px; border: 1px solid var(--line); cursor: zoom-in; }
+.eqs { display: flex; flex-direction: column; gap: 6px; }
+.eq-fila { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) auto; gap: 6px; align-items: center; }
+.eq-fila select, .eq-fila input { width: 100%; padding: 10px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; min-width: 0; }
+.eq-fila input { text-transform: uppercase; font-family: var(--f-mono); }
+.eq-quitar { border: 0; background: var(--danger-bg); color: var(--danger); border-radius: 9px; width: 40px; height: 40px; font-weight: 700; }
+.btn-mas { border: 1px dashed var(--accent); color: var(--accent); background: transparent; border-radius: 10px; padding: 9px 12px; font-weight: 700; font-size: .85rem; align-self: flex-start; }
 .sub-acciones { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; justify-content: flex-end; background: var(--bg); padding: 10px 0; border-top: 1px solid var(--line); z-index: 5; }
 .sub-acciones .btn { flex: 1; padding: 13px; }
 .paginas { display: flex; flex-direction: column; gap: 10px; }
@@ -438,7 +444,7 @@ label.subir { text-align: center; cursor: pointer; }
       <div class="field"><label for="enFecha">Fecha de la hoja</label><input id="enFecha" type="date"></div>
       <div class="field"><label for="enTipo">Tipo</label><select id="enTipo"></select></div>
     </div>
-    <div class="field"><label for="enSeriales">Seriales de los equipos</label><input id="enSeriales" type="text" autocomplete="off" placeholder="Ej: MP21CWB4, 5CD511220K"></div>
+    <div class="field"><span class="lbl">Equipos (tipo y serial)</span><div class="eqs" id="enEqs"></div><button type="button" class="btn-mas solo-editar" id="enAddEq">+ Agregar otro equipo</button></div>
     <div class="field"><label for="enNota">Nota</label><textarea id="enNota" placeholder="Ej: entregó con cargador y mouse"></textarea></div>
     <div class="meta" id="enEditado"></div>
     <div class="err" id="enErr" hidden></div>
@@ -485,6 +491,25 @@ const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.mi
 const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 const PDFLIB_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js';
 const TIPOS = [{ k: 'entrega', n: 'Entrega' }, { k: 'devolucion', n: 'Devolución' }, { k: 'otro', n: 'Otro' }];
+const EQUIPOS_FT = ['Portátil', 'Monitor', 'GPS', 'Tablet', 'Cámara semi', 'Cámara digital', 'Celular', 'Video beam', 'Impresora', 'Bafle', 'Radios', 'Disco duro', 'Otro'];
+const eqVacio = () => ({ tipo: 'Portátil', serial: '' });
+// Equipos de una hoja; las hojas viejas solo tenían el texto "seriales".
+function equiposDe(e) {
+  if (Array.isArray(e.equipos)) return e.equipos;
+  return String(e.seriales || '').split(/[,;\n]+/).map(x => x.trim()).filter(Boolean).map(serial => ({ tipo: '', serial }));
+}
+function limpiarEquipos(eqs) { return eqs.map(q => ({ tipo: q.tipo || '', serial: String(q.serial || '').trim().toUpperCase().replace(/\s+/g, '') })).filter(q => q.serial); }
+const textoSeriales = eqs => eqs.map(q => q.serial).join(', ');
+const textoEquipos = eqs => eqs.map(q => (q.tipo ? q.tipo + ': ' : '') + q.serial).join('; ');
+function filasEquipos(eqs, ro) {
+  const lst = eqs.length ? eqs : [eqVacio()];
+  return lst.map((q, i) => `<div class="eq-fila" data-eq-i="${i}">
+      <select data-eq-k="tipo" aria-label="Tipo de equipo ${i + 1}" ${ro ? 'disabled' : ''}>${EQUIPOS_FT.concat(q.tipo && !EQUIPOS_FT.includes(q.tipo) ? [q.tipo] : []).map(t => `<option ${t === q.tipo ? 'selected' : ''}>${esc(t)}</option>`).join('')}${q.tipo ? '' : '<option value="" selected>Sin tipo</option>'}</select>
+      <input type="text" data-eq-k="serial" value="${esc(q.serial)}" placeholder="Serial" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Serial del equipo ${i + 1}" ${ro ? 'disabled' : ''}>
+      <button type="button" class="eq-quitar solo-editar" data-eq-del="${i}" aria-label="Quitar equipo ${i + 1}">✕</button>
+    </div>`).join('');
+}
+function leerFilas(caja) { return [...caja.querySelectorAll('.eq-fila')].map(f => ({ tipo: f.querySelector('[data-eq-k=tipo]').value, serial: f.querySelector('[data-eq-k=serial]').value })); }
 const ANCHO = 1700, CALIDAD = 0.8, TROZO = 700000, MAX_PAGINAS = 40;
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -653,7 +678,7 @@ function renderEnt() {
       <span class="hoja-t">
         <span class="card-head"><span class="card-title">${esc(e.nombre || 'Sin nombre')}</span><span class="pill t-${esc(e.tipo || 'entrega')}">${tipoNombre(e.tipo)}</span></span>
         <span class="facts"><span class="mono">${fechaBonita(e.fecha)}</span>${e.cedula ? `<span>CC ${esc(e.cedula)}</span>` : ''}<span>${n} ${n === 1 ? 'página' : 'páginas'}</span></span>
-        ${e.seriales ? `<span class="meta mono">${esc(e.seriales)}</span>` : ''}
+        ${equiposDe(e).length ? `<span class="meta mono">${esc(textoSeriales(equiposDe(e)))}</span>` : ''}
         ${!e.nombre || !e.fecha ? '<span class="pill rev">Falta completar datos</span>' : ''}
       </span>
     </button>`;
@@ -674,7 +699,7 @@ async function prepararPagina(canvas, origen) {
   const blob = await canvasA(canvas, 'image/jpeg', CALIDAD);
   const mini = escalar(canvas, canvas.width, canvas.height, 220).toDataURL('image/jpeg', 0.6);
   const vista = escalar(canvas, canvas.width, canvas.height, 700).toDataURL('image/jpeg', 0.75);
-  return { blob, mini, vista, ancho: canvas.width, alto: canvas.height, origen, incluir: true, unir: false, nombre: '', cedula: '', fecha: '', tipo: 'entrega', seriales: '', nota: '' };
+  return { blob, mini, vista, ancho: canvas.width, alto: canvas.height, origen, incluir: true, unir: false, nombre: '', cedula: '', fecha: '', tipo: 'entrega', equipos: [eqVacio()], nota: '' };
 }
 async function leerArchivos(files) {
   const nuevas = [];
@@ -724,7 +749,7 @@ function renderSub() {
         <div class="field"><label>Fecha de la hoja</label><input type="date" data-k="fecha" value="${esc(p.fecha)}"></div>
         <div class="field"><label>Tipo</label><select data-k="tipo">${TIPOS.map(t => `<option value="${t.k}" ${p.tipo === t.k ? 'selected' : ''}>${t.n}</option>`).join('')}</select></div>
       </div>
-      <div class="field"><label>Seriales de los equipos</label><input type="text" data-k="seriales" value="${esc(p.seriales)}" autocomplete="off" placeholder="Opcional"></div>
+      <div class="field"><span class="lbl">Equipos (tipo y serial)</span><div class="eqs">${filasEquipos(p.equipos, false)}</div><button type="button" class="btn-mas" data-add-eq>+ Agregar otro equipo</button></div>
       <div class="field"><label>Nota</label><input type="text" data-k="nota" value="${esc(p.nota)}" autocomplete="off" placeholder="Opcional"></div>`}
     </div>`).join('');
 }
@@ -754,7 +779,7 @@ async function guardarLote() {
         const d = g.datos;
         await escribir({ tipo: 'set', col: COL, id, data: Object.assign({
           nombre: d.nombre.trim().replace(/\s+/g, ' '), cedula: d.cedula.trim(), fecha: d.fecha, tipo: d.tipo,
-          seriales: d.seriales.trim().toUpperCase(), nota: d.nota.trim(), paginas, miniatura: g.paginas[0].mini,
+          equipos: limpiarEquipos(d.equipos), seriales: textoSeriales(limpiarEquipos(d.equipos)), nota: d.nota.trim(), paginas, miniatura: g.paginas[0].mini,
           origen: g.paginas.map(p => p.origen).join(' + '), subido: new Date().toISOString()
         }, sello()) });
         hechos++;
@@ -789,7 +814,7 @@ function abrirEn(id) {
   $('enSub').textContent = `${tipoNombre(e.tipo)} · ${fechaBonita(e.fecha)} · ${(e.paginas || []).length} ${(e.paginas || []).length === 1 ? 'página' : 'páginas'}`;
   $('enTipo').innerHTML = TIPOS.map(t => `<option value="${t.k}">${t.n}</option>`).join('');
   $('enNombre').value = e.nombre || ''; $('enCedula').value = e.cedula || ''; $('enFecha').value = e.fecha || '';
-  $('enTipo').value = e.tipo || 'entrega'; $('enSeriales').value = e.seriales || ''; $('enNota').value = e.nota || '';
+  $('enTipo').value = e.tipo || 'entrega'; $('enEqs').innerHTML = filasEquipos(equiposDe(e), soloLectura); $('enNota').value = e.nota || '';
   $('enErr').hidden = true;
   $('enEditado').textContent = e.actualizado ? `Subida ${hace(e.subido)}${e.por ? ' por ' + e.por : ''}. Origen: ${e.origen || '—'}.` : '';
   $('enForm').querySelectorAll('input, select, textarea').forEach(x => { x.disabled = soloLectura; });
@@ -807,8 +832,10 @@ function cerrarEn() { $('enSheet').hidden = true; enActual = null; }
 function guardarEn(ev) {
   ev.preventDefault(); if (soloLectura || !enActual) return cerrarEn();
   const e0 = ENT.get(enActual); if (!e0) return cerrarEn();
-  const datos = { nombre: $('enNombre').value.trim().replace(/\s+/g, ' '), cedula: $('enCedula').value.trim(), fecha: $('enFecha').value, tipo: $('enTipo').value, seriales: $('enSeriales').value.trim().toUpperCase(), nota: $('enNota').value.trim() };
+  const datos = { nombre: $('enNombre').value.trim().replace(/\s+/g, ' '), cedula: $('enCedula').value.trim(), fecha: $('enFecha').value, tipo: $('enTipo').value, nota: $('enNota').value.trim() };
+  const eqs = limpiarEquipos(leerFilas($('enEqs')));
   const cambios = {}; Object.keys(datos).forEach(k => { if (datos[k] !== (e0[k] ?? '')) cambios[k] = datos[k]; });
+  if (JSON.stringify(eqs) !== JSON.stringify(limpiarEquipos(equiposDe(e0))) || !Array.isArray(e0.equipos)) { cambios.equipos = eqs; cambios.seriales = textoSeriales(eqs); }
   if (Object.keys(cambios).length) { escribir({ tipo: 'update', col: COL, id: enActual, data: Object.assign(cambios, sello()) }); toast('Cambios guardados'); }
   cerrarEn();
 }
@@ -852,11 +879,11 @@ function renderDb() {
   const ver = lista().filter(e => !q || textoDe(e).includes(q)).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
   $('dbCount').textContent = `${ver.length} de ${ENT.size} filas`;
   const inp = (e, f, cls, lbl, t) => `<td><input type="${t || 'text'}" class="${cls || ''}" data-f="${f}" value="${esc(e[f])}" ${ro} aria-label="${lbl}"></td>`;
-  $('dbTable').innerHTML = `<table class="teq"><thead><tr><th class="stk1">Nombre</th><th>Cédula</th><th>Fecha</th><th>Tipo</th><th>Seriales</th><th>Nota</th><th>Páginas</th><th>Origen</th><th class="solo-editar"></th></tr></thead><tbody>${ver.map(e => `<tr data-id="${esc(e.id)}">
+  $('dbTable').innerHTML = `<table class="teq"><thead><tr><th class="stk1">Nombre</th><th>Cédula</th><th>Fecha</th><th>Tipo</th><th>Equipos</th><th>Nota</th><th>Páginas</th><th>Origen</th><th class="solo-editar"></th></tr></thead><tbody>${ver.map(e => `<tr data-id="${esc(e.id)}">
     <td class="stk1"><input type="text" class="m" data-f="nombre" value="${esc(e.nombre)}" ${ro} aria-label="Nombre" list="dlNombres"></td>
     ${inp(e, 'cedula', 'm', 'Cédula')}${inp(e, 'fecha', '', 'Fecha', 'date')}
     <td><select data-f="tipo" ${ro} aria-label="Tipo">${TIPOS.map(t => `<option value="${t.k}" ${(e.tipo || 'entrega') === t.k ? 'selected' : ''}>${t.n}</option>`).join('')}</select></td>
-    ${inp(e, 'seriales', 'w', 'Seriales')}${inp(e, 'nota', 'w', 'Nota')}
+    <td><div class="cell mono">${esc(textoEquipos(equiposDe(e))) || '—'}</div></td>${inp(e, 'nota', 'w', 'Nota')}
     <td class="num">${(e.paginas || []).length}</td><td><div class="cell">${esc(e.origen)}</div></td>
     <td class="solo-editar"><button type="button" class="icon-btn" data-del="${esc(e.id)}">Borrar</button></td>
   </tr>`).join('') || '<tr><td colspan="9">Sin filas</td></tr>'}</tbody></table>`;
@@ -864,14 +891,14 @@ function renderDb() {
 function editarCelda(el) {
   if (soloLectura) return;
   const tr = el.closest('tr'); const e = tr && ENT.get(tr.dataset.id); if (!e) return;
-  const f = el.dataset.f; let v = el.value.trim(); if (f === 'seriales') v = v.toUpperCase();
+  const f = el.dataset.f; const v = el.value.trim();
   if ((e[f] ?? '') === v) return;
   escribir({ tipo: 'update', col: COL, id: tr.dataset.id, data: Object.assign({ [f]: v }, sello()) }); toast('Guardado');
 }
 async function descargarExcel() {
   if (!DL) return;
-  const filas = [['NOMBRE', 'CÉDULA', 'FECHA', 'TIPO', 'SERIALES', 'NOTA', 'PÁGINAS', 'ARCHIVO DE ORIGEN', 'SUBIDA POR', 'FECHA DE SUBIDA']]
-    .concat(lista().sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || ''))).map(e => [e.nombre || '', e.cedula || '', fechaBonita(e.fecha), tipoNombre(e.tipo), e.seriales || '', e.nota || '', (e.paginas || []).length, e.origen || '', e.por || '', e.subido ? e.subido.slice(0, 10) : '']));
+  const filas = [['NOMBRE', 'CÉDULA', 'FECHA', 'TIPO', 'EQUIPOS', 'NOTA', 'PÁGINAS', 'ARCHIVO DE ORIGEN', 'SUBIDA POR', 'FECHA DE SUBIDA']]
+    .concat(lista().sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || ''))).map(e => [e.nombre || '', e.cedula || '', fechaBonita(e.fecha), tipoNombre(e.tipo), textoEquipos(equiposDe(e)), e.nota || '', (e.paginas || []).length, e.origen || '', e.por || '', e.subido ? e.subido.slice(0, 10) : '']));
   try {
     if (!window.XLSX) { try { await cargarScript(XLSX_URL); } catch (e) {} }
     let data, filename = `Entregas Consulta Previa ${hoyIso()}`;
@@ -897,19 +924,40 @@ $('archivo').onchange = async e => {
   renderSub();
 };
 $('subList').addEventListener('input', e => {
+  const ek = e.target.dataset.eqK;
+  if (ek) { const card = e.target.closest('[data-i]'), fila = e.target.closest('[data-eq-i]'); lote[Number(card.dataset.i)].equipos[Number(fila.dataset.eqI)][ek] = e.target.value; return; }
   const k = e.target.dataset.k, card = e.target.closest('[data-i]'); if (!k || !card) return;
   const p = lote[Number(card.dataset.i)]; if (e.target.type !== 'checkbox') p[k] = e.target.value;
 });
 $('subList').addEventListener('change', e => {
+  const ek = e.target.dataset.eqK;
+  if (ek) { const card = e.target.closest('[data-i]'), fila = e.target.closest('[data-eq-i]'); lote[Number(card.dataset.i)].equipos[Number(fila.dataset.eqI)][ek] = e.target.value; return; }
   const k = e.target.dataset.k, card = e.target.closest('[data-i]'); if (!k || !card) return;
   const p = lote[Number(card.dataset.i)];
   if (e.target.type === 'checkbox') { p[k] = e.target.checked; renderSub(); } else p[k] = e.target.value;
 });
-$('subList').onclick = e => { const v = e.target.closest('[data-ver]'); if (v) { const i = Number(v.dataset.ver); verGrande(lote[i].vista, `Página ${i + 1}`); } };
+$('subList').onclick = e => {
+  const add = e.target.closest('[data-add-eq]'), del = e.target.closest('[data-eq-del]');
+  if (add || del) {
+    const i = Number(e.target.closest('[data-i]').dataset.i), p = lote[i];
+    if (add) p.equipos.push(eqVacio()); else { p.equipos.splice(Number(del.dataset.eqDel), 1); if (!p.equipos.length) p.equipos.push(eqVacio()); }
+    renderSub();
+    if (add) { const ins = $('subList').querySelectorAll(`[data-i="${i}"] [data-eq-k=serial]`); ins[ins.length - 1].focus(); }
+    return;
+  }
+  const v = e.target.closest('[data-ver]'); if (v) { const i = Number(v.dataset.ver); verGrande(lote[i].vista, `Página ${i + 1}`); } };
 $('subGuardar').onclick = guardarLote;
 $('subCancelar').onclick = () => confirmar('Descartar', 'Se quitan las páginas que no has guardado. Lo ya guardado no se toca.', 'Descartar', () => { lote = []; $('subEstado').textContent = ''; renderSub(); });
 $('enForm').onsubmit = guardarEn; $('enCancel').onclick = cerrarEn; $('enDel').onclick = () => borrarEn(enActual);
 $('enPdf').onclick = () => descargarPdf(enActual);
+$('enAddEq').onclick = () => {
+  const eqs = leerFilas($('enEqs')); eqs.push(eqVacio()); $('enEqs').innerHTML = filasEquipos(eqs, soloLectura);
+  const ins = $('enEqs').querySelectorAll('[data-eq-k=serial]'); ins[ins.length - 1].focus();
+};
+$('enEqs').onclick = e => {
+  const del = e.target.closest('[data-eq-del]'); if (!del) return;
+  const eqs = leerFilas($('enEqs')); eqs.splice(Number(del.dataset.eqDel), 1); $('enEqs').innerHTML = filasEquipos(eqs, soloLectura);
+};
 $('enPaginas').onclick = e => { const b = e.target.closest('[data-pv]'); const img = b && b.querySelector('img:not(.borrosa)'); if (img) verGrande(img.src, `${$('enTitle').textContent} · página ${Number(b.dataset.pv) + 1}`); };
 $('enSheet').onclick = e => { if (e.target === $('enSheet')) cerrarEn(); };
 $('visorCerrar').onclick = () => { $('visor').hidden = true; $('visorImg').src = ''; };
