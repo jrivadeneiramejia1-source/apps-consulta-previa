@@ -336,6 +336,14 @@ label.subir { text-align: center; cursor: pointer; }
 .eq-fila select, .eq-fila input { width: 100%; padding: 10px 8px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; min-width: 0; }
 .eq-fila input { text-transform: uppercase; font-family: var(--f-mono); }
 .eq-quitar { border: 0; background: var(--danger-bg); color: var(--danger); border-radius: 9px; width: 40px; height: 40px; font-weight: 700; }
+.eq-info { grid-column: 1 / -1; font-size: .78rem; color: var(--muted); margin-top: -2px; }
+.eq-info.nuevo { color: var(--warn); }
+.eq-info b { color: var(--fg); }
+.eq-nuevo { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.eq-nuevo input { text-transform: none; font-family: var(--f-body); }
+.enlace { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.sync { font-size: .82rem; border-radius: 10px; padding: 8px 10px; background: var(--disco-bg); color: var(--disco); }
+.sync.no { background: var(--surface-2); color: var(--muted); }
 .btn-mas { border: 1px dashed var(--accent); color: var(--accent); background: transparent; border-radius: 10px; padding: 9px 12px; font-weight: 700; font-size: .85rem; align-self: flex-start; }
 .sub-acciones { position: sticky; bottom: calc(76px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 8px; justify-content: flex-end; background: var(--bg); padding: 10px 0; border-top: 1px solid var(--line); z-index: 5; }
 .sub-acciones .btn { flex: 1; padding: 13px; }
@@ -377,6 +385,7 @@ label.subir { text-align: center; cursor: pointer; }
   <!-- SECCIÓN 2: SUBIR -->
   <section class="view" id="vSub" hidden>
     <div class="note">Sube el PDF escaneado o fotos de las hojas. Cada página sale aparte: escribe a quién pertenece y guárdala. Si una persona tiene dos páginas, marca <b>Unir con la anterior</b>. Los datos los escribes tú; la app no lee la letra.</div>
+    <div class="aviso info" id="subEnlace" hidden><span>Esta app no está conectada con <b>Equipos</b>: las hojas se guardan, pero no actualizan la lista de equipos.</span><button class="btn small" type="button" onclick="nube.enlazar('equipos')">Conectar</button></div>
     <label class="btn primary big solo-editar subir">Escoger PDF o fotos<input type="file" id="archivo" accept="application/pdf,image/*" multiple hidden></label>
     <div class="meta" id="subEstado"></div>
     <div class="list" id="subList"></div>
@@ -399,6 +408,7 @@ label.subir { text-align: center; cursor: pointer; }
       <div class="card-title">Copia de seguridad y acceso</div>
       <div class="meta" id="nubeInfo"></div>
       <div class="meta">La copia incluye las hojas escaneadas, así que puede pesar bastante.</div>
+      <div class="enlace"><b>Conexión con Equipos</b><div class="meta" id="enlaceInfo"></div><div class="row" id="enlaceBtn"></div></div>
       <div class="row">
         <button class="btn" type="button" onclick="nube.exportar()">Descargar copia (JSON)</button>
         <label class="btn solo-editar">Importar copia<input type="file" accept=".json,application/json" hidden onchange="nube.importar(this)"></label>
@@ -436,6 +446,7 @@ label.subir { text-align: center; cursor: pointer; }
     <p class="sub" id="enSub"></p>
     <div class="paginas" id="enPaginas"></div>
     <button class="btn ok" type="button" id="enPdf">Descargar PDF</button>
+    <div class="sync" id="enSync" hidden></div>
     <div class="fields cols">
       <div class="field"><label for="enNombre">Nombre</label><input id="enNombre" type="text" list="dlNombres" autocomplete="off"></div>
       <div class="field"><label for="enCedula">Cédula</label><input id="enCedula" type="text" inputmode="numeric" autocomplete="off"></div>
@@ -477,9 +488,9 @@ label.subir { text-align: center; cursor: pointer; }
 </div>
 
 <div class="toast" id="toast" hidden></div>
-<datalist id="dlNombres"></datalist>
+<datalist id="dlNombres"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png"};</script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}]};</script>
 <script src="../config.js"></script>
 <script src="../nube.js"></script>
 <script>
@@ -498,18 +509,50 @@ function equiposDe(e) {
   if (Array.isArray(e.equipos)) return e.equipos;
   return String(e.seriales || '').split(/[,;\n]+/).map(x => x.trim()).filter(Boolean).map(serial => ({ tipo: '', serial }));
 }
-function limpiarEquipos(eqs) { return eqs.map(q => ({ tipo: q.tipo || '', serial: String(q.serial || '').trim().toUpperCase().replace(/\s+/g, '') })).filter(q => q.serial); }
+function limpiarEquipos(eqs) {
+  return eqs.map(q => {
+    const o = { tipo: q.tipo || '', serial: String(q.serial || '').trim().toUpperCase().replace(/\s+/g, '') };
+    if (String(q.marca || '').trim()) o.marca = String(q.marca).trim();
+    if (String(q.modelo || '').trim()) o.modelo = String(q.modelo).trim();
+    return o;
+  }).filter(q => q.serial);
+}
 const textoSeriales = eqs => eqs.map(q => q.serial).join(', ');
 const textoEquipos = eqs => eqs.map(q => (q.tipo ? q.tipo + ': ' : '') + q.serial).join('; ');
 function filasEquipos(eqs, ro) {
   const lst = eqs.length ? eqs : [eqVacio()];
   return lst.map((q, i) => `<div class="eq-fila" data-eq-i="${i}">
       <select data-eq-k="tipo" aria-label="Tipo de equipo ${i + 1}" ${ro ? 'disabled' : ''}>${EQUIPOS_FT.concat(q.tipo && !EQUIPOS_FT.includes(q.tipo) ? [q.tipo] : []).map(t => `<option ${t === q.tipo ? 'selected' : ''}>${esc(t)}</option>`).join('')}${q.tipo ? '' : '<option value="" selected>Sin tipo</option>'}</select>
-      <input type="text" data-eq-k="serial" value="${esc(q.serial)}" placeholder="Serial" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Serial del equipo ${i + 1}" ${ro ? 'disabled' : ''}>
+      <input type="text" data-eq-k="serial" value="${esc(q.serial)}" placeholder="Serial" list="dlSerEq" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Serial del equipo ${i + 1}" ${ro ? 'disabled' : ''}>
       <button type="button" class="eq-quitar solo-editar" data-eq-del="${i}" aria-label="Quitar equipo ${i + 1}">✕</button>
+      ${infoFila(q, ro)}
     </div>`).join('');
 }
-function leerFilas(caja) { return [...caja.querySelectorAll('.eq-fila')].map(f => ({ tipo: f.querySelector('[data-eq-k=tipo]').value, serial: f.querySelector('[data-eq-k=serial]').value })); }
+// Debajo de cada serial: qué dice la app de Equipos de ese equipo. Si no existe, pide marca y modelo.
+function infoFila(q, ro) {
+  const id = idSerial(q.serial), eq = EQ.get(id);
+  const nuevo = !!(EQDB && id && !eq);
+  let txt = '';
+  if (EQDB && id) txt = eq ? `<b>${esc([eq.marca, eq.modelo].filter(Boolean).join(' ') || eq.tipo)}</b> · ahora: ${esc(eq.asignado || 'sin asignar')}${pendienteEq(id) ? ' · ya está pendiente en Recibidos' : ''}` : 'No está en Equipos: escribe marca y modelo para agregarlo.';
+  return `<div class="eq-info ${nuevo ? 'nuevo' : ''}" data-eq-info ${txt ? '' : 'hidden'}>${txt}</div>
+      <div class="eq-nuevo" data-eq-nuevo ${nuevo ? '' : 'hidden'}><input type="text" data-eq-k="marca" value="${esc(q.marca || '')}" placeholder="Marca" autocomplete="off" ${ro ? 'disabled' : ''}><input type="text" data-eq-k="modelo" value="${esc(q.modelo || '')}" placeholder="Modelo" autocomplete="off" ${ro ? 'disabled' : ''}></div>`;
+}
+// Al escribir un serial: actualiza el aviso de la fila y pone el tipo que tiene en Equipos.
+function refrescarFila(fila, guardarEn, soloInfo) {
+  const q = { tipo: fila.querySelector('[data-eq-k=tipo]').value, serial: fila.querySelector('[data-eq-k=serial]').value,
+    marca: fila.querySelector('[data-eq-k=marca]').value, modelo: fila.querySelector('[data-eq-k=modelo]').value };
+  const eq = EQ.get(idSerial(q.serial));
+  if (eq && eq.tipo && !soloInfo) {
+    const t = EQ_A_TIPO[eq.tipo] || eq.tipo, sel = fila.querySelector('[data-eq-k=tipo]');
+    if (![...sel.options].some(o => o.value === t)) sel.add(new Option(t, t));
+    if (sel.value !== t) { sel.value = t; q.tipo = t; if (guardarEn) guardarEn.tipo = t; }
+  }
+  const tmp = document.createElement('div'); tmp.innerHTML = infoFila(q, false);
+  const [info, nuevo] = tmp.children;
+  const i0 = fila.querySelector('[data-eq-info]'), n0 = fila.querySelector('[data-eq-nuevo]');
+  i0.className = info.className; i0.innerHTML = info.innerHTML; i0.hidden = info.hidden; n0.hidden = nuevo.hidden;
+}
+function leerFilas(caja) { return [...caja.querySelectorAll('.eq-fila')].map(f => ({ tipo: f.querySelector('[data-eq-k=tipo]').value, serial: f.querySelector('[data-eq-k=serial]').value, marca: f.querySelector('[data-eq-k=marca]').value, modelo: f.querySelector('[data-eq-k=modelo]').value })); }
 const ANCHO = 1700, CALIDAD = 0.8, TROZO = 700000, MAX_PAGINAS = 40;
 const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -520,6 +563,11 @@ let listo = false, conexion = 'cargando', fechaCache = null;
 let pendientes = lsGet(PEND_KEY) || [];
 let vista = 'ent', filtro = 'todos', enActual = null, renderPendiente = false;
 let lote = [];          // páginas que se están subiendo
+let EQDB = null, EQ = new Map(), EQR = new Map();   // conexión con la app de Equipos
+const TIPO_A_EQ = { 'Portátil': 'PC Portátil', 'Impresora': 'Impresora Portátil', 'Video beam': 'Video Beam' };
+const EQ_A_TIPO = { 'PC Portátil': 'Portátil', 'Impresora Portátil': 'Impresora', 'Video Beam': 'Video beam', 'Escaner': 'Otro', 'Antena Starlink': 'Otro' };
+const idSerial = x => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+const pendienteEq = id => [...EQR.values()].find(x => !x.cerrado && idSerial(x.serial) === id);
 const ui = lsGet(UI_KEY) || {};
 
 /* ================= UTILIDADES ================= */
@@ -764,7 +812,7 @@ async function guardarLote() {
   const sinNombre = grupos.filter(g => !g.datos.nombre.trim()).length;
   const hacer = async () => {
     $('subGuardar').disabled = true; $('subCancelar').disabled = true;
-    let hechos = 0;
+    let hechos = 0; const resumenEq = [];
     try {
       for (const g of grupos) {
         const id = nuevoId('e'), paginas = [];
@@ -777,14 +825,19 @@ async function guardarLote() {
           paginas.push({ trozos: n, ancho: p.ancho, alto: p.alto, bytes: p.blob.size, origen: p.origen });
         }
         const d = g.datos;
-        await escribir({ tipo: 'set', col: COL, id, data: Object.assign({
+        const datosHoja = {
           nombre: d.nombre.trim().replace(/\s+/g, ' '), cedula: d.cedula.trim(), fecha: d.fecha, tipo: d.tipo,
           equipos: limpiarEquipos(d.equipos), seriales: textoSeriales(limpiarEquipos(d.equipos)), nota: d.nota.trim(), paginas, miniatura: g.paginas[0].mini,
           origen: g.paginas.map(p => p.origen).join(' + '), subido: new Date().toISOString()
-        }, sello()) });
+        };
+        await escribir({ tipo: 'set', col: COL, id, data: Object.assign(datosHoja, sello()) });
         hechos++;
+        $('subEstado').textContent = 'Actualizando Equipos…';
+        const txt = await enviarYMarcar(id);
+        if (txt) resumenEq.push(`${datosHoja.nombre || 'Sin nombre'}: ${txt}`);
       }
-      toast(hechos === 1 ? '1 hoja guardada' : `${hechos} hojas guardadas`);
+      toast((hechos === 1 ? '1 hoja guardada' : `${hechos} hojas guardadas`) + (resumenEq.length ? ' y Equipos actualizado' : ''));
+      if (resumenEq.length) confirmar('Equipos actualizado', resumenEq.join('\n'), 'Listo', null, 'ok');
       lote = []; $('subEstado').textContent = ''; renderSub(); ir('ent');
     } catch (e) {
       toast('Se cortó la subida: ' + (e && (e.message || e.code) || e) + '. Lo ya guardado quedó guardado.');
@@ -793,6 +846,82 @@ async function guardarLote() {
   };
   if (sinNombre) confirmar('Hay hojas sin nombre', `${sinNombre} ${sinNombre === 1 ? 'hoja no tiene' : 'hojas no tienen'} nombre. Se guardan igual y quedan en el filtro "Sin nombre o fecha" para completarlas después.`, 'Guardar igual', hacer, 'ok');
   else hacer();
+}
+
+/* ================= CONEXIÓN CON EQUIPOS ================= */
+function suscribirEquipos() {
+  EQDB.collection('equipos').limit(1000).onSnapshot(s => {
+    EQ = new Map(s.docs.map(d => [d.id, d.data()]));
+    $('dlSerEq').innerHTML = [...EQ.values()].sort((a, b) => cmpTxt(a.serial, b.serial)).map(e => `<option value="${esc(e.serial)}">${esc([e.tipo, e.marca, e.modelo, e.asignado].filter(Boolean).join(' · '))}</option>`).join('');
+    document.querySelectorAll('.eq-fila').forEach(f => refrescarFila(f, null, true));
+  }, () => {});
+  EQDB.collection('recibidos').limit(1000).onSnapshot(s => { EQR = new Map(s.docs.map(d => [d.id, d.data()])); }, () => {});
+}
+const cmpTxt = (a, b) => String(a || '').localeCompare(String(b || ''), 'es', { numeric: true });
+function pintarEnlace() {
+  const ok = !!EQDB;
+  $('subEnlace').hidden = ok || !DB;
+  $('enlaceInfo').textContent = ok
+    ? 'Conectada. Hoja de Entrega: el equipo queda asignado a esa persona en Equipos. Hoja de Devolución: el equipo entra a Recibidos como pendiente de mantenimiento y backup.'
+    : 'No conectada. Toca Conectar y escribe la clave de la app de Equipos.';
+  $('enlaceBtn').innerHTML = ok ? `<button class="btn danger" type="button" onclick="nube.desenlazar('equipos')">Desconectar</button>` : `<button class="btn primary" type="button" onclick="nube.enlazar('equipos')">Conectar con Equipos</button>`;
+}
+// Aplica una hoja en la app de Equipos. Devuelve un resumen, o '' si no hubo nada que hacer.
+async function enviarAEquipos(h) {
+  if (!EQDB || (h.tipo !== 'entrega' && h.tipo !== 'devolucion')) return '';
+  const eqs = limpiarEquipos(equiposDe(h)); if (!eqs.length) return '';
+  const r = { asig: 0, nuevos: 0, pend: 0, yaPend: 0, igual: 0, sinNombre: 0 };
+  const s = { actualizado: new Date().toISOString(), por: miId || '' };
+  for (const q of eqs) {
+    const id = idSerial(q.serial); if (!id) continue;
+    const eq = EQ.get(id);
+    if (h.tipo === 'entrega') {
+      const persona = (h.nombre || '').trim(); if (!persona) { r.sinNombre++; continue; }
+      if (eq) {
+        if (eq.asignado === persona) { r.igual++; continue; }
+        await EQDB.collection('equipos').doc(id).update(Object.assign({ asignado: persona }, s));
+        EQ.set(id, Object.assign({}, eq, { asignado: persona })); r.asig++;
+      } else {
+        const n = Math.max(0, ...[...EQ.values()].map(x => Number(x.n) || 0)) + 1;
+        const nuevo = Object.assign({ serial: q.serial, tipo: TIPO_A_EQ[q.tipo] || q.tipo || '', marca: q.marca || '', modelo: q.modelo || '', asignado: persona, mail: '', cliente: 'Petrobras', proyecto: 'Consulta Previa', departamento: 'Guajira', municipio: 'Riohacha', fechaMtto: '', obs: 'Agregado desde Entregas', n }, s);
+        await EQDB.collection('equipos').doc(id).set(nuevo); EQ.set(id, nuevo); r.nuevos++;
+      }
+    } else {
+      if (pendienteEq(id)) { r.yaPend++; continue; }
+      const rid = 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      const rec = Object.assign({
+        serial: eq ? eq.serial : q.serial, fechaIngreso: h.fecha || hoyIso(),
+        tipo: eq ? (eq.tipo || '') : (TIPO_A_EQ[q.tipo] || q.tipo || ''), marca: eq ? (eq.marca || '') : (q.marca || ''), modelo: eq ? (eq.modelo || '') : (q.modelo || ''),
+        persona: 'Bodega Riohacha', proyecto: eq ? (eq.proyecto || '') : '',
+        mtto: 'pend', mttoFecha: '', backup: 'pend', backupFecha: '',
+        obs: `Devuelto por ${h.nombre || 'sin nombre'} el ${fechaBonita(h.fecha)} (hoja de Entregas)`, acc: [], cerrado: false, cerradoEn: '', origen: 'entregas'
+      }, s);
+      await EQDB.collection('recibidos').doc(rid).set(rec); EQR.set(rid, rec); r.pend++;
+    }
+  }
+  const t = [];
+  if (r.asig) t.push(`${r.asig} ${r.asig === 1 ? 'equipo asignado' : 'equipos asignados'} a ${h.nombre}`);
+  if (r.nuevos) t.push(`${r.nuevos} ${r.nuevos === 1 ? 'equipo nuevo agregado' : 'equipos nuevos agregados'}`);
+  if (r.igual) t.push(`${r.igual} ya ${r.igual === 1 ? 'estaba asignado' : 'estaban asignados'} a esa persona`);
+  if (r.pend) t.push(`${r.pend} ${r.pend === 1 ? 'quedó pendiente' : 'quedaron pendientes'} en Recibidos`);
+  if (r.yaPend) t.push(`${r.yaPend} ya ${r.yaPend === 1 ? 'estaba pendiente' : 'estaban pendientes'} en Recibidos`);
+  if (r.sinNombre) t.push('falta el nombre para asignar');
+  return t.join(' · ');
+}
+async function enviarYMarcar(id) {
+  const h = ENT.get(id); if (!h) return '';
+  try {
+    const txt = await enviarAEquipos(h);
+    if (txt) escribir({ tipo: 'update', col: COL, id, data: { equiposSync: { fecha: new Date().toISOString(), texto: txt, completo: !/falta el nombre/.test(txt) } } });
+    return txt;
+  } catch (e) { toast('No se pudo actualizar Equipos: ' + (e.message || e.code || e)); return ''; }
+}
+function pintarSync(e) {
+  const box = $('enSync'), aplica = e.tipo === 'entrega' || e.tipo === 'devolucion';
+  if (!EQDB || !aplica || !limpiarEquipos(equiposDe(e)).length) { box.hidden = true; return; }
+  box.hidden = false;
+  if (e.equiposSync) { box.className = 'sync'; box.innerHTML = `Enviada a Equipos ${esc(hace(e.equiposSync.fecha))}: ${esc(e.equiposSync.texto)}. <button type="button" class="btn small solo-editar" id="enReenviar">Enviar otra vez</button>`; }
+  else { box.className = 'sync no'; box.innerHTML = `Todavía no se ha enviado a Equipos. <button type="button" class="btn small primary solo-editar" id="enReenviar">Enviar a Equipos</button>`; }
 }
 
 /* ================= VER / EDITAR ================= */
@@ -816,6 +945,7 @@ function abrirEn(id) {
   $('enNombre').value = e.nombre || ''; $('enCedula').value = e.cedula || ''; $('enFecha').value = e.fecha || '';
   $('enTipo').value = e.tipo || 'entrega'; $('enEqs').innerHTML = filasEquipos(equiposDe(e), soloLectura); $('enNota').value = e.nota || '';
   $('enErr').hidden = true;
+  pintarSync(e);
   $('enEditado').textContent = e.actualizado ? `Subida ${hace(e.subido)}${e.por ? ' por ' + e.por : ''}. Origen: ${e.origen || '—'}.` : '';
   $('enForm').querySelectorAll('input, select, textarea').forEach(x => { x.disabled = soloLectura; });
   $('enPaginas').innerHTML = (e.paginas || []).map((p, i) => `<button type="button" class="pagina" data-pv="${i}"><img src="${esc(e.miniatura)}" alt="" class="borrosa" data-pi="${i}"><span class="meta">Cargando página ${i + 1}…</span></button>`).join('');
@@ -836,8 +966,12 @@ function guardarEn(ev) {
   const eqs = limpiarEquipos(leerFilas($('enEqs')));
   const cambios = {}; Object.keys(datos).forEach(k => { if (datos[k] !== (e0[k] ?? '')) cambios[k] = datos[k]; });
   if (JSON.stringify(eqs) !== JSON.stringify(limpiarEquipos(equiposDe(e0))) || !Array.isArray(e0.equipos)) { cambios.equipos = eqs; cambios.seriales = textoSeriales(eqs); }
-  if (Object.keys(cambios).length) { escribir({ tipo: 'update', col: COL, id: enActual, data: Object.assign(cambios, sello()) }); toast('Cambios guardados'); }
+  const id = enActual;
+  if (Object.keys(cambios).length) { escribir({ tipo: 'update', col: COL, id, data: Object.assign(cambios, sello()) }); toast('Cambios guardados'); }
   cerrarEn();
+  // Si la hoja no se había enviado completa a Equipos (por ejemplo, le faltaba el nombre), se envía ahora.
+  const e1 = ENT.get(id);
+  if (EQDB && e1 && Object.keys(cambios).length && !(e1.equiposSync && e1.equiposSync.completo)) enviarYMarcar(id).then(t => { if (t) toast('Equipos: ' + t); });
 }
 function borrarEn(id) {
   const e = ENT.get(id); if (!e) return;
@@ -870,7 +1004,7 @@ let cfAccion = null;
 function confirmar(titulo, texto, boton, accion, estilo) {
   $('cfTitle').textContent = titulo; $('cfText').textContent = texto; $('cfYes').textContent = boton;
   $('cfYes').className = 'btn ' + (estilo === 'ok' ? 'primary' : 'danger');
-  cfAccion = accion; $('cfSheet').hidden = false; $('cfNo').focus();
+  cfAccion = accion; $('cfSheet').hidden = false; $('cfNo').hidden = !accion; (accion ? $('cfNo') : $('cfYes')).focus();
 }
 
 /* ================= BASE DE DATOS ================= */
@@ -925,13 +1059,13 @@ $('archivo').onchange = async e => {
 };
 $('subList').addEventListener('input', e => {
   const ek = e.target.dataset.eqK;
-  if (ek) { const card = e.target.closest('[data-i]'), fila = e.target.closest('[data-eq-i]'); lote[Number(card.dataset.i)].equipos[Number(fila.dataset.eqI)][ek] = e.target.value; return; }
+  if (ek) { const card = e.target.closest('[data-i]'), fila = e.target.closest('[data-eq-i]'), q = lote[Number(card.dataset.i)].equipos[Number(fila.dataset.eqI)]; q[ek] = e.target.value; if (ek === 'serial') refrescarFila(fila, q); return; }
   const k = e.target.dataset.k, card = e.target.closest('[data-i]'); if (!k || !card) return;
   const p = lote[Number(card.dataset.i)]; if (e.target.type !== 'checkbox') p[k] = e.target.value;
 });
 $('subList').addEventListener('change', e => {
   const ek = e.target.dataset.eqK;
-  if (ek) { const card = e.target.closest('[data-i]'), fila = e.target.closest('[data-eq-i]'); lote[Number(card.dataset.i)].equipos[Number(fila.dataset.eqI)][ek] = e.target.value; return; }
+  if (ek) { const card = e.target.closest('[data-i]'), fila = e.target.closest('[data-eq-i]'), q = lote[Number(card.dataset.i)].equipos[Number(fila.dataset.eqI)]; q[ek] = e.target.value; if (ek === 'serial') refrescarFila(fila, q); return; }
   const k = e.target.dataset.k, card = e.target.closest('[data-i]'); if (!k || !card) return;
   const p = lote[Number(card.dataset.i)];
   if (e.target.type === 'checkbox') { p[k] = e.target.checked; renderSub(); } else p[k] = e.target.value;
@@ -953,6 +1087,14 @@ $('enPdf').onclick = () => descargarPdf(enActual);
 $('enAddEq').onclick = () => {
   const eqs = leerFilas($('enEqs')); eqs.push(eqVacio()); $('enEqs').innerHTML = filasEquipos(eqs, soloLectura);
   const ins = $('enEqs').querySelectorAll('[data-eq-k=serial]'); ins[ins.length - 1].focus();
+};
+$('enEqs').addEventListener('input', e => { if (e.target.dataset.eqK === 'serial') refrescarFila(e.target.closest('.eq-fila')); });
+$('enSync').onclick = async e => {
+  if (!e.target.closest('#enReenviar') || !enActual) return;
+  const id = enActual; e.target.disabled = true;
+  const t = await enviarYMarcar(id);
+  toast(t ? 'Equipos: ' + t : 'No había nada que cambiar en Equipos.');
+  const h = ENT.get(id); if (h && enActual === id) pintarSync(h);
 };
 $('enEqs').onclick = e => {
   const del = e.target.closest('[data-eq-del]'); if (!del) return;
@@ -986,6 +1128,9 @@ async function iniciar() {
   if (USER) { try { miId = await USER.id(); } catch (e) {} }
   if (!DB) { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
   pintarAvisos(); suscribir(); reintentarPendientes();
+  EQDB = window.nube ? window.nube.enlace('equipos') : null;
+  if (EQDB) suscribirEquipos();
+  pintarEnlace();
 }
 iniciar();
 </script>

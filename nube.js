@@ -11,6 +11,7 @@
   const guardar = (k, v) => { try { v == null ? localStorage.removeItem(K(k)) : localStorage.setItem(K(k), v); } catch (e) {} };
 
   let espacio = leer('espacio');
+  let claveTmp = null;
   let nombre = leer('nombre') || '';
   let F = null, fs = null, enVuelo = 0, errorFirebase = '';
   let avisar = () => {};
@@ -59,10 +60,10 @@
         });
     });
   }
-  function crearDb() {
+  function crearDb(esp) {
     return Object.freeze({
       collection(col) {
-        const ref = F.collection(fs, ...ruta(col));
+        const ref = F.collection(fs, 'espacios', esp, col);
         const obj = {
           limit() { return obj; },
           onSnapshot(next, err) {
@@ -75,7 +76,7 @@
             }, e => { if (err) err(mapError(e)); });
           },
           doc(id) {
-            const d = F.doc(fs, ...ruta(col), id);
+            const d = F.doc(fs, 'espacios', esp, col, id);
             return {
               set: data => esperar(F.setDoc(d, data)),
               update: data => esperar(F.updateDoc(d, data)),
@@ -194,7 +195,7 @@
       $nueva.onclick = terminar;
       f.onsubmit = async ev => {
         ev.preventDefault(); $e.hidden = true;
-        const clave = $k.value.trim();
+        const clave = $k.value.trim(); claveTmp = clave;
         if (clave.length < 6) return fallo('La clave debe tener al menos 6 caracteres.');
         if (!$n.value.trim()) return fallo('Escribe tu nombre.');
         $b.disabled = true; $b.textContent = 'Revisando…';
@@ -231,7 +232,32 @@
     }
     return out;
   }
+  async function probarEnlace(en, clave) {
+    const h = await huella(en.id + ':' + clave);
+    const q = F.query(F.collection(fs, 'espacios', h, en.col), F.limit(1));
+    const snap = await Promise.race([F.getDocsFromServer ? F.getDocsFromServer(q) : F.getDocs(q), new Promise((_, m) => setTimeout(() => m(new Error('tiempo')), 8000))]);
+    if (snap.empty) return false;
+    guardar('enlace_' + en.id, h); return true;
+  }
+  const enlaceCfg = id => (APP.enlaces || []).find(e => e.id === id);
   const nube = {
+    enlace(id) { const h = leer('enlace_' + id); return h && fs ? crearDb(h) : null; },
+    async enlazar(id) {
+      const en = enlaceCfg(id); if (!en || !fs) return toast('La base de datos no está abierta.');
+      const clave = prompt(`Escribe la clave de acceso de la app de ${en.nombre}:`);
+      if (clave == null) return;
+      if (clave.trim().length < 6) return toast('La clave debe tener al menos 6 caracteres.');
+      try {
+        if (await probarEnlace(en, clave.trim())) { toast(`Conectada con ${en.nombre}`); setTimeout(() => location.reload(), 700); }
+        else toast(`Con esa clave no hay datos de ${en.nombre}. Revisa la clave.`);
+      } catch (e) { toast('No se pudo comprobar la clave: revisa tu internet.'); }
+    },
+    desenlazar(id) {
+      const en = enlaceCfg(id); if (!en) return;
+      const hacer = () => { guardar('enlace_' + id, null); location.reload(); };
+      if (typeof window.confirmar === 'function') window.confirmar(`Desconectar de ${en.nombre}`, `Las hojas que guardes ya no cambiarán nada en ${en.nombre}. Lo que ya se envió no se borra.`, 'Desconectar', hacer);
+      else if (confirm('¿Desconectar?')) hacer();
+    },
     async exportar() {
       if (!fs || !espacio) return toast('La base de datos no está abierta.');
       try {
@@ -278,7 +304,7 @@
       guardar('nombre', v); location.reload();
     },
     salir() {
-      const hacer = () => { guardar('espacio', null); location.reload(); };
+      const hacer = () => { guardar('espacio', null); (APP.enlaces || []).forEach(en => guardar('enlace_' + en.id, null)); location.reload(); };
       if (typeof window.confirmar === 'function') window.confirmar('Salir de este teléfono', 'Se olvida la clave en este teléfono. Para volver a entrar tendrás que escribirla otra vez. Los datos no se borran.', 'Salir', hacer);
       else if (confirm('¿Salir de este teléfono?')) hacer();
     },
@@ -296,8 +322,13 @@
     const conexion = conectar().catch(e => { errorFirebase = e.message || String(e); });
     if (!espacio) { await conexion; await pantallaClave(errorFirebase && !navigator.onLine ? 'Sin internet: la primera vez necesitas conexión.' : ''); }
     await conexion;
-    if (fs && espacio) DB = crearDb();
-    else if (errorFirebase) console.warn('Firebase:', errorFirebase);
+    if (fs && espacio) DB = crearDb(espacio);
+    // Si la misma clave abre otra app enlazada (por ejemplo Equipos), se conecta sola.
+    if (fs && claveTmp && Array.isArray(APP.enlaces) && navigator.onLine) {
+      for (const en of APP.enlaces) { if (!leer('enlace_' + en.id)) { try { await probarEnlace(en, claveTmp); } catch (e) {} } }
+    }
+    claveTmp = null;
+    if (!DB && errorFirebase) console.warn('Firebase:', errorFirebase);
     const info = document.getElementById('nubeInfo');
     if (info) info.textContent = DB ? `Estás como ${nombre || 'sin nombre'}. Los datos se guardan en Firebase y se ven en todos los teléfonos que usen la misma clave.` : 'No se pudo conectar con la base de datos.';
     soltar();
