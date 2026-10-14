@@ -499,9 +499,9 @@ body.ro .mini { display: none; }
 
 <div class="toast" id="toast" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png"};</script>
-<script src="../config.js?v=6"></script>
-<script src="../nube.js?v=6"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "v": "7"};</script>
+<script src="../config.js?v=7"></script>
+<script src="../nube.js?v=7"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos';
@@ -828,14 +828,16 @@ function renderRec() {
     return `<div class="card rec st-${e.k}">
       <button type="button" class="card-top" data-rec="${esc(r.id)}">
         <div class="card-head"><div class="cab">${iconoDe(r.tipo)}<div class="cab-t"><div class="card-title serial">${esc(r.serial)}</div><div class="meta">${esc([r.tipo, r.marca, r.modelo].filter(Boolean).join(' · ') || 'Sin datos del equipo')}</div></div></div><span class="pill ${e.clase}">${e.n}</span></div>
-        <div class="facts"><span><b>${esc(r.persona || 'Sin persona')}</b></span><span class="mono">Llegó ${fechaBonita(r.fechaIngreso)}</span>${r.cerrado ? '' : textoEspera(r)}${!eq && !r.cerrado ? '<span class="tag-shared">Equipo nuevo</span>' : ''}</div>
+        <div class="facts"><span><b>${esc(r.persona || 'Sin persona')}</b></span><span class="mono">Llegó ${fechaBonita(r.fechaIngreso)}</span>${r.cerrado ? '' : textoEspera(r)}${!eq && !r.cerrado ? '<span class="tag-shared">Equipo nuevo</span>' : ''}${r.origen === 'entregas' ? '<span class="tag-shared">Devolución</span>' : ''}</div>
         ${(r.acc || []).length ? `<div class="acc-mini">Trajo: ${esc(r.acc.join(', '))}</div>` : ''}
         ${r.cerrado ? '' : `<div class="prog" aria-label="${hechas} de 2 tareas resueltas"><span style="width:${hechas * 50}%"></span></div>`}
       </button>
       ${controlTarea(r, 'mtto', 'Mantenimiento')}${controlTarea(r, 'backup', 'Backup')}
       ${r.obs ? `<div class="obs">${esc(r.obs)}</div>` : ''}
-      ${e.k === 'listo' ? `<button type="button" class="btn ok solo-editar" data-pasar="${esc(r.id)}">Pasar a Equipos</button>` : ''}
-      ${r.cerrado ? `<div class="meta">Pasado a Equipos ${hace(r.cerradoEn)}.</div>` : ''}
+      ${r.cerrado ? '' : e.k === 'listo'
+        ? `<button type="button" class="btn ok solo-editar" data-pasar="${esc(r.id)}">✓ Listo: pasar a ${esc(destinoDe(r))}</button>`
+        : `<button type="button" class="btn ok solo-editar" data-listo="${esc(r.id)}">✓ Listo: ${faltanDe(r).join(' y ')} ${faltanDe(r).length > 1 ? 'hechos' : 'hecho'} → ${esc(destinoDe(r))}</button>`}
+      ${r.cerrado ? `<div class="meta">Pasado a Equipos ${hace(r.cerradoEn)}${r.persona ? ', asignado a ' + esc(r.persona) : ''}.</div>` : ''}
     </div>`;
   }).join('') : (filtroRec === 'pendientes' && !q
     ? `<div class="empty-state"><b>Todo al día</b>No hay equipos esperando mantenimiento ni backup.</div>`
@@ -851,6 +853,23 @@ function setTarea(rid, t, v) {
 }
 
 /* ================= PASAR A EQUIPOS ================= */
+const destinoDe = r => (r.persona || '').trim() || 'Equipos';
+const faltanDe = r => ['mtto', 'backup'].filter(t => (r[t] || 'pend') === 'pend').map(t => t === 'mtto' ? 'mantenimiento' : 'backup');
+// Un solo toque: marca como hecho lo que falte (con la fecha de hoy) y pasa el equipo a su destino.
+function listoTodo(rid) {
+  const r = R.get(rid); if (!r || r.cerrado) return;
+  if (soloLectura) { toast('Solo lectura: no puedes editar.'); return; }
+  if (!idSerial(r.serial)) { toast('Falta el serial para pasarlo a Equipos.'); return; }
+  const data = {}, faltan = faltanDe(r);
+  ['mtto', 'backup'].forEach(t => { if ((r[t] || 'pend') === 'pend') { data[t] = 'hecho'; data[t + 'Fecha'] = hoyIso(); } });
+  const p = planPasar(Object.assign({}, r, data));
+  const acc = (r.acc || []).length ? `\n\nEntrégalo con: ${r.acc.join(', ')}.` : '';
+  confirmar(`¿Listo y pasar a ${destinoDe(r)}?`, `${r.serial}\nSe marca ${faltan.join(' y ')} como ${faltan.length > 1 ? 'hechos' : 'hecho'} hoy (${fechaBonita(hoyIso())}).\n${p.lineas.join('\n')}${acc}`, 'Sí, listo', async () => {
+    const r2 = R.get(rid); if (!r2 || r2.cerrado) return;
+    await escribir({ tipo: 'update', col: COL_R, id: rid, data: Object.assign({}, data, sello()) });
+    await ejecutarPasar(rid);
+  }, 'ok');
+}
 function planPasar(r) {
   const id = idSerial(r.serial), eq = Q.get(id), lineas = [];
   const data = {};
@@ -875,7 +894,9 @@ function preguntarPasar(rid) {
   if (!idSerial(r.serial)) { toast('Falta el serial para pasarlo a Equipos.'); return; }
   const p = planPasar(r);
   const acc = (r.acc || []).length ? `\n\nEntrégalo con: ${r.acc.join(', ')}.` : '';
-  confirmar('¿Pasar a Equipos?', `${r.serial}\n${p.lineas.join('\n')}${acc}`, 'Sí, pasar a Equipos', async () => {
+  confirmar(`¿Pasar a ${destinoDe(r)}?`, `${r.serial}\n${p.lineas.join('\n')}${acc}`, 'Sí, pasar', () => ejecutarPasar(rid), 'ok');
+}
+async function ejecutarPasar(rid) {
     const r2 = R.get(rid); if (!r2 || r2.cerrado) return;
     const p2 = planPasar(r2);
     if (p2.eq) await escribir({ tipo: 'update', col: COL_Q, id: p2.id, data: Object.assign({}, p2.data, sello()) });
@@ -884,8 +905,7 @@ function preguntarPasar(rid) {
       await escribir({ tipo: 'set', col: COL_Q, id: p2.id, data: Object.assign({ serial: String(r2.serial).trim().toUpperCase(), tipo: '', marca: '', modelo: '', asignado: '', mail: '', cliente: 'Petrobras', proyecto: '', departamento: 'Guajira', municipio: 'Riohacha', fechaMtto: '', obs: '', n }, p2.data, sello()) });
     }
     await escribir({ tipo: 'update', col: COL_R, id: rid, data: Object.assign({ cerrado: true, cerradoEn: new Date().toISOString() }, sello()) });
-    toast('Equipo actualizado en la lista principal');
-  }, 'ok');
+    toast(`Listo: ${r2.serial} quedó asignado a ${destinoDe(r2)}`);
 }
 
 /* ================= HOJA: RECIBIDO ================= */
@@ -1213,6 +1233,7 @@ $('chipsRec').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { 
 $('recList').onclick = e => {
   const t = e.target.closest('[data-tarea]'); if (t) { if (!t.disabled) setTarea(t.dataset.rid, t.dataset.tarea, t.dataset.v); return; }
   const p = e.target.closest('[data-pasar]'); if (p) return preguntarPasar(p.dataset.pasar);
+  const l = e.target.closest('[data-listo]'); if (l) return listoTodo(l.dataset.listo);
   const b = e.target.closest('[data-rec]'); if (b) abrirRec(b.dataset.rec);
 };
 $('btnNewRec').onclick = () => abrirRec(null);

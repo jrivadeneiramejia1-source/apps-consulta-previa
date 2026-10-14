@@ -496,9 +496,9 @@ label.subir { text-align: center; cursor: pointer; }
 <div class="toast" id="toast" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}]};</script>
-<script src="../config.js?v=6"></script>
-<script src="../nube.js?v=6"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "7"};</script>
+<script src="../config.js?v=7"></script>
+<script src="../nube.js?v=7"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -578,6 +578,7 @@ let listo = false, conexion = 'cargando', fechaCache = null;
 let pendientes = lsGet(PEND_KEY) || [];
 let vista = 'ent', filtro = 'todos', enActual = null, renderPendiente = false;
 let lote = [];          // páginas que se están subiendo
+window.hayCambiosSinGuardar = () => lote.length > 0;
 let EQDB = null, EQ = new Map(), EQR = new Map();   // conexión con la app de Equipos
 let eqListos = 0, eqListo; const eqListoP = new Promise(res => { eqListo = res; });
 const TIPO_A_EQ = { 'Portátil': 'PC Portátil', 'Impresora': 'Impresora Portátil', 'Video beam': 'Video Beam' };

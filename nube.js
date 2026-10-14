@@ -312,13 +312,30 @@
   };
   window.nube = nube;
 
+  /* ---------- versión nueva ---------- */
+  // Si en GitHub hay una versión más nueva que la que está abierta, recarga con ella (una sola vez por versión).
+  async function revisarVersion() {
+    if (!APP.v || !/^https?:$/.test(location.protocol)) return;
+    try {
+      const r = await fetch('../version.json?t=' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) return;
+      const { v } = await r.json();
+      if (!v || v === APP.v) return;
+      if (typeof window.hayCambiosSinGuardar === 'function' && window.hayCambiosSinGuardar()) { toast('Hay una versión nueva de la app: guarda y vuelve a abrirla.'); return; }
+      const k = 'nube_recarga_' + APP.id + '_' + v;
+      try { if (sessionStorage.getItem(k)) return; sessionStorage.setItem(k, '1'); } catch (e) {}
+      location.replace(location.pathname + '?v=' + encodeURIComponent(v));
+    } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') revisarVersion(); });
+
   /* ---------- arranque ---------- */
   async function arrancar() {
     barra = document.createElement('div'); barra.className = 'nube-barra'; barra.hidden = true; barra.setAttribute('role', 'status');
     const top = document.querySelector('header.top');
     if (top) top.after(barra); else document.body.prepend(barra);
     avisar = m => { barra.className = 'nube-barra off'; barra.textContent = m; barra.hidden = false; setTimeout(() => pintarEstado(), 8000); };
-    pintarEstado(); pintarInstalar();
+    pintarEstado(); pintarInstalar(); revisarVersion();
     const conexion = conectar().catch(e => { errorFirebase = e.message || String(e); });
     if (!espacio) { await conexion; await pantallaClave(errorFirebase && !navigator.onLine ? 'Sin internet: la primera vez necesitas conexión.' : ''); }
     await conexion;
