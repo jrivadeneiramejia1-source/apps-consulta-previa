@@ -1,11 +1,10 @@
 // Pruebas del escáner de Entregas: cámara del teléfono → recorte → revisar → lista de páginas.
-// Uso: node pruebas/escaner.mjs [carpeta-de-capturas]. Fotos de prueba en /tmp/claude-0/esc (generadas con gen.py).
+// Uso: node pruebas/escaner.mjs [carpeta-de-capturas]. Fotos de prueba en pruebas/fotos (generadas con pruebas/fotos-gen.py).
 import fs from 'node:fs';
-import { chromium, servir, pagina, semillaEquipos } from './banco.mjs';
+import { chromium, lanzar, AXE_JS, FOTOS, SALIDA, servir, pagina, semillaEquipos } from './banco.mjs';
 
-const OUT = process.argv[2] || '/tmp/claude-0/pr';
-const F = '/tmp/claude-0/esc';
-const AXE = fs.readFileSync('/home/claude/construir/node_modules/axe-core/axe.min.js', 'utf8');
+const OUT = process.argv[2] || SALIDA;
+const AXE = AXE_JS;
 const URL = 'http://127.0.0.1:8819';
 let ok = 0, mal = 0;
 function chequear(cond, nombre) { if (cond) ok++; else { mal++; console.log('  FALLA:', nombre); } }
@@ -39,10 +38,10 @@ async function botonesGrandes(page, nombre) {
 }
 
 const srv = await servir(8819);
-const br = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox', '--disable-dev-shm-usage'] });
+const br = await lanzar();
 
 let ERR = [], PG = null;
-process.on('uncaughtException', async e => { console.log('ERROR:', e.message.split('\n')[0], '\n  errores de la página:', ERR.join(' | ')); try { await PG.screenshot({ path: '/tmp/claude-0/esc/falla.png' }); } catch (x) {} process.exit(2); });
+process.on('uncaughtException', async e => { console.log('ERROR:', e.message.split('\n')[0], '\n  errores de la página:', ERR.join(' | ')); try { await PG.screenshot({ path: SALIDA + '/falla.png' }); } catch (x) {} process.exit(2); });
 async function abrirEntregas(opc = {}) {
   const err = []; ERR = err;
   const sem = semillaEquipos(); delete sem.nube_equipos_espacio;
@@ -60,7 +59,7 @@ for (const tema of ['light', 'dark']) {
   const { ctx, pg, err } = await abrirEntregas({ tema });
 
   // 1. El botón abre la cámara del teléfono de una vez
-  const ch1 = await tomarFoto(pg, `${F}/fotos2/00.jpg`, () => pg.click('#btnEscanear'));
+  const ch1 = await tomarFoto(pg, `${FOTOS}/a4-mano.jpg`, () => pg.click('#btnEscanear'));
   chequear(await ch1.element().getAttribute('capture') === 'environment' && !ch1.isMultiple(), 'abre la cámara trasera del teléfono (una foto)');
   await esperarRevisar(pg);
   chequear((await titulo(pg)) === 'Página 1', 'pantalla de revisar: Página 1');
@@ -114,18 +113,18 @@ for (const tema of ['light', 'dark']) {
   await axe(pg, `lista ${tema}`); await sinDesborde(pg, 'lista'); await botonesGrandes(pg, 'lista');
 
   // 3. Foto sin hoja: abre el editor; Repetir abre la cámara otra vez
-  await tomarFoto(pg, `${F}/neg/00.jpg`, () => pg.locator('.esc [data-a="camara"]').click());
+  await tomarFoto(pg, `${FOTOS}/sin-hoja.jpg`, () => pg.locator('.esc [data-a="camara"]').click());
   await esperarPantalla(pg, 'Ajusta las esquinas');
   chequear((await arriba(pg).locator('.esc-estado').textContent()).includes('No encontré'), 'sin hoja: pide ajustar las esquinas');
   await arriba(pg).locator('[data-a="todo"]').click(); await arriba(pg).locator('[data-a="listo"]').click(); await esperarRevisar(pg);
-  await tomarFoto(pg, `${F}/fotos3/05.jpg`, () => arriba(pg).locator('[data-a="repetir"]').click());
+  await tomarFoto(pg, `${FOTOS}/oficio.jpg`, () => arriba(pg).locator('[data-a="repetir"]').click());
   await esperarRevisar(pg);
   chequear((await titulo(pg)) === 'Página 2' && (await arriba(pg).locator('.esc-estado').textContent()).includes('Hoja encontrada'), 'Repetir abre la cámara y procesa la foto nueva');
   d = await dim(); chequear(Math.abs(Math.max(d.h / d.w, d.w / d.h) - 330 / 216) < 0.01, `proporción real oficio (${(d.h / d.w).toFixed(3)})`);
   await arriba(pg).locator('[data-a="usar"]').click(); await pg.waitForSelector('.esc-pag >> nth=1');
 
   // 4. Galería: varias fotos, una por una
-  const chG = await tomarFoto(pg, [`${F}/fotos/03.jpg`, `${F}/fotos/07.jpg`], () => pg.locator('.esc [data-a="galeria"]').click());
+  const chG = await tomarFoto(pg, [`${FOTOS}/galeria-1.jpg`, `${FOTOS}/galeria-2.jpg`], () => pg.locator('.esc [data-a="galeria"]').click());
   chequear(chG.isMultiple() && !(await chG.element().getAttribute('capture')), 'galería: varias fotos, sin cámara');
   await esperarRevisar(pg);
   chequear((await titulo(pg)) === 'Página 3 (1 de 2)', 'galería: Página 3 (1 de 2)');
@@ -158,12 +157,12 @@ for (const tema of ['light', 'dark']) {
   chequear(lote && lote.startsWith('data:image/jpeg'), 'miniatura de la página escaneada');
 
   // 7. Cerrar con páginas pide confirmación; atrás del teléfono
-  await tomarFoto(pg, `${F}/fotos/09.jpg`, () => pg.click('#btnEscanear')); await esperarRevisar(pg);
+  await tomarFoto(pg, `${FOTOS}/hoja-3.jpg`, () => pg.click('#btnEscanear')); await esperarRevisar(pg);
   await pg.goBack(); await espera(200);
   chequear(await pg.locator('.esc').count() === 1 && await pg.locator('.esc-pag').count() === 0, 'atrás del teléfono: descarta la foto y vuelve a la lista');
   if (tema === 'light') await pg.screenshot({ path: `${OUT}/s0-guia.png` });
   await axe(pg, `guía ${tema}`); await botonesGrandes(pg, 'guía');
-  await tomarFoto(pg, `${F}/fotos/09.jpg`, () => pg.locator('.esc [data-a="camara"]').click()); await esperarRevisar(pg);
+  await tomarFoto(pg, `${FOTOS}/hoja-3.jpg`, () => pg.locator('.esc [data-a="camara"]').click()); await esperarRevisar(pg);
   await arriba(pg).locator('[data-a="usar"]').click(); await pg.waitForSelector('.esc-pag');
   await pg.locator('.esc [data-a="cerrar"]').click();
   chequear(await pg.locator('.esc').count() === 1 && (await pg.locator('.esc [data-a="cerrar"]').textContent()).includes('¿Descartar 1?'), 'Cerrar con páginas pide confirmar');
@@ -175,7 +174,7 @@ for (const tema of ['light', 'dark']) {
   chequear(pg.url().endsWith('/entregas/'), 'atrás no se sale de la app');
 
   // 8. Recortar una página ya cargada (foto de galería subida aparte)
-  await pg.setInputFiles('#archivo', [`${F}/fotos3/12.jpg`]);
+  await pg.setInputFiles('#archivo', [`${FOTOS}/recortar.jpg`]);
   await pg.waitForSelector('#subList .card.pag >> nth=2');
   await pg.locator('[data-recortar="2"]').click();
   await esperarRevisar(pg);
@@ -193,7 +192,7 @@ for (const tema of ['light', 'dark']) {
   console.log('\n=== SIN RECORTADOR ===');
   const { ctx, pg, err } = await abrirEntregas();
   await ctx.route(/opencv\.js$/, r => r.abort());
-  await tomarFoto(pg, `${F}/fotos/02.jpg`, () => pg.click('#btnEscanear'));
+  await tomarFoto(pg, `${FOTOS}/hoja-4.jpg`, () => pg.click('#btnEscanear'));
   await esperarRevisar(pg);
   chequear((await arriba(pg).locator('.esc-estado').textContent()).includes('Sin internet'), 'avisa que se usa la foto completa');
   chequear(await arriba(pg).locator('.esc-filtros').isHidden() && await arriba(pg).locator('[data-a="esquinas"]').count() === 0, 'sin filtros ni esquinas');

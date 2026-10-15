@@ -41,12 +41,13 @@ export async function cifrar(texto, p256dh, auth) {
 }
 
 // Firma VAPID (JWT ES256) para el servicio de notificaciones.
-export async function vapid(endpoint, d, sujeto) {
-  const llave = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', x: VAPID_X, y: VAPID_Y, d, ext: true }, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
+// x, y: parte pública de la llave (por defecto la de la app; las pruebas usan una llave propia).
+export async function vapid(endpoint, d, sujeto, x = VAPID_X, y = VAPID_Y) {
+  const llave = await crypto.subtle.importKey('jwk', { kty: 'EC', crv: 'P-256', x, y, d, ext: true }, { name: 'ECDSA', namedCurve: 'P-256' }, false, ['sign']);
   const cab = b64u(enc.encode(JSON.stringify({ typ: 'JWT', alg: 'ES256' })));
   const cuerpo = b64u(enc.encode(JSON.stringify({ aud: new URL(endpoint).origin, exp: Math.floor(Date.now() / 1000) + 12 * 3600, sub: sujeto })));
   const firma = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, llave, enc.encode(cab + '.' + cuerpo));
-  const pub = b64u(unir(new Uint8Array([4]), deB64u(VAPID_X), deB64u(VAPID_Y)));
+  const pub = b64u(unir(new Uint8Array([4]), deB64u(x), deB64u(y)));
   return `vapid t=${cab}.${cuerpo}.${b64u(firma)}, k=${pub}`;
 }
 
@@ -55,15 +56,40 @@ function cors(origen) {
 }
 const json = (datos, estado, h) => new Response(JSON.stringify(datos), { status: estado, headers: Object.assign({ 'Content-Type': 'application/json' }, h) });
 
+// Registro de errores: las apps mandan aquí los errores que pasan en los teléfonos y el Worker los publica en Slack.
+// Secreto opcional en Cloudflare: SLACK_WEBHOOK (dirección de un "Incoming Webhook" de Slack). Sin él, no se publica nada.
+const MAX_ERRORES = 10;
+const corto = (v, n) => String(v == null ? '' : v).replace(/[\u0000-\u0008\u000b-\u001f]/g, ' ').slice(0, n);
+// Slack interpreta < > & (menciones como <!channel>): se escapan para que el texto llegue tal cual.
+const slackTxt = v => v.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+async function errores(req, env, h) {
+  let datos;
+  try { datos = await req.json(); } catch (e) { return json({ error: 'JSON inválido' }, 400, h); }
+  const lista = (Array.isArray(datos && datos.errores) ? datos.errores : [datos]).filter(x => x && x.mensaje).slice(0, MAX_ERRORES);
+  if (!lista.length) return json({ error: 'no hay errores' }, 400, h);
+  if (!env.SLACK_WEBHOOK) return json({ ok: true, slack: false }, 202, h);
+  const bloques = lista.map(x => {
+    const quien = slackTxt([corto(x.nombre, 40) || 'sin nombre', corto(x.navegador, 60)].filter(Boolean).join(' · '));
+    const veces = Number(x.veces) > 1 ? ` (${Math.min(999, Number(x.veces))} veces)` : '';
+    return `:warning: *Error en ${slackTxt(corto(x.app, 20)) || 'la app'} v${slackTxt(corto(x.version, 10)) || '?'}*${veces} · ${quien}\n>${slackTxt(corto(x.mensaje, 300))}` +
+      (x.detalle ? '\n```' + slackTxt(corto(x.detalle, 1200)).replace(/```/g, "'''") + '```' : '') + (x.donde ? `\n_${slackTxt(corto(x.donde, 120))}_` : '');
+  });
+  try {
+    const r = await fetch(env.SLACK_WEBHOOK, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: bloques.join('\n\n') }) });
+    return json({ ok: r.ok, slack: true, estado: r.status }, r.ok ? 200 : 502, h);
+  } catch (e) { return json({ ok: false, slack: true, error: String(e.message || e) }, 502, h); }
+}
+
 export default {
   async fetch(req, env) {
     const origen = req.headers.get('Origin') || '';
     const permitido = ORIGENES.includes(origen);
     const h = permitido ? cors(origen) : {};
     if (req.method === 'OPTIONS') return new Response(null, { status: permitido ? 204 : 403, headers: h });
-    if (req.method === 'GET') return json({ ok: true, servicio: 'avisos-equipos', listo: !!env.VAPID_D }, 200, h);
+    if (req.method === 'GET') return json({ ok: true, servicio: 'avisos-equipos', listo: !!env.VAPID_D, slack: !!env.SLACK_WEBHOOK }, 200, h);
     if (req.method !== 'POST') return json({ error: 'método no permitido' }, 405, h);
     if (!permitido) return json({ error: 'origen no permitido' }, 403, h);
+    if (new URL(req.url).pathname.replace(/\/+$/, '').endsWith('/errores')) return errores(req, env, h);
     if (!env.VAPID_D) return json({ error: 'falta el secreto VAPID_D en el Worker' }, 500, h);
     let datos;
     try { datos = await req.json(); } catch (e) { return json({ error: 'JSON inválido' }, 400, h); }
@@ -76,7 +102,7 @@ export default {
         if (!s || !/^https:\/\//.test(s.endpoint || '') || !s.keys) return { estado: 0, error: 'suscripción inválida' };
         const r = await fetch(s.endpoint, {
           method: 'POST',
-          headers: { Authorization: await vapid(s.endpoint, env.VAPID_D, sujeto), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'high' },
+          headers: { Authorization: await vapid(s.endpoint, env.VAPID_D, sujeto, env.VAPID_X || VAPID_X, env.VAPID_Y || VAPID_Y), 'Content-Encoding': 'aes128gcm', 'Content-Type': 'application/octet-stream', TTL: '86400', Urgency: 'high' },
           body: await cifrar(texto, s.keys.p256dh, s.keys.auth)
         });
         return { estado: r.status, vencida: r.status === 404 || r.status === 410 };

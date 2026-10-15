@@ -1,9 +1,9 @@
 // Pruebas de Equipos y Entregas con Firebase falso. Uso: node pruebas/prueba.mjs [carpeta-de-capturas]
 import fs from 'node:fs';
-import { chromium, servir, pagina, semillaEquipos, huella } from './banco.mjs';
+import { chromium, lanzar, AXE_JS, FOTOS, SALIDA, servir, pagina, semillaEquipos, huella } from './banco.mjs';
 
-const OUT = process.argv[2] || '/tmp/claude-0/pr';
-const AXE = fs.readFileSync('/home/claude/construir/node_modules/axe-core/axe.min.js', 'utf8');
+const OUT = process.argv[2] || SALIDA;
+const AXE = AXE_JS;
 const URL = 'http://127.0.0.1:8811';
 let ok = 0, mal = 0;
 const fallas = [];
@@ -24,7 +24,7 @@ async function sinDesborde(page, nombre) {
 async function enfocadoDentro(page, sel) { return page.evaluate(s => { const el = document.querySelector(s); return !!el && el.contains(document.activeElement); }, sel); }
 
 const srv = await servir();
-const br = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+const br = await lanzar();
 
 for (const tema of ['light', 'dark']) {
   console.log(`\n=== EQUIPOS (${tema}) ===`);
@@ -228,7 +228,7 @@ for (const tema of ['light', 'dark']) {
 
   // subir dos fotos
   await pg.click('#tabSub');
-  await pg.setInputFiles('#archivo', [`${OUT}/hoja1.jpg`, `${OUT}/hoja2.jpg`]);
+  await pg.setInputFiles('#archivo', [`${FOTOS}/hoja1.jpg`, `${FOTOS}/hoja2.jpg`]);
   await pg.waitForSelector('#subList .card.pag >> nth=1');
   chequear(await pg.locator('#badgeSub').textContent() === '2', 'insignia de páginas sin guardar');
   await pg.fill('#l0n', 'Ana Gómez'); await pg.fill('#l0f', '2026-10-14');

@@ -1,13 +1,13 @@
 // Notificaciones de la Agenda (con el permiso del navegador y el servidor simulados). Uso: node pruebas/avisos.mjs
 import fs from 'node:fs';
 import vm from 'node:vm';
-import { chromium, servir, pagina, semillaEquipos, huella, RAIZ } from './banco.mjs';
+import { chromium, lanzar, AXE_JS, FOTOS, SALIDA, servir, pagina, semillaEquipos, huella, RAIZ } from './banco.mjs';
 const URL = 'http://127.0.0.1:8817', esp = ms => new Promise(r => setTimeout(r, ms));
-const AXE = fs.readFileSync('/home/claude/construir/node_modules/axe-core/axe.min.js', 'utf8');
+const AXE = AXE_JS;
 const B = `espacios/${huella('equipos', 'prueba123')}`;
 let ok = 0, mal = 0;
 const log = (n, t, x) => { t ? ok++ : mal++; console.log((t ? 'OK   ' : 'FALLA') + ' ' + n + (t || !x ? '' : '\n      ' + x)); };
-const srv = await servir(8817); const br = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+const srv = await servir(8817); const br = await lanzar();
 const err = [];
 const { ctx, page } = await pagina(br, { semilla: semillaEquipos(), errores: err });
 // Permiso y suscripción simulados (en un teléfono real los da Chrome)

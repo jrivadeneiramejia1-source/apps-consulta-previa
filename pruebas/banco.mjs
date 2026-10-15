@@ -3,10 +3,20 @@ import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import { createRequire } from 'node:module';
-const require = createRequire('/home/claude/construir/');
-export const { chromium } = require('playwright');
 export const RAIZ = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
+// Las librerías salen del node_modules del repo (npm install); si no está, de la carpeta de trabajo de Claude.
+const BASE = fs.existsSync(path.join(RAIZ, 'node_modules', 'playwright')) ? RAIZ + '/' : '/home/claude/construir/';
+export const require = createRequire(BASE);
+export const { chromium } = require('playwright');
+// Navegador: el que diga CHROMIUM, el preinstalado de Claude o el que instala Playwright (en GitHub Actions).
+export const CHROMIUM = process.env.CHROMIUM || (fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined);
+export const lanzar = (extra = []) => chromium.launch({ executablePath: CHROMIUM, args: ['--no-sandbox', '--disable-dev-shm-usage', ...extra] });
+export const AXE_JS = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'utf8');
+export const FOTOS = path.join(RAIZ, 'pruebas', 'fotos');
+export const SALIDA = process.env.CAPTURAS || path.join(os.tmpdir(), 'capturas-apps');
+fs.mkdirSync(SALIDA, { recursive: true });
 const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
 export function servir(puerto = 8811) {
   const srv = http.createServer((req, res) => {
@@ -21,11 +31,11 @@ export function servir(puerto = 8811) {
 }
 export const huella = (app, clave) => crypto.createHash('sha256').update(app + ':' + clave).digest('hex').slice(0, 40);
 const LIBS = {
-  'xlsx.full.min.js': '/home/claude/construir/node_modules/xlsx/dist/xlsx.full.min.js',
-  'opencv.js': '/home/claude/construir/node_modules/@techstark/opencv-js/dist/opencv.js',
+  'xlsx.full.min.js': require.resolve('xlsx/dist/xlsx.full.min.js'),
+  'opencv.js': path.join(path.dirname(require.resolve('@techstark/opencv-js/package.json')), 'dist', 'opencv.js'),
 };
-export async function pagina(browser, { tema = 'light', ancho = 390, alto = 844, semilla = null, errores = [] } = {}) {
-  const ctx = await browser.newContext({ viewport: { width: ancho, height: alto }, colorScheme: tema, locale: 'es-CO', deviceScaleFactor: 2 });
+export async function pagina(browser, { tema = 'light', ancho = 390, alto = 844, semilla = null, errores = [], quieto = false } = {}) {
+  const ctx = await browser.newContext({ viewport: { width: ancho, height: alto }, colorScheme: tema, locale: 'es-CO', deviceScaleFactor: 2, reducedMotion: quieto ? 'reduce' : 'no-preference' });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, async r => {
     const u = r.request().url();
     if (u.includes('/firebasejs/')) return r.fulfill({ path: path.join(RAIZ, 'pruebas', u.includes('firestore') ? 'firebase-firestore.js' : 'firebase-app.js'), contentType: 'text/javascript' });

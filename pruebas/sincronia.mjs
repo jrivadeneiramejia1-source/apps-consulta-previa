@@ -1,7 +1,7 @@
 // Sincronía Entregas ↔ Equipos y mantenimiento programado. Uso: node pruebas/sincronia.mjs
-import { chromium, servir, pagina, semillaEquipos, huella } from './banco.mjs';
+import { chromium, lanzar, AXE_JS, FOTOS, SALIDA, servir, pagina, semillaEquipos, huella } from './banco.mjs';
 const URL = 'http://127.0.0.1:8814', esp = ms => new Promise(r => setTimeout(r, ms));
-const srv = await servir(8814); const br = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--no-sandbox'] });
+const srv = await servir(8814); const br = await lanzar();
 const B = `espacios/${huella('equipos', 'prueba123')}`, BE = `espacios/${huella('entregas', 'prueba123')}`;
 const HOY = new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
 let ok = 0, mal = 0;
@@ -16,7 +16,7 @@ const hojaDe = (s, nombre) => Object.entries(s).find(([k, v]) => k.startsWith(BE
 const archivosDe = (s, hid) => Object.keys(s).filter(k => k.startsWith(BE + '/archivos/' + hid + '_'));
 
 async function subir(nombre, tipo, serial, archivo = 'hoja1.jpg') {
-  await en.click('#tabSub'); await en.setInputFiles('#archivo', ['/tmp/claude-0/pr/' + archivo]); await en.waitForSelector('#l0n');
+  await en.click('#tabSub'); await en.setInputFiles('#archivo', [FOTOS + '/' + archivo]); await en.waitForSelector('#l0n');
   await en.fill('#l0n', nombre); await en.fill('#l0f', '2026-10-14'); await en.selectOption('#l0t', tipo);
   await en.locator('[data-i="0"] [data-eq-k="serial"]').fill(serial);
   await en.click('#subGuardar'); await en.waitForSelector('#cfSheet:not([hidden])'); await en.click('#cfYes'); await esp(500);

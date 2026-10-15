@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=20">
+<link rel="stylesheet" href="../comun.css?v=21">
 <style>
 
 /* --- Entregas --- */
@@ -223,16 +223,16 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "20"};</script>
-<script src="../iconos.js?v=20"></script>
-<script src="../comun.js?v=20"></script>
-<script src="escaner.js?v=20"></script>
-<script src="../config.js?v=20"></script>
-<script src="../nube.js?v=20"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "21"};</script>
+<script src="../iconos.js?v=21"></script>
+<script src="../comun.js?v=21"></script>
+<script src="escaner.js?v=21"></script>
+<script src="../config.js?v=21"></script>
+<script src="../nube.js?v=21"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
-const CACHE_KEY = 'ent_cache_v1', PEND_KEY = 'ent_pendientes_v1', UI_KEY = 'ent_ui_v1';
+const CACHE_KEY = 'ent_cache_v1', PEND_KEY = 'ent_pendientes_v1';
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const PDFJS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
 const PDFJS_WORKER = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -308,7 +308,59 @@ let listo = false, conexion = 'cargando', fechaCache = null;
 let pendientes = lsGet(PEND_KEY) || [];
 let vista = 'ent', filtro = 'todos', enActual = null, renderPendiente = false;
 let lote = [];          // páginas que se están subiendo
-window.hayCambiosSinGuardar = () => lote.length > 0;
+let loteSeguro = true;  // ¿lo que hay en Subir ya quedó guardado en el teléfono?
+window.hayCambiosSinGuardar = () => lote.length > 0 && !loteSeguro;
+/* Páginas sin guardar: quedan en el teléfono (IndexedDB) por si se cierra la app, se recarga o se acaba la batería.
+   Se borran al guardarlas o descartarlas. Solo se recuperan con la misma clave con que se escanearon. */
+const LOTE_DB = 'entregas-lote', LOTE_ST = 'lote', ESPACIO_KEY = 'nube_entregas_espacio';
+let loteDb = null, loteT = 0, loteListo = false;   // hasta recuperar lo anterior no se escribe encima
+function abrirLoteDb() {
+  if (!loteDb) loteDb = new Promise((ok, mal) => {
+    if (!window.indexedDB) return mal(new Error('sin IndexedDB'));
+    const r = indexedDB.open(LOTE_DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(LOTE_ST);
+    r.onsuccess = () => ok(r.result); r.onerror = () => mal(r.error); r.onblocked = () => mal(new Error('IndexedDB bloqueada'));
+  }).catch(e => { loteDb = null; throw e; });
+  return loteDb;
+}
+function loteTx(modo, hacer) {
+  return abrirLoteDb().then(db => new Promise((ok, mal) => {
+    const tx = db.transaction(LOTE_ST, modo), q = hacer(tx.objectStore(LOTE_ST));
+    tx.oncomplete = () => ok(q && q.result); tx.onerror = () => mal(tx.error); tx.onabort = () => mal(tx.error);
+  }));
+}
+async function loteGuardarYa() {
+  clearTimeout(loteT); loteT = 0;
+  if (!loteListo) return;
+  const n = lote.length;
+  try {
+    // Solo datos simples y la imagen (Blob): así nunca falla la copia.
+    const paginas = lote.map(p => { const { blob, ...resto } = p; return Object.assign(JSON.parse(JSON.stringify(resto)), { blob }); });
+    let espacio = ''; try { espacio = localStorage.getItem(ESPACIO_KEY) || ''; } catch (e) {}
+    await loteTx('readwrite', st => paginas.length ? st.put({ v: 1, guardado: Date.now(), espacio, paginas }, 'actual') : st.delete('actual'));
+    if (!loteT && lote.length === n) loteSeguro = true;
+  } catch (e) {}
+}
+// Mientras se escribe se guarda medio segundo después; al quedar vacío se borra enseguida.
+const loteGuardar = () => { clearTimeout(loteT); loteT = 0; if (!lote.length) { loteSeguro = true; loteGuardarYa(); } else { loteSeguro = false; loteT = setTimeout(loteGuardarYa, 500); } };
+document.addEventListener('visibilitychange', () => { if (document.hidden && loteT) loteGuardarYa(); });
+async function loteRecuperar() {
+  let n = 0;
+  try {
+    const r = await loteTx('readonly', st => st.get('actual'));
+    let esp = ''; try { esp = localStorage.getItem(ESPACIO_KEY) || ''; } catch (e) {}
+    if (r && (!esp || r.espacio !== esp)) await loteTx('readwrite', st => st.delete('actual'));   // otra clave o se salió: no se muestran
+    else if (r && Array.isArray(r.paginas)) {
+      const pags = r.paginas.filter(p => p && p.blob instanceof Blob && p.vista);
+      pags.forEach(p => { if (!Array.isArray(p.equipos) || !p.equipos.length) p.equipos = [eqVacio()]; });
+      n = Math.min(pags.length, MAX_PAGINAS);
+      if (n) lote = pags.concat(lote).slice(0, MAX_PAGINAS);   // si ya cargó otras mientras tanto, quedan después
+    }
+  } catch (e) { n = 0; }
+  loteListo = true;
+  if (n) { renderSub(); avisoLote(); } else if (lote.length) loteGuardar();
+  return n;
+}
 let EQDB = null, EQ = new Map(), EQR = new Map();   // conexión con la app de Equipos
 let eqListos = 0, eqListo; const eqListoP = new Promise(res => { eqListo = res; });
 const TIPO_A_EQ = { 'Portátil': 'PC Portátil', 'Impresora': 'Impresora Portátil', 'Video beam': 'Video Beam' };
@@ -316,7 +368,6 @@ const EQ_A_TIPO = { 'PC Portátil': 'Portátil', 'Impresora Portátil': 'Impreso
 const idSerial = x => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const pendienteEq = id => [...EQR.values()].find(x => !x.cerrado && idSerial(x.serial) === id);
 const pendienteEqId = id => { for (const [k, x] of EQR) if (!x.cerrado && idSerial(x.serial) === id) return k; return null; };
-const ui = lsGet(UI_KEY) || {};
 
 /* ================= UTILIDADES ================= */
 const $ = id => document.getElementById(id);
@@ -491,7 +542,9 @@ function renderEnt() {
       </span>
     </button>`;
   });
+  const moverEnt = UI.antes($('entList'));
   $('entList').innerHTML = html || UI.vacio('buscar', 'Nada coincide', 'Prueba con otro filtro o borra la búsqueda.');
+  moverEnt();
 }
 
 /* ================= SUBIR ================= */
@@ -577,6 +630,7 @@ async function recortarPagina(i) {
   } catch (err) { toast('No se pudo recortar: ' + (err.message || err)); }
 }
 function renderSub() {
+  loteGuardar();
   $('subAcciones').hidden = !lote.length;
   UI.insignia($('badgeSub'), lote.length);
   const reg = gruposLote();
@@ -633,19 +687,20 @@ async function guardarLote() {
           origen: g.paginas.map(p => p.origen).join(' + '), subido: new Date().toISOString()
         };
         await escribir({ tipo: 'set', col: COL, id, data: Object.assign(datosHoja, sello()) });
+        g.paginas.forEach(p => { p.guardada = true; });
         hechos++;
         $('subEstado').textContent = 'Actualizando Equipos…';
         const txt = await enviarYMarcar(id);
         if (txt) resumenEq.push(`${datosHoja.nombre || 'Sin nombre'}: ${txt}`);
       }
-      toast((hechos === 1 ? '1 hoja guardada' : `${hechos} hojas guardadas`) + (resumenEq.length ? ' y Equipos actualizado' : ''));
+      toast((hechos === 1 ? '1 hoja guardada' : `${hechos} hojas guardadas`) + (resumenEq.length ? ' y Equipos actualizado' : '')); if (hechos) UI.celebrar();
       if (resumenEq.length) confirmar('Equipos actualizado', resumenEq.join('\n'), 'Listo', null, 'ok');
       else if (!EQDB && grupos.some(g => (g.datos.tipo === 'entrega' || g.datos.tipo === 'devolucion') && limpiarEquipos(g.datos.equipos).length))
         confirmar('No se envió a Equipos', 'Las hojas se guardaron, pero esta app no está conectada con Equipos, así que no se asignó nada ni quedó pendiente en Recibidos. Toca Conectar, escribe la clave de Equipos y luego "Enviar ahora".', 'Conectar', () => nube.enlazar('equipos'), 'ok');
       lote = []; $('subEstado').textContent = ''; renderSub(); ir('ent');
     } catch (e) {
-      toast('Se cortó la subida: ' + (e && (e.message || e.code) || e) + '. Lo ya guardado quedó guardado.');
-      lote = lote.slice(0); renderSub();
+      toast('Se cortó la subida: ' + (e && (e.message || e.code) || e) + (hechos === 1 ? '. La hoja que alcanzó a subir quedó guardada y se quitó de aquí.' : hechos ? `. Las ${hechos} hojas que alcanzaron a subir quedaron guardadas y se quitaron de aquí.` : '. Vuelve a tocar Guardar.'));
+      lote = lote.filter(p => !p.guardada); renderSub(); avisoLote();
     } finally { $('subGuardar').disabled = false; $('subCancelar').disabled = false; }
   };
   if (sinNombre) confirmar('Hay hojas sin nombre', `${sinNombre} ${sinNombre === 1 ? 'hoja no tiene' : 'hojas no tienen'} nombre. Se guardan igual y quedan en el filtro "Sin nombre o fecha" para completarlas después.`, 'Guardar igual', hacer, 'ok');
@@ -1027,9 +1082,10 @@ $('archivo').onchange = async e => {
 };
 $('subList').addEventListener('input', e => {
   const ek = e.target.dataset.eqK;
-  if (ek) { const card = e.target.closest('[data-i]'), fila = e.target.closest('[data-eq-i]'), q = lote[Number(card.dataset.i)].equipos[Number(fila.dataset.eqI)]; q[ek] = e.target.value; if (ek === 'serial') refrescarFila(fila, q); return; }
+  if (ek) { const card = e.target.closest('[data-i]'), fila = e.target.closest('[data-eq-i]'), q = lote[Number(card.dataset.i)].equipos[Number(fila.dataset.eqI)]; q[ek] = e.target.value; if (ek === 'serial') refrescarFila(fila, q); loteGuardar(); return; }
   const k = e.target.dataset.k, card = e.target.closest('[data-i]'); if (!k || !card) return;
   const p = lote[Number(card.dataset.i)]; if (e.target.type !== 'checkbox') p[k] = e.target.value;
+  loteGuardar();
 });
 $('subList').addEventListener('change', e => {
   const ek = e.target.dataset.eqK;
@@ -1104,7 +1160,8 @@ $('btnCopia').onclick = () => nube.exportar();
 $('archivoCopia').onchange = e => nube.importar(e.target);
 $('btnNombre').onclick = () => nube.cambiarNombre();
 $('btnSalir').onclick = () => nube.salir();
-window.addEventListener('beforeunload', e => { if (lote.length) { e.preventDefault(); e.returnValue = ''; } });
+// Solo pregunta al salir si las páginas aún no quedaron guardadas en el teléfono.
+window.addEventListener('beforeunload', e => { if (lote.length && !loteSeguro) { if (loteT) loteGuardarYa(); e.preventDefault(); e.returnValue = ''; } });
 
 /* ================= ARRANQUE ================= */
 async function iniciar() {
@@ -1116,6 +1173,7 @@ async function iniciar() {
   const [db, user, dl] = await Promise.all([usar('db'), usar('user'), usar('downloads')]);
   DB = db; USER = user; DL = dl;
   $('btnExcel').hidden = !DL;
+  loteRecuperar().then(n => { if (n) toast(n === 1 ? 'Se recuperó 1 página que no se había guardado. Está en Subir.' : `Se recuperaron ${n} páginas que no se habían guardado. Están en Subir.`); });
   if (USER) { try { miId = await USER.id(); } catch (e) {} }
   if (!DB) { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
   pintarAvisos(); suscribir(); reintentarPendientes();

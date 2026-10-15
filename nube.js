@@ -34,6 +34,71 @@
     return { code: tabla[c] || c || 'unavailable', message: (e && e.message) || String(e) };
   }
 
+  /* ---------- registro de errores ---------- */
+  // Los errores que pasan en los teléfonos se mandan al Worker (avisos-equipos), que los publica en Slack.
+  // Solo va: app, versión, mensaje, dónde pasó, nombre de la persona y navegador. Nunca la clave, la huella ni los datos.
+  // Solo se envía desde GitHub Pages (en pruebas se usa window.ERRORES_URL). Sin internet quedan en cola para después.
+  const ERR = { max: 5, enviados: new Set(), vistos: new Map(), timer: 0 };
+  const errDestino = () => window.ERRORES_URL || (/\.github\.io$/.test(location.hostname) && window.AVISOS && window.AVISOS.url ? String(window.AVISOS.url).replace(/\/+$/, '') + '/errores' : '');
+  const RUIDO = /ResizeObserver loop|^Script error\.?$|Failed to fetch|NetworkError|Load failed|network ?error|ERR_INTERNET|ERR_NETWORK|AbortError|The operation was aborted|QuotaExceeded|unavailable|offline|Could not reach Cloud Firestore|chrome-extension:|moz-extension:|safari-extension:/i;
+  const limpiarErr = (s, n) => String(s == null ? '' : s)
+    .replace(/[a-f0-9]{40}/gi, '…')                       // huella del espacio (da acceso a los datos)
+    .replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '…@…')           // correos
+    .replace(/https?:\/\/[^\s)]+/g, u => { try { const x = new URL(u); return x.origin === location.origin ? x.pathname : x.host + x.pathname; } catch (e) { return '…'; } })
+    .slice(0, n);
+  function navegadorCorto() {
+    const u = navigator.userAgent || '';
+    const so = /Android/.test(u) ? 'Android' : /iPhone|iPad|iPod/.test(u) ? 'iPhone' : /Windows/.test(u) ? 'Windows' : /Mac OS/.test(u) ? 'Mac' : /Linux/.test(u) ? 'Linux' : 'otro';
+    const nav = /Edg\//.test(u) ? 'Edge' : /SamsungBrowser/.test(u) ? 'Samsung' : /Firefox\/|FxiOS/.test(u) ? 'Firefox' : /Chrome\/|CriOS/.test(u) ? 'Chrome' : /Safari\//.test(u) ? 'Safari' : 'otro';
+    const m = u.match(/(?:Chrome|CriOS|Firefox|FxiOS|Version)\/(\d+)/);
+    return `${so} · ${nav}${m ? ' ' + m[1] : ''}${matchMedia('(display-mode: standalone)').matches ? ' · instalada' : ''}`;
+  }
+  const colaErr = () => { try { return JSON.parse(leer('errores') || '[]'); } catch (e) { return []; } };
+  async function enviarErrores() {
+    ERR.timer = 0;
+    const url = errDestino(), lista = colaErr();
+    if (!url || !lista.length || !navigator.onLine) return;
+    try {
+      const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ errores: lista }), keepalive: true });
+      if (r.ok || r.status === 202 || r.status === 400) guardar('errores', null);   // 400: el Worker no lo acepta, no se reintenta
+    } catch (e) {}
+  }
+  function reportarError(error, donde) {
+    try {
+      const e = error && error.reason !== undefined ? error.reason : error;
+      const mensaje = limpiarErr(e && e.message ? (e.name && !String(e.message).startsWith(e.name) ? e.name + ': ' : '') + e.message : e, 300);
+      if (!mensaje || RUIDO.test(mensaje) || !navigator.onLine) return;
+      const sitio = limpiarErr(donde || location.pathname, 120);
+      const llave = mensaje + '|' + sitio, veces = (ERR.vistos.get(llave) || 0) + 1;
+      ERR.vistos.set(llave, veces);
+      if (ERR.enviados.has(llave)) {
+        // Ya se avisó: solo se actualiza cuántas veces pasó si sigue en la cola.
+        const cola = colaErr(), x = cola.find(c => c.mensaje === mensaje && c.donde === sitio);
+        if (x) { x.veces = veces; guardar('errores', JSON.stringify(cola)); }
+        return;
+      }
+      if (ERR.enviados.size >= ERR.max) return;
+      ERR.enviados.add(llave);
+      const cola = colaErr().slice(-9);
+      cola.push({ app: APP.nombre || APP.id, version: APP.v || '?', mensaje, detalle: limpiarErr(e && e.stack, 1200), donde: sitio, nombre: limpiarErr(nombre, 40), navegador: navegadorCorto(), veces, hora: new Date().toISOString() });
+      guardar('errores', JSON.stringify(cola));
+      clearTimeout(ERR.timer); ERR.timer = setTimeout(enviarErrores, 3000);
+    } catch (x) {}
+  }
+  window.addEventListener('error', ev => {
+    if (!ev.error && !ev.message) return;   // falla al cargar una imagen o un script: no es un error del código
+    reportarError(ev.error || { message: ev.message }, `${location.pathname}${ev.filename ? ' · ' + ev.filename.split('/').pop().split('?')[0] + ':' + ev.lineno + ':' + ev.colno : ''}`);
+  });
+  window.addEventListener('unhandledrejection', ev => {
+    const r = ev.reason;
+    if (r && (r.code === 'unavailable' || r.code === 'permission_denied' || r.code === 'permission-denied')) return;   // sin señal o clave: ya se le avisa a la persona
+    let texto = typeof r === 'string' ? r : r && r.message;
+    if (!texto && !(r instanceof Error)) { try { texto = JSON.stringify(r); } catch (x) { texto = String(r); } }
+    reportarError(r instanceof Error ? r : { message: texto }, location.pathname + ' · promesa');
+  });
+  window.addEventListener('online', () => { if (!ERR.timer) ERR.timer = setTimeout(enviarErrores, 3000); });
+  setTimeout(enviarErrores, 5000);   // lo que quedó en cola la última vez
+
   /* ---------- Firebase ---------- */
   async function conectar() {
     if (!window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.projectId) throw new Error('Falta la configuración de Firebase (config.js).');
@@ -201,7 +266,7 @@
         const v = conCampo ? inp.value.trim() : true;
         if (o.validar) {
           const t0 = ok.textContent; ok.disabled = true; ok.textContent = o.revisando || t0;
-          let m = ''; try { m = await o.validar(v); } catch (x) { m = x && x.message || String(x); }
+          let m; try { m = await o.validar(v); } catch (x) { m = x && x.message || String(x); }
           ok.disabled = false; ok.textContent = t0;
           if (m) { err.textContent = m; err.hidden = false; if (inp) { inp.setAttribute('aria-invalid', 'true'); inp.focus(); } return; }
         }
@@ -265,7 +330,8 @@
           terminar();
         } catch (e) { $b.disabled = false; $b.textContent = 'Entrar'; fallo(e.message || String(e)); }
       };
-      setTimeout(() => $k.focus(), 50);
+      // Foco en la clave, salvo que la persona ya esté escribiendo en otro campo (si no, lo que escribe cae en la clave).
+      setTimeout(() => { if (!div.contains(document.activeElement)) $k.focus(); }, 50);
     });
   }
 
@@ -360,6 +426,7 @@
     },
     get nombre() { return nombre; }
   };
+  nube.reportarError = reportarError;
   window.nube = nube;
 
   /* ---------- versión nueva ---------- */

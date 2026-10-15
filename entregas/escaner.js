@@ -216,7 +216,7 @@
   // Ajuste fino: con la foto más grande, pega cada lado al borde real del papel (recta por mínimos cuadrados).
   function afinar(cv, canvas, q) {
     const W = canvas.width, H = canvas.height, src = cv.imread(canvas), g = new cv.Mat(), e = new cv.Mat();
-    let res = q;
+    let res;
     try {
       cv.cvtColor(src, g, cv.COLOR_RGBA2GRAY); cv.GaussianBlur(g, g, new cv.Size(5, 5), 0); cv.Canny(g, e, 15, 45);
       const d = e.data, R = Math.max(4, Math.round(Math.hypot(W, H) * 0.006)), rectas = [];
@@ -650,7 +650,7 @@
 
   // Foto → hoja lista: busca la hoja sola; si no la encuentra, se ajustan las esquinas a mano. Devuelve lo de revisar() o null.
   async function revisarFoto(cv, foto, opc) {
-    let q = null, estado = '';
+    let q = null, estado;
     if (cv) { try { q = detectar(cv, foto); } catch (e) { q = null; } }
     let filtro = filtroPref, giro = 0;
     if (cv && q) estado = 'Hoja encontrada y enderezada. Revisa que no le falte nada.';

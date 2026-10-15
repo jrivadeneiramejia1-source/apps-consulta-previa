@@ -13,8 +13,21 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - `nube.js`: conexión con Firebase, pantalla de clave, copia de seguridad e instalación.
 - `sw.js`: guarda la app en el teléfono para abrir sin internet.
 - `comun.css`, `comun.js`, `iconos.js`, `fuentes/`: diseño compartido de Equipos y Entregas (ver `DESIGN.md`).
+- `firestore.rules`: reglas de la base de datos (las mismas que hay que pegar en Firebase).
 - `pruebas/`: banco de pruebas con Firebase falso. `node pruebas/prueba.mjs` prueba Equipos y Entregas en tema claro y oscuro.
   `node pruebas/sincronia.mjs` prueba la sincronía Entregas ↔ Equipos y la agenda de mantenimiento.
+- `package.json`, `eslint.config.js`, `lighthouserc.cjs`, `.github/workflows/`: solo para las pruebas automáticas; las apps no se compilan.
+
+## Pruebas automáticas
+Cada vez que se sube un cambio a GitHub, **Actions** corre todo (pestaña *Actions*, en inglés "acciones"). Para correrlo en un computador:
+```
+npm ci
+npm run lint        # revisa el código (ESLint), también el que está dentro de los index.html
+npm run pruebas     # las apps en un navegador de verdad (Playwright) con Firebase falso, y la accesibilidad (axe)
+npm run enlaces     # enlaces, íconos y archivos que guarda cada sw.js
+npm run reglas      # reglas de Firestore en el emulador de Firebase (necesita Java)
+npm run lighthouse  # velocidad, accesibilidad y buenas prácticas (solo avisa)
+```
 
 ## Cómo se enlazan Entregas y Equipos
 - Hoja de **devolución**: crea un pendiente en Recibidos. La hoja guarda `recibidos: { SERIAL: id }` y el pendiente guarda `hoja` y `devueltoPor`.
@@ -25,6 +38,7 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - **Agenda de mantenimiento** (Equipos): `prog: { fecha, nota }` en el equipo; al hacerlo se actualiza `fechaMtto` y se agrega a `mttos`.
 
 ## Reglas de Firestore
+Están en `firestore.rules` (se prueban con `npm run reglas`). En Firebase → Firestore Database → Reglas (Rules):
 ```
 rules_version = '2';
 service cloud.firestore {
@@ -52,3 +66,13 @@ service cloud.firestore {
 - Cada teléfono que activa las notificaciones queda en la colección `avisos` (nombre de la persona y su suscripción).
 - Al programar un mantenimiento con **Responsable**, la app le envía el aviso a los teléfonos de esa persona.
 - Pruebas: `node pruebas/worker.mjs` (cifrado y firma) y `node pruebas/avisos.mjs` (flujo en la app).
+
+## Registro de errores (Slack)
+- `nube.js` captura los errores de código que pasan en los teléfonos (`error` y promesas sin atender) y los manda al mismo Worker, en `…/errores`.
+- Va solo: app, versión, mensaje, dónde pasó, nombre de la persona, navegador y cuántas veces. Nunca la clave, la huella del espacio, correos ni datos.
+- Máximo 5 errores distintos por sesión; el mismo error no se repite. Sin señal quedan en cola y se mandan al volver a abrir. Solo se envía desde GitHub Pages.
+- Desde el código de la app también se puede avisar a mano: `nube.reportarError(error, 'dónde')`.
+- El Worker los publica en Slack si tiene el secreto `SLACK_WEBHOOK`; sin él los acepta y no publica nada.
+- Para activarlo: en Slack crea una app → *Incoming Webhooks* (webhooks entrantes) → *Add New Webhook* (agregar webhook) → escoge el canal y copia la dirección `https://hooks.slack.com/services/…`.
+  En Cloudflare → Workers → avisos-equipos → *Settings* (configuración) → *Variables and Secrets* (variables y secretos) → *Add* (agregar) → tipo *Secret* (secreto), nombre `SLACK_WEBHOOK`, valor la dirección.
+- Prueba: `node pruebas/errores.mjs`.

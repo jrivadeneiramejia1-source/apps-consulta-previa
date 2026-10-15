@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=20">
+<link rel="stylesheet" href="../comun.css?v=21">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -269,11 +269,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "20"};</script>
-<script src="../iconos.js?v=20"></script>
-<script src="../comun.js?v=20"></script>
-<script src="../config.js?v=20"></script>
-<script src="../nube.js?v=20"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "21"};</script>
+<script src="../iconos.js?v=21"></script>
+<script src="../comun.js?v=21"></script>
+<script src="../config.js?v=21"></script>
+<script src="../nube.js?v=21"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas';
@@ -600,6 +600,7 @@ function renderRec() {
       : UI.vacio('vacio', 'No hay equipos en espera', 'Cuando te traigan uno, toca “Registrar equipo recibido”.');
     return;
   }
+  const moverRec = UI.antes($('recList'));
   $('recList').innerHTML = lista.length ? lista.map(r => {
     const e = estadoRec(r), eq = Q.get(idSerial(r.serial));
     const hechas = ['mtto', 'backup'].filter(t => (r[t] || 'pend') !== 'pend').length;
@@ -620,6 +621,7 @@ function renderRec() {
   }).join('') : (filtroRec === 'pendientes' && !q
     ? UI.vacio('checkCirculo', 'Todo al día', 'No hay equipos esperando mantenimiento ni backup.', 'bien')
     : UI.vacio('buscar', 'Nada coincide', 'Prueba con otro filtro o borra la búsqueda.'));
+  moverRec();
 }
 let recien = { k: '', t: 0 };   // la última tarea tocada brilla un momento
 function setTarea(rid, t, v) {
@@ -716,7 +718,7 @@ async function ejecutarPasar(rid, destino) {
       await escribir({ tipo: 'set', col: COL_Q, id: p2.id, data: Object.assign({ serial: String(r2.serial).trim().toUpperCase(), tipo: '', marca: '', modelo: '', asignado: '', mail: '', cliente: 'Petrobras', proyecto: '', departamento: 'Guajira', municipio: 'Riohacha', fechaMtto: '', obs: '', n }, p2.data, sello()) });
     }
     await escribir({ tipo: 'update', col: COL_R, id: rid, data: Object.assign({ cerrado: true, cerradoEn: new Date().toISOString(), cerradoA: destino }, sello()) });
-    toast(`Listo: ${r2.serial} quedó asignado a ${destino}`);
+    toast(`Listo: ${r2.serial} quedó asignado a ${destino}`); UI.celebrar();
     if (r2.hoja) actualizarHojaEntregas(r2.hoja, destino);
     p2.cierra.forEach(t => {
       const f = t.tipo === 'backup' ? p2.data.fechaBackup : p2.data.fechaMtto;
@@ -919,6 +921,7 @@ function renderEq() {
   const cuantos = new Map();
   lista.forEach(e => { const g = grupoDe(e, orden); cuantos.set(g, (cuantos.get(g) || 0) + 1); });
   let grupo = null;
+  const moverEq = UI.antes($('eqList'));
   $('eqList').innerHTML = lista.length ? lista.map(e => {
     const rec = pendienteDe(e.serial), g = grupoDe(e, orden);
     let cab = '';
@@ -931,6 +934,7 @@ function renderEq() {
       ${activasDe(e.id).map(t => `<div><span class="pill ${(diasHasta(t.fecha) ?? 1) < 0 ? 's-rojo' : 'tp-' + esc(t.tipo || 'fisico')}">${ico(tipoT(t).ico)}${tipoT(t).c} programado ${fechaBonita(t.fecha)}</span></div>`).join('')}
     </button>`;
   }).join('') : UI.vacio('buscar', 'Nada coincide', 'Prueba con otro tipo, otro filtro o borra la búsqueda.');
+  moverEq();
 }
 
 /* ================= HOJA: EQUIPO ================= */
@@ -1104,7 +1108,7 @@ function renderMt() {
   UI.contar($('sumMt'));
   const q = sinTildes($('qMt').value.trim());
   const coincide = (t, e) => !q || sinTildes([e && e.serial, e && e.asignado, e && e.marca, e && e.modelo, e && e.tipo, t && t.nota, t && t.resp, t && tipoT(t).n].join(' ')).includes(q);
-  let html = '', total = 0, vistos = 0;
+  let html, total, vistos;
   if (filtroMt === 'sug') {
     total = sug.length; const l = sug.filter(e => coincide(null, e)); vistos = l.length; html = l.map(tarjetaSugerido).join('');
   } else {
@@ -1124,11 +1128,13 @@ function renderMt() {
   if (filtroMt === 'sug') $('chipsResp').hidden = true;
   $('mtCount').textContent = (filtroMt === 'sug' ? `Equipos con ${MESES_ALERTA} meses o más sin mantenimiento físico, o sin fecha. ` : '') + (total ? `Mostrando ${vistos} de ${total}` : '');
   if (!Q.size) { $('mtList').innerHTML = conexion === 'cargando' ? UI.esqueleto(3) : UI.vacio('equipos', 'Todavía no hay equipos', 'Agrega equipos en la pestaña Equipos.'); return; }
+  const moverMt = UI.antes($('mtList'));
   $('mtList').innerHTML = html || (q ? UI.vacio('buscar', 'Nada coincide', 'Prueba con otra búsqueda.')
     : filtroMt === 'sug' ? UI.vacio('checkCirculo', 'Todos al día', `Ningún equipo lleva ${MESES_ALERTA} meses o más sin mantenimiento.`, 'bien')
     : filtroMt === 'atras' ? UI.vacio('checkCirculo', 'Nada atrasado', 'Ninguna tarea programada está vencida.', 'bien')
     : filtroMt === 'mias' ? UI.vacio('checkCirculo', 'Nada para ti', 'No tienes tareas asignadas ni te han pedido prender un equipo.', 'bien')
     : UI.vacio('calendario', 'No hay tareas programadas', 'Toca “Programar tarea” para un mantenimiento físico, uno remoto o un backup.'));
+  moverMt();
 }
 
 /* ---------- acciones de una tarea, cada una con su aviso ---------- */
@@ -1181,7 +1187,7 @@ function accionTarea(tid, a) {
         if (!e2[tt.campo] || f >= e2[tt.campo]) { datos[tt.campo] = f; if (disco) datos.discoBackup = disco; }
         escribir({ tipo: 'update', col: COL_Q, id: e2.id || idSerial(t.serial), data: Object.assign(datos, sello()) });
       }
-      toast(`${tt.n} de ${e.serial} hecho: ${fechaBonita(f)}${disco ? ', en el disco ' + disco : ''}`);
+      toast(`${tt.n} de ${e.serial} hecho: ${fechaBonita(f)}${disco ? ', en el disco ' + disco : ''}`); UI.celebrar();
       avisarA([t.creadoPor, t.resp], { titulo: `${tt.c} hecho: ${e.serial}`, cuerpo: `${yo} hizo ${tt.txt} el ${fechaBonita(f)}${disco ? ' en el disco ' + disco + '. Ya puedes desconectar el disco' : ''}.${nota ? ' ' + nota : ''}`, url, etiqueta });
     }, 'ok', `<div class="field"><label for="cfTFecha">Fecha</label><input id="cfTFecha" type="date" value="${hoyIso()}" max="${hoyIso()}"></div>`
       + (pideDisco ? `<div class="field"><label for="cfTDisco">Disco donde quedó el backup</label><input id="cfTDisco" type="text" list="dlDiscos" autocomplete="off" value="${esc(t.disco || '')}" placeholder="Ej: Disco Backup 1"></div>` : '')
