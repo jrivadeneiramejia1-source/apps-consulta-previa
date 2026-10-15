@@ -267,14 +267,21 @@
   }
   // Foto a resolución completa si el teléfono lo permite; si no, el cuadro del video.
   // Con la luz encendida se usa el cuadro del video: tomar la foto aparte puede apagar la luz en algunos teléfonos.
-  async function fotoDe(video, stream, conLuz) {
+  // pedirFlash: la linterna no se pudo encender aparte; se intenta el flash propio de la foto (fillLightMode).
+  async function fotoDe(video, stream, conLuz, pedirFlash) {
+    fotoDe.usoFlash = false;
     const cuadro = () => { const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight; c.getContext('2d').drawImage(video, 0, 0); return c; };
     const pista = stream && stream.getVideoTracks()[0];
-    if (!pista || conLuz || !perfil().foto || typeof window.ImageCapture !== 'function') return cuadro();
+    if (!pista || conLuz || (!pedirFlash && !perfil().foto) || typeof window.ImageCapture !== 'function') return cuadro();
     try {
       const ic = new window.ImageCapture(pista); let ajustes;
-      // Que el flash propio de la cámara no se dispare si el usuario lo dejó apagado.
-      try { const pc = await ic.getPhotoCapabilities(); if (pc && pc.fillLightMode && pc.fillLightMode.includes('off')) ajustes = { fillLightMode: 'off' }; } catch (e) {}
+      try {
+        const pc = await ic.getPhotoCapabilities(), modos = (pc && pc.fillLightMode) || [];
+        if (pedirFlash && modos.includes('flash')) { ajustes = { fillLightMode: 'flash' }; fotoDe.usoFlash = true; }
+        // Que el flash propio de la cámara no se dispare si el usuario lo dejó apagado.
+        else if (modos.includes('off')) ajustes = { fillLightMode: 'off' };
+      } catch (e) {}
+      if (pedirFlash && !fotoDe.usoFlash) return cuadro();
       const blob = await Promise.race([ic.takePhoto(ajustes), new Promise((_, mal) => setTimeout(() => mal(new Error('tiempo')), 5000))]);
       const c = await aCanvas(blob);
       // Si la foto sale girada respecto a lo que se ve en pantalla, se usa el cuadro del video.
@@ -282,6 +289,23 @@
       return c;
     } catch (e) { return cuadro(); }
   }
+
+  // Prueba si una pista de video enciende la linterna, aunque el navegador no la anuncie en getCapabilities().
+  async function sondearLinterna(p) {
+    try { const c = p.getCapabilities ? p.getCapabilities() : {}; if (c && c.torch) return true; } catch (e) {}
+    try {
+      await p.applyConstraints({ advanced: [{ torch: true }] });
+      const ok = !!(p.getSettings && p.getSettings().torch === true);
+      try { await p.applyConstraints({ advanced: [{ torch: false }] }); } catch (e) {}
+      return ok;
+    } catch (e) { return false; }
+  }
+  const navegadorSinLinterna = () => {
+    const u = navigator.userAgent || '';
+    if (/Firefox|FxiOS/i.test(u)) return 'Firefox no deja encender el flash desde una página web. Abre la app en Chrome.';
+    if (/iPhone|iPad|iPod/i.test(u)) return 'En iPhone el navegador no deja encender el flash desde una página web.';
+    return '';
+  };
 
   // Abre la cámara, detecta la hoja en vivo y devuelve la lista de páginas escaneadas (canvas).
   // opciones.max: cuántas páginas se pueden escanear como máximo.
@@ -334,7 +358,7 @@
     function pintarPanel() {
       panel.hidden = !panelAbierto;
       if (panelAbierto === 'flash') {
-        const nota = !stream ? '' : linternaOK ? '' : '<div class="nota">Este teléfono o navegador no deja encender el flash desde la app. Busca más luz o apoya la hoja cerca de una lámpara.</div>';
+        const nota = !stream ? '' : linternaOK ? '' : '<div class="nota">' + (navegadorSinLinterna() || 'Este teléfono o navegador no deja encender el flash desde la app.') + ' Busca más luz o apoya la hoja cerca de una lámpara.</div>';
         panel.innerHTML = `<div class="lista">${Object.keys(FLASH).map(k => `<button class="esc-btn" type="button" data-luz="${k}" aria-pressed="${k === luz}">${FLASH[k]}</button>`).join('')}</div>${nota}`;
       } else if (panelAbierto === 'calidad') {
         panel.innerHTML = `<div class="lista">${Object.keys(CALIDADES).map(k => `<button class="esc-btn" type="button" data-cal="${k}" aria-pressed="${k === calidad}">${CALIDADES[k].nombre}<small>${CALIDADES[k].detalle}</small></button>`).join('')}</div><div class="meta2">${resolucion()}</div>`;
@@ -356,15 +380,47 @@
       }
       avisar(`Calidad ${perfil().nombre}${video.videoWidth ? ' · ' + resolucion() : ''}`);
     }
+    // Si la cámara trasera por defecto no tiene linterna, prueba las demás cámaras traseras (hay teléfonos con varios lentes).
+    async function buscarCamaraConLinterna() {
+      if (!navigator.mediaDevices.enumerateDevices) return false;
+      const actual = pista && pista.getSettings ? pista.getSettings().deviceId : '';
+      let lista = []; try { lista = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput' && d.deviceId && d.deviceId !== actual && !/front|frontal|user|selfie|delantera/i.test(d.label)); } catch (e) {}
+      const [w, h] = perfil().cam;
+      for (const d of lista.slice(0, 4)) {
+        let s = null;
+        try {
+          s = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: d.deviceId }, width: { ideal: w }, height: { ideal: h } }, audio: false });
+          if (cerrado) { s.getTracks().forEach(t => t.stop()); return false; }
+          if (await sondearLinterna(s.getVideoTracks()[0])) {
+            if (stream) stream.getTracks().forEach(t => t.stop());
+            stream = s; pista = s.getVideoTracks()[0]; linternaOn = false; video.srcObject = s; await video.play();
+            guardar('escaner.camLinterna', d.deviceId);
+            return true;
+          }
+          s.getTracks().forEach(t => t.stop());
+        } catch (e) { if (s) s.getTracks().forEach(t => t.stop()); }
+      }
+      return false;
+    }
+    let camarasProbadas = false;
     async function iniciarCamara() {
       if (stream) stream.getTracks().forEach(t => t.stop());
       stream = null; pista = null; linternaOn = false;
       const [w, h] = perfil().cam;
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: w }, height: { ideal: h } }, audio: false });
+      let guardada = ''; try { guardada = localStorage.getItem('escaner.camLinterna') || ''; } catch (e) {}
+      const video0 = { facingMode: { ideal: 'environment' }, width: { ideal: w }, height: { ideal: h } };
+      if (guardada) video0.deviceId = { ideal: guardada };
+      const s = await navigator.mediaDevices.getUserMedia({ video: video0, audio: false });
       if (cerrado) { s.getTracks().forEach(t => t.stop()); return; }
       stream = s; pista = s.getVideoTracks()[0];
       video.srcObject = s; await video.play();
       revisarLinterna();
+      // Algunos navegadores tienen linterna pero no la anuncian: se prueba encenderla de verdad.
+      if (!linternaOK && await sondearLinterna(pista)) { linternaOK = true; pintarBotones(); }
+      if (!linternaOK && !camarasProbadas && !navegadorSinLinterna()) {
+        camarasProbadas = true; ponerEstado('Buscando la cámara con flash…');
+        if (await buscarCamaraConLinterna()) { linternaOK = true; pintarBotones(); }
+      }
       // Algunos teléfonos avisan que tienen flash un momento después de abrir la cámara.
       if (!linternaOK) setTimeout(() => { if (!cerrado && pista && !linternaOK) { revisarLinterna(); if (luz === 'fijo') linterna(true); } }, 1200);
       if (luz === 'fijo') await linterna(true);
@@ -477,10 +533,11 @@
           if (luz === 'fijo') encendida = linternaOn;
           else if (quiere) {
             if (linternaOK) { ponerEstado('Flash…', true); encendida = await linterna(true); if (encendida) await espera(900); }
-            else if (!avisoSinFlash) { avisoSinFlash = true; avisar('Este teléfono no deja encender el flash desde la app: busca más luz.'); }
           }
           ponerEstado('Tomando la foto…', true);
-          const foto = await fotoDe(video, stream, encendida);
+          // Sin linterna aparte, se intenta el flash propio de la foto.
+          const foto = await fotoDe(video, stream, encendida, quiere && !linternaOK);
+          if (quiere && !linternaOK && !fotoDe.usoFlash && !avisoSinFlash) { avisoSinFlash = true; avisar('Este teléfono no deja encender el flash desde la app: busca más luz.'); }
           if (encendida && luz !== 'fijo') await linterna(false);
           let q = null; try { if (cv) q = detectar(cv, foto); } catch (e) {}
           await agregar(foto, q);
