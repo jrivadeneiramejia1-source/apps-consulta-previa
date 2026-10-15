@@ -142,6 +142,10 @@ for (const tema of ['light', 'dark']) {
   // pestaña Equipos
   await page.click('#tabEq'); await page.waitForSelector('#eqList .card');
   chequear(await page.locator('#eqList .grupo').count() >= 5, 'equipos agrupados por tipo');
+  await page.click('#sumEq [data-filtro="asignados"]'); await espera(80);
+  { const sx = await store(page); const n = Object.entries(sx).filter(([k, v]) => k.startsWith(B + '/equipos/') && v.asignado && !/bodega/i.test(v.asignado)).length;
+    chequear(n > 0 && await page.locator('#eqList .card').count() === n && Number(await page.locator('#sumEq [data-k="eAsi"]').textContent()) === n, `cifra Asignados a personas filtra (${n})`); }
+  await page.click('#sumEq [data-filtro="asignados"]'); await espera(80);
   await page.click('#sumEq [data-filtro="bodega"]'); await espera(80);
   chequear(await page.locator('#eqList .card').count() === 3 && await page.inputValue('#fEqEst') === 'bodega', 'cifra En bodega filtra');
   await page.click('#sumEq [data-filtro="bodega"]'); await espera(80);

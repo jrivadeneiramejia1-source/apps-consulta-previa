@@ -31,8 +31,15 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /espacios/{espacio}/{coleccion}/{id} {
       allow read, write: if espacio.size() == 40
-        && coleccion in ['comunidades', 'evidencias', 'equipos', 'recibidos', 'entregas', 'archivos'];
+        && coleccion in ['comunidades', 'evidencias', 'equipos', 'recibidos', 'entregas', 'archivos', 'avisos'];
     }
   }
 }
 ```
+
+## Notificaciones (Agenda de Equipos)
+- `avisos/worker.js`: Cloudflare Worker **avisos-equipos** que cifra y firma (Web Push, RFC 8291 y 8292) los avisos. No guarda nada.
+  En Cloudflare necesita el secreto `VAPID_D`. La parte pública de la llave está en `config.js` (`window.AVISOS`).
+- Cada teléfono que activa las notificaciones queda en la colección `avisos` (nombre de la persona y su suscripción).
+- Al programar un mantenimiento con **Responsable**, la app le envía el aviso a los teléfonos de esa persona.
+- Pruebas: `node pruebas/worker.mjs` (cifrado y firma) y `node pruebas/avisos.mjs` (flujo en la app).

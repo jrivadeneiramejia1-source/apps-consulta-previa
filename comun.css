@@ -159,6 +159,8 @@ main:focus { outline: none; }
 .sum .sum-ico .ph { width: 17px; height: 17px; }
 .sum .num { font-family: var(--f-display); font-weight: 760; font-size: 1.95rem; line-height: 1; letter-spacing: -.02em; display: block; color: var(--c); margin-top: 6px; }
 .sum .sum-lbl { font-size: .78rem; color: var(--muted); line-height: 1.25; font-weight: 600; -webkit-hyphens: auto; hyphens: auto; overflow-wrap: anywhere; }
+.summary.cuatro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (min-width: 640px) { .summary.cuatro { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .sum.t-org { --c: var(--org); --cbg: var(--org-bg); }
 .sum.t-listo { --c: var(--listo); --cbg: var(--listo-bg); }
 .sum.t-disco { --c: var(--disco); --cbg: var(--disco-bg); }

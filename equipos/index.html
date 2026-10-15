@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=14">
+<link rel="stylesheet" href="../comun.css?v=15">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -53,7 +53,7 @@
   <!-- SECCIÓN 2: EQUIPOS -->
   <section class="view" id="vEq" aria-labelledby="tEq" hidden>
     <h2 class="titulo-vista" id="tEq">Equipos</h2>
-    <div class="summary" id="sumEq"></div>
+    <div class="summary cuatro" id="sumEq"></div>
     <input class="search" id="qEq" type="search" placeholder="Buscar serial, persona o modelo" autocomplete="off" aria-label="Buscar equipo">
     <div class="filters">
       <div class="field"><label for="fTipo">Tipo de equipo</label><select id="fTipo"></select></div>
@@ -68,6 +68,7 @@
   <!-- SECCIÓN: MANTENIMIENTO PROGRAMADO -->
   <section class="view" id="vMt" aria-labelledby="tMt" hidden>
     <h2 class="titulo-vista" id="tMt">Agenda de mantenimiento</h2>
+    <div class="aviso info" id="notiAviso" hidden><span id="notiAvisoTxt">Activa las notificaciones para que te avise cuando te programen un mantenimiento, aunque la app esté cerrada.</span><span class="row"><button class="btn small ghost" type="button" data-noti="ocultar">Ahora no</button><button class="btn small primary" type="button" data-noti="activar"><span data-ico="campana"></span>Activar</button></span></div>
     <div class="summary" id="sumMt"></div>
     <button class="btn primary big solo-editar" id="btnNewMt" type="button"><span data-ico="programar"></span>Programar mantenimiento</button>
     <input class="search" id="qMt" type="search" placeholder="Buscar serial, persona o modelo" autocomplete="off" aria-label="Buscar en mantenimiento">
@@ -93,6 +94,7 @@
     <div class="card nube-card">
       <h3 class="card-title"><span data-ico="nube"></span>Copia de seguridad y acceso</h3>
       <div class="meta" id="nubeInfo"></div>
+      <div class="enlace"><b>Notificaciones en este teléfono</b><div class="meta" id="notiInfo"></div><div class="row" id="notiBtns"></div></div>
       <div class="enlace"><b>Conexión con Entregas</b><div class="meta" id="enlaceInfo"></div><div class="row" id="enlaceBtn"></div></div>
       <div class="row">
         <button class="btn" type="button" id="btnCopia"><span data-ico="descargar"></span>Descargar copia (JSON)</button>
@@ -218,7 +220,11 @@
     <p class="sub" id="mtSub">Para cuando te piden hacerle mantenimiento a un equipo. No hace falta subir ninguna hoja.</p>
     <div class="field"><label for="mtSerial">Serial del equipo</label><input id="mtSerial" type="text" list="dlSeriales" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe o busca el serial"></div>
     <div class="note" id="mtInfo" hidden></div>
-    <div class="field"><label for="mtFecha">Fecha programada</label><input id="mtFecha" type="date"></div>
+    <div class="fields cols">
+      <div class="field"><label for="mtFecha">Fecha programada</label><input id="mtFecha" type="date"></div>
+      <div class="field"><label for="mtResp">Responsable</label><input id="mtResp" type="text" list="dlResp" autocomplete="off" placeholder="Quién le hace el mantenimiento" aria-describedby="mtRespInfo"><datalist id="dlResp"></datalist></div>
+    </div>
+    <div class="meta" id="mtRespInfo"></div>
     <div class="field"><label for="mtNota">Nota</label><textarea id="mtNota" placeholder="Ej: comunicarse con Ana Gómez; dijo que lo trae el jueves"></textarea></div>
     <div class="err" id="mtErr" role="alert" hidden></div>
     <div class="sheet-actions">
@@ -246,11 +252,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "14"};</script>
-<script src="../iconos.js?v=14"></script>
-<script src="../comun.js?v=14"></script>
-<script src="../config.js?v=14"></script>
-<script src="../nube.js?v=14"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "15"};</script>
+<script src="../iconos.js?v=15"></script>
+<script src="../comun.js?v=15"></script>
+<script src="../config.js?v=15"></script>
+<script src="../nube.js?v=15"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos';
@@ -284,6 +290,7 @@ let Q = new Map(), R = new Map();          // equipos y recibidos: id -> datos
 let DB = null, USER = null, DL = null, miId = null, puedeEscribir = null, soloLectura = false;
 let ENTDB = null;   // conexión con la app de Entregas (para actualizar o borrar la hoja de una devolución)
 let filtroMt = 'prog', mtActual = null;
+let AV = new Map(), avisosBloqueados = false;   // teléfonos con notificaciones activadas: id -> { nombre, sub }
 let listoQ = false, listoR = false, conexion = 'cargando', fechaCache = null;
 let pendientes = lsGet(PEND_KEY) || [];
 let vista = 'rec', tablaDb = 'eq', filtroRec = 'pendientes', rcActual = null, eqActual = null;
@@ -450,7 +457,7 @@ function guardarCacheLuego() {
 }
 function trasSnapshot() {
   pendientes.forEach(aplicarLocal);
-  if (listoQ && listoR) { conexion = 'vivo'; guardarCacheLuego(); }
+  if (listoQ && listoR) { conexion = 'vivo'; guardarCacheLuego(); if (!trasSnapshot.primera) { trasSnapshot.primera = true; setTimeout(avisarNuevosParaMi, 800); } }
   pintarConexion(); pintarAvisos(); pedirRender();
 }
 const subs = [];
@@ -461,6 +468,9 @@ function suscribir() {
     Q = new Map(s.docs.map(d => [d.id, Object.assign({}, d.data())])); listoQ = true; trasSnapshot();
     if (s.size >= 1000) toast('Hay 1000 equipos o más: avísale a quien mantiene la app.');
   }, alError));
+  subs.push(DB.collection('avisos').limit(300).onSnapshot(s => {
+    AV = new Map(s.docs.map(d => [d.id, d.data()])); avisosBloqueados = false; pintarNotis(); if (vista === 'mt') renderMt();
+  }, e => { avisosBloqueados = e && e.code === 'permission_denied'; pintarNotis(); }));
   subs.push(DB.collection(COL_R).limit(1000).onSnapshot(s => {
     R = new Map(s.docs.map(d => [d.id, Object.assign({}, d.data())])); listoR = true; trasSnapshot();
   }, alError));
@@ -844,7 +854,7 @@ function filtraEq(e, q, tipo, est) {
   if (q && !sinTildes([e.serial, e.asignado, e.marca, e.modelo, e.tipo, e.proyecto, e.obs].join(' ')).includes(q)) return false;
   const m = mesesDesde(e.fechaMtto);
   if (est === 'bodega') return esBodega(e);
-  if (est === 'asignados') return !esBodega(e);
+  if (est === 'asignados') return !esBodega(e) && !!(e.asignado || '').trim();
   if (est === 'viejo') return m !== null && m >= MESES_ALERTA;
   if (est === 'sinfecha') return m === null;
   if (est === 'enrec') return !!pendienteDe(e.serial);
@@ -862,6 +872,7 @@ function renderEq() {
   const est = $('fEqEst').value || 'todos';
   $('sumEq').innerHTML = UI.cifra({ k: 'eTot', n: todos.length, lbl: 'Equipos', icono: 'equipos', filtro: 'todos', activo: est === 'todos' })
     + UI.cifra({ k: 'eBod', n: todos.filter(esBodega).length, lbl: 'En bodega', icono: 'otro', tono: 'listo', filtro: 'bodega', activo: est === 'bodega' })
+    + UI.cifra({ k: 'eAsi', n: todos.filter(e => !esBodega(e) && (e.asignado || '').trim()).length, lbl: 'Asignados a personas', icono: 'persona', tono: 'disco', filtro: 'asignados', activo: est === 'asignados' })
     + UI.cifra({ k: 'eVie', n: todos.filter(e => { const m = mesesDesde(e.fechaMtto); return m !== null && m >= MESES_ALERTA; }).length, lbl: `Manteni\u00ADmiento de hace ${MESES_ALERTA} meses o más`, icono: 'aviso', tono: 'org', filtro: 'viejo', activo: est === 'viejo' });
   UI.contar($('sumEq'));
   const q = sinTildes($('qEq').value.trim()), tipo = $('fTipo').value || 'todos';
@@ -982,6 +993,7 @@ function textoCuando(f) {
   return n === 0 ? 'Hoy' : n === 1 ? 'Mañana' : n > 1 ? `En ${n} días` : n === -1 ? 'Atrasado 1 día' : `Atrasado ${-n} días`;
 }
 function renderMt() {
+  lsSet('eqcp_agenda_vista', new Date().toISOString()); avisarNuevosParaMi.hecho = true;
   const prog = programados(), atras = prog.filter(e => diasHasta(e.prog.fecha) < 0), sug = sugeridos();
   $('sumMt').innerHTML = UI.cifra({ k: 'mProg', n: prog.length, lbl: 'Programados', icono: 'calendario', tono: 'listo', filtro: 'prog', activo: filtroMt === 'prog' })
     + UI.cifra({ k: 'mAtr', n: atras.length, lbl: 'Atrasados', icono: 'aviso', tono: 'rojo', filtro: 'atras', activo: filtroMt === 'atras' })
@@ -1007,6 +1019,7 @@ function renderMt() {
         <div class="card-head"><div class="cab">${iconoDe(e.tipo)}<div class="cab-t"><div class="card-title serial">${esc(e.serial)}</div><div class="meta">${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · '))}</div></div></div>
           ${p ? `<span class="pill ${n < 0 ? 's-rojo' : n <= 2 ? 's-org' : 's-listo'}">${textoCuando(p.fecha)}</span>` : '<span class="pill s-org">Sugerido</span>'}</div>
         <div class="facts"><span><b>${esc(e.asignado || 'Sin asignar')}</b></span>${p ? `<span>Programado para <span class="mono">${fechaBonita(p.fecha)}</span></span>` : ''}</div>
+        ${p && p.resp ? `<div class="facts"><span class="acc-mini">${ico('persona')}Responsable: <b>${esc(p.resp)}</b></span></div>` : ''}
         <div class="facts">${textoMtto(e)}</div>
         ${p && p.nota ? `<div class="obs">${esc(p.nota)}</div>` : ''}
       </button>
@@ -1015,6 +1028,97 @@ function renderMt() {
     </div>`;
   }).join('');
 }
+/* ---------- notificaciones ---------- */
+const mismoNombre = (a, b) => !!a && !!b && sinTildes(String(a).trim()) === sinTildes(String(b).trim());
+function nombresResp() {
+  const n = [...AV.values()].map(a => a.nombre).concat([...Q.values()].map(e => e.prog && e.prog.resp), [miId]).filter(Boolean).map(x => String(x).trim());
+  return [...new Map(n.map(x => [sinTildes(x), x])).values()].sort((a, b) => a.localeCompare(b, 'es'));
+}
+const subsDe = nombre => [...AV.entries()].filter(([, a]) => mismoNombre(a.nombre, nombre) && a.sub && a.sub.endpoint);
+function infoResp() {
+  const n = $('mtResp').value.trim(), box = $('mtRespInfo');
+  if (!n) { box.textContent = 'Opcional. Si escribes quién lo hace, le llega una notificación a su teléfono.'; return; }
+  const k = subsDe(n).length;
+  box.textContent = mismoNombre(n, miId) ? 'Eres tú: no te llega aviso, ya lo estás viendo.'
+    : k ? `${n} tiene las notificaciones activadas en ${k === 1 ? '1 teléfono' : k + ' teléfonos'}: le llegará el aviso.`
+    : `${n} todavía no activó las notificaciones; lo verá al abrir la app.`;
+}
+const avisosListos = () => !!(window.AVISOS && window.AVISOS.url && window.AVISOS.vapid);
+async function enviarAviso(nombre, aviso, silencioso) {
+  const lista = subsDe(nombre);
+  if (!avisosListos()) return 0;
+  if (!lista.length) { if (!silencioso) toast(`${nombre} todavía no activó las notificaciones; lo verá al abrir la app.`); return 0; }
+  try {
+    const r = await fetch(window.AVISOS.url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.assign({ subs: lista.map(([, a]) => a.sub) }, aviso)) });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error || 'el servidor respondió ' + r.status);
+    let llegaron = 0;
+    (j.resultados || []).forEach((x, i) => { if (x.vencida) DB.collection('avisos').doc(lista[i][0]).delete().catch(() => {}); else if (x.estado >= 200 && x.estado < 300) llegaron++; });
+    if (!silencioso) toast(llegaron ? `Aviso enviado a ${nombre}` : `No se pudo avisar a ${nombre}: sus notificaciones vencieron. Que las active otra vez.`);
+    return llegaron;
+  } catch (e) { if (!silencioso) toast('No se pudo enviar el aviso: revisa tu internet.'); return 0; }
+}
+const soportaPush = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+const esIphone = () => /iphone|ipad|ipod/i.test(navigator.userAgent);
+const miAviso = () => { const id = lsGet('eqcp_aviso_id'); return id && AV.has(id) ? id : null; };
+function b64uABytes(s) { const b = atob(s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4)); return Uint8Array.from(b, c => c.charCodeAt(0)); }
+async function idDeAviso(endpoint) { const h = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(endpoint))); return 'a-' + [...h.slice(0, 12)].map(x => x.toString(16).padStart(2, '0')).join(''); }
+async function activarNotis() {
+  if (!DB) { toast('No hay conexión con la base de datos.'); return; }
+  if (!avisosListos()) { toast('Falta configurar el servidor de avisos.'); return; }
+  if (!soportaPush()) { toast(esIphone() ? 'En iPhone primero instala la app: Compartir, luego Agregar a inicio, y ábrela desde el ícono.' : 'Este navegador no permite notificaciones. Usa Chrome.'); return; }
+  if (!miId) { toast('Primero escribe tu nombre en Base de datos, Cambiar mi nombre.'); return; }
+  const permiso = await Notification.requestPermission();
+  if (permiso !== 'granted') { toast('No diste permiso. Puedes activarlo en los ajustes del navegador, en Notificaciones de este sitio.'); pintarNotis(); return; }
+  try {
+    const reg = await Promise.race([navigator.serviceWorker.ready, esperar(8000).then(() => { throw new Error('la app no terminó de instalarse'); })]);
+    const sub = (await reg.pushManager.getSubscription()) || await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uABytes(window.AVISOS.vapid) });
+    const id = await idDeAviso(sub.endpoint);
+    const datos = { nombre: miId, app: 'equipos', sub: JSON.parse(JSON.stringify(sub)), creado: new Date().toISOString(), equipo: navigator.userAgent.slice(0, 120) };
+    AV.set(id, datos); lsSet('eqcp_aviso_id', id);
+    await DB.collection('avisos').doc(id).set(datos);
+    toast(`Notificaciones activadas para ${miId} en este teléfono`);
+  } catch (e) { toast('No se pudieron activar: ' + (e.message || e)); }
+  pintarNotis();
+}
+async function desactivarNotis() {
+  const id = lsGet('eqcp_aviso_id');
+  try { const reg = await navigator.serviceWorker.getRegistration(); const sub = reg && await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); } catch (e) {}
+  if (id) { AV.delete(id); DB && DB.collection('avisos').doc(id).delete().catch(() => {}); }
+  lsSet('eqcp_aviso_id', null); toast('Notificaciones desactivadas en este teléfono'); pintarNotis();
+}
+function pintarNotis() {
+  const activo = !!miAviso() && 'Notification' in window && Notification.permission === 'granted';
+  const neg = 'Notification' in window && Notification.permission === 'denied';
+  const txt = avisosBloqueados ? 'La base de datos no permite guardar los avisos todavía: hay que actualizar las reglas de Firestore (agregar "avisos").'
+    : !avisosListos() ? 'Falta configurar el servidor de avisos.'
+    : activo ? `Activadas para ${miId}. Te llega una notificación cuando te programen un mantenimiento.`
+    : neg ? 'Bloqueadas en este navegador. Actívalas en los ajustes del navegador, en Notificaciones de este sitio.'
+    : !soportaPush() && esIphone() ? 'En iPhone primero instala la app (Compartir, Agregar a inicio) y ábrela desde el ícono.'
+    : 'Desactivadas. Actívalas para que te avise cuando te programen un mantenimiento, aunque la app esté cerrada.';
+  $('notiInfo').textContent = txt;
+  $('notiBtns').innerHTML = activo
+    ? `<button class="btn" type="button" data-noti="probar">${ico('campana')}Probar</button><button class="btn danger" type="button" data-noti="quitar">${ico('campanaNo')}Desactivar</button>`
+    : avisosBloqueados || !avisosListos() ? '' : `<button class="btn primary" type="button" data-noti="activar">${ico('campana')}Activar notificaciones</button>`;
+  $('notiAviso').hidden = activo || neg || avisosBloqueados || !avisosListos() || !DB || !!lsGet('eqcp_noti_oculto');
+}
+async function clicNoti(e) {
+  const b = e.target.closest('[data-noti]'); if (!b) return;
+  const a = b.dataset.noti;
+  if (a === 'activar') return activarNotis();
+  if (a === 'ocultar') { lsSet('eqcp_noti_oculto', 1); pintarNotis(); toast('Puedes activarlas cuando quieras en Base de datos.'); return; }
+  if (a === 'quitar') return confirmar('Desactivar notificaciones', 'Ya no te llegarán avisos a este teléfono. Puedes activarlas otra vez cuando quieras.', 'Desactivar', desactivarNotis);
+  if (a === 'probar') { b.disabled = true; const n = await enviarAviso(miId, { titulo: 'Prueba de avisos', cuerpo: 'Si ves esto, las notificaciones funcionan en este teléfono.', url: './?agenda=1', etiqueta: 'prueba' }, true); b.disabled = false; toast(n ? 'Aviso de prueba enviado: debe llegar en unos segundos' : 'No se pudo enviar la prueba. Desactiva y activa otra vez.'); }
+}
+// Al abrir la app: si te programaron mantenimientos desde la última vez, te lo dice aunque no tengas notificaciones.
+function avisarNuevosParaMi() {
+  if (!miId || !listoQ) return;
+  const visto = lsGet('eqcp_agenda_vista') || '', mios = programados().filter(e => mismoNombre(e.prog.resp, miId) && !mismoNombre(e.prog.por, miId) && (e.prog.creado || '') > visto);
+  if (!mios.length || avisarNuevosParaMi.hecho) return;
+  avisarNuevosParaMi.hecho = true;
+  toast(mios.length === 1 ? `Te programaron un mantenimiento: ${mios[0].serial}. Míralo en Agenda.` : `Te programaron ${mios.length} mantenimientos. Míralos en Agenda.`);
+}
+
 function abrirMt(id) {
   const e = id ? Q.get(id) : null;
   mtActual = e ? id : null;
@@ -1024,8 +1128,11 @@ function abrirMt(id) {
   const f = new Date(); f.setDate(f.getDate() + 7);
   $('mtFecha').value = p ? p.fecha : `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`;
   $('mtNota').value = p ? (p.nota || '') : '';
+  $('mtResp').value = p ? (p.resp || '') : '';
+  $('dlResp').innerHTML = nombresResp().map(n => `<option value="${esc(n)}"></option>`).join('');
+  infoResp();
   $('mtQuitar').hidden = !p; $('mtErr').hidden = true;
-  [$('mtFecha'), $('mtNota')].forEach(x => { x.disabled = soloLectura; });
+  [$('mtFecha'), $('mtNota'), $('mtResp')].forEach(x => { x.disabled = soloLectura; });
   infoMt();
   $('mtSheet').hidden = false;
   fotoMt = UI.foto($('mtForm'));
@@ -1047,10 +1154,20 @@ function guardarMt(ev) {
   if (!id) return mostrarErr('mtErr', 'Escribe el serial del equipo.');
   if (!e) return mostrarErr('mtErr', 'Ese serial no está en la lista de Equipos. Agrégalo primero en la pestaña Equipos.');
   if (!$('mtFecha').value) return mostrarErr('mtErr', 'Escoge la fecha programada.');
-  const antes = e.prog && e.prog.fecha;
-  escribir({ tipo: 'update', col: COL_Q, id, data: Object.assign({ prog: { fecha: $('mtFecha').value, nota: $('mtNota').value.trim(), por: miId || '', creado: (e.prog && e.prog.creado) || new Date().toISOString() } }, sello()) });
-  toast(antes ? 'Mantenimiento programado actualizado' : `Mantenimiento programado para el ${fechaBonita($('mtFecha').value)}`);
+  const antes = e.prog && e.prog.fecha ? e.prog : null;
+  const prog = { fecha: $('mtFecha').value, nota: $('mtNota').value.trim(), resp: $('mtResp').value.trim().replace(/\s+/g, ' '), por: miId || '', creado: (antes && antes.creado) || new Date().toISOString() };
+  escribir({ tipo: 'update', col: COL_Q, id, data: Object.assign({ prog }, sello()) });
+  toast(antes ? 'Mantenimiento programado actualizado' : `Mantenimiento programado para el ${fechaBonita(prog.fecha)}`);
   cerrarMt();
+  // Aviso al responsable si es otra persona y algo importante cambió.
+  const cambio = !antes || antes.resp !== prog.resp || antes.fecha !== prog.fecha || antes.nota !== prog.nota;
+  if (prog.resp && cambio && !mismoNombre(prog.resp, miId)) {
+    enviarAviso(prog.resp, {
+      titulo: `Mantenimiento programado: ${e.serial}`,
+      cuerpo: `${[e.tipo, e.marca, e.modelo].filter(Boolean).join(' ')} · asignado a ${e.asignado || 'nadie'} · para el ${fechaBonita(prog.fecha)}${prog.nota ? '. ' + prog.nota : ''}${miId ? ' (programó ' + miId + ')' : ''}`,
+      url: './?agenda=1', etiqueta: 'mt-' + id
+    });
+  }
 }
 function quitarMt() {
   const e = Q.get(mtActual); if (!e) return;
@@ -1187,6 +1304,9 @@ $('mtList').onclick = e => {
   const b = e.target.closest('[data-mt]'); if (b) { const x = Q.get(b.dataset.mt); if (x && x.prog && x.prog.fecha) abrirMt(b.dataset.mt); else abrirEq(b.dataset.mt); }
 };
 $('mtSerial').addEventListener('input', infoMt);
+$('mtResp').addEventListener('input', infoResp);
+$('notiBtns').onclick = clicNoti;
+$('notiAviso').onclick = clicNoti;
 $('mtForm').onsubmit = guardarMt; $('mtCancel').onclick = pedirCerrarMt; $('mtQuitar').onclick = quitarMt;
 $('mtSheet').onclick = e => { if (e.target === $('mtSheet')) pedirCerrarMt(); };
 $('eqProg').onclick = () => { const id = eqActual; cerrarEq(); ir('mt'); abrirMt(id); };
@@ -1276,7 +1396,7 @@ async function iniciar() {
     Q = new Map(cache.q); R = new Map(cache.r); fechaCache = cache.t || null;
     pendientes.forEach(aplicarLocal);
   }
-  pintarConexion(); pintarAvisos(); ir('rec');
+  pintarConexion(); pintarAvisos(); ir(/[?&]agenda=1/.test(location.search) ? 'mt' : 'rec');
   if (!window.claude || typeof window.claude.use !== 'function') { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
   const usar = n => window.claude.use(n).catch(() => null);
   const [db, user, dl] = await Promise.all([usar('db'), usar('user'), usar('downloads')]);
@@ -1290,7 +1410,8 @@ async function iniciar() {
   if (!DB) { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
   pintarAvisos(); suscribir(); reintentarPendientes();
   ENTDB = window.nube && typeof window.nube.enlace === 'function' ? window.nube.enlace('entregas') : null;
-  pintarEnlace();
+  pintarEnlace(); pintarNotis();
+  setTimeout(avisarNuevosParaMi, 2500);
 }
 iniciar();
 </script>
