@@ -9,6 +9,8 @@ const VAPID_X = 'YWkeAiPGn6veSXcFRzTM8JY4TNjmPWI3b4-TVv6MgCQ';
 const VAPID_Y = 'S9hYnx9UKCEk-9hRzpQmuz0uqNXCx_1W5PSkqARfd9Q';
 // Páginas que pueden pedir avisos.
 const ORIGENES = ['https://jrivadeneiramejia1-source.github.io', 'http://127.0.0.1:8811', 'http://localhost:8811'];
+// Mis Claves (Cloudflare Pages: mis-claves.pages.dev y sus vistas previas) solo puede mandar errores, no avisos.
+const ORIGEN_CLAVES = /^https:\/\/([a-z0-9-]+\.)?mis-claves(-[a-z0-9]+)?\.pages\.dev$/;
 const MAX_SUBS = 25, MAX_TEXTO = 600;
 
 const enc = new TextEncoder();
@@ -83,13 +85,14 @@ async function errores(req, env, h) {
 export default {
   async fetch(req, env) {
     const origen = req.headers.get('Origin') || '';
-    const permitido = ORIGENES.includes(origen);
+    const esErrores = new URL(req.url).pathname.replace(/\/+$/, '').endsWith('/errores');
+    const permitido = ORIGENES.includes(origen) || (esErrores && ORIGEN_CLAVES.test(origen));
     const h = permitido ? cors(origen) : {};
     if (req.method === 'OPTIONS') return new Response(null, { status: permitido ? 204 : 403, headers: h });
     if (req.method === 'GET') return json({ ok: true, servicio: 'avisos-equipos', listo: !!env.VAPID_D, slack: !!env.SLACK_WEBHOOK }, 200, h);
     if (req.method !== 'POST') return json({ error: 'método no permitido' }, 405, h);
     if (!permitido) return json({ error: 'origen no permitido' }, 403, h);
-    if (new URL(req.url).pathname.replace(/\/+$/, '').endsWith('/errores')) return errores(req, env, h);
+    if (esErrores) return errores(req, env, h);
     if (!env.VAPID_D) return json({ error: 'falta el secreto VAPID_D en el Worker' }, 500, h);
     let datos;
     try { datos = await req.json(); } catch (e) { return json({ error: 'JSON inválido' }, 400, h); }

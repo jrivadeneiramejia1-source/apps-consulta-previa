@@ -65,5 +65,11 @@ t('errores con Slack: publica un solo mensaje con todos', r.status === 200 && ll
 t('escapa < > & para que nadie pueda mencionar a todo el canal', slack && !slack.text.includes('<!channel>') && slack.text.includes('&lt;!channel&gt;'));
 r = await pedirErr(errorEj, Object.assign({ SLACK_WEBHOOK: 'https://hooks.slack.com/services/T/B/X' }, env), 'https://otro-sitio.com'); t('errores: rechaza otros sitios', r.status === 403);
 r = await pedirErr({ nada: 1 }, env); t('errores vacíos responde 400', r.status === 400);
+// Mis Claves (Cloudflare Pages) puede mandar errores, pero no avisos.
+r = await pedirErr({ app: 'Mis Claves', version: '2.2', mensaje: 'TypeError: x' }, env, 'https://mis-claves.pages.dev'); t('Mis Claves puede mandar errores', r.status === 202 && r.headers.get('Access-Control-Allow-Origin') === 'https://mis-claves.pages.dev');
+r = await W.default.fetch(new Request('https://avisos-equipos.x.workers.dev/errores', { method: 'OPTIONS', headers: { Origin: 'https://abc123.mis-claves.pages.dev' } }), env); t('y su vista previa pasa la consulta previa (OPTIONS)', r.status === 204);
+r = await pedir({ subs: [sub], titulo: 'x' }, 'https://mis-claves.pages.dev'); t('Mis Claves no puede mandar avisos', r.status === 403);
+r = await pedirErr({ mensaje: 'x' }, env, 'https://mis-claves.pages.dev.otro.com'); t('un sitio que se hace pasar por Mis Claves no entra', r.status === 403);
+r = await pedirErr({ mensaje: 'x' }, env, 'https://otro-mis-claves.pages.dev'); t('ni otro proyecto con nombre parecido', r.status === 403);
 console.log(`\n${ok} bien, ${mal} mal${v.real ? '' : ' (con una llave de prueba)'}`);
 process.exit(mal ? 1 : 0);
