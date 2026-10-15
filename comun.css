@@ -465,3 +465,36 @@ body.con-hoja .toast { bottom: auto; top: calc(14px + env(safe-area-inset-top, 0
 .card.mt.atras { box-shadow: inset 4px 0 0 var(--danger), var(--shadow-sm); }
 .card.mt.sug { box-shadow: inset 4px 0 0 var(--org), var(--shadow-sm); }
 .pill.s-rojo { color: var(--danger); background: var(--danger-bg); }
+
+/* Agenda: tipos de tarea, estado y acciones */
+.card.mt.t-fisico { box-shadow: inset 4px 0 0 var(--org), var(--shadow-sm); }
+.card.mt.t-remoto { box-shadow: inset 4px 0 0 var(--listo), var(--shadow-sm); }
+.card.mt.t-backup { box-shadow: inset 4px 0 0 var(--accent), var(--shadow-sm); }
+.card.mt.atras { box-shadow: inset 4px 0 0 var(--danger), var(--shadow-sm); }
+.card.mt.sug { box-shadow: inset 4px 0 0 var(--line-2), var(--shadow-sm); }
+.card.mt.mia { border-color: var(--accent); }
+.pill.tp-fisico { color: var(--org); background: var(--org-bg); }
+.pill.tp-remoto { color: var(--listo); background: var(--listo-bg); }
+.pill.tp-backup { color: var(--accent-txt); background: var(--accent-soft); }
+.estado-t { display: flex; gap: 8px; align-items: flex-start; font-size: .88rem; font-weight: 600; border-radius: 12px; padding: 9px 11px; }
+.estado-t .ph { margin-top: 1px; }
+.estado-t.org { color: var(--org); background: var(--org-bg); }
+.estado-t.ok { color: var(--disco); background: var(--disco-bg); }
+.estado-t.rojo { color: var(--danger); background: var(--danger-bg); }
+.anydesk-t { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: .88rem; background: var(--surface-2); border-radius: 12px; padding: 6px 6px 6px 11px; }
+.anydesk-t > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
+.anydesk-t.sin { color: var(--muted); padding: 9px 11px; }
+.acciones-t { display: flex; flex-wrap: wrap; gap: 8px; }
+.acciones-t .btn { flex: 1 1 auto; }
+.seg3.tipo-t { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+.seg3.tipo-t button { min-height: 44px; font-size: .86rem; }
+.seg3.tipo-t button[aria-pressed="true"] { background: var(--surface); color: var(--fg); }
+.linea-t { list-style: none; margin: 0; padding: 0 0 0 14px; border-left: 2px solid var(--line); display: flex; flex-direction: column; gap: 8px; font-size: .86rem; }
+.linea-t li { display: flex; flex-direction: column; gap: 1px; }
+.personas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.persona { border: 1px solid var(--line); border-radius: 14px; padding: 10px 12px; background: var(--field); }
+.persona-cab { display: flex; align-items: center; gap: 10px; }
+.persona-cab .ico { width: 36px; height: 36px; border-radius: 11px; }
+.persona .disp { list-style: none; margin: 8px 0 0; padding: 0 0 0 46px; display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--muted); }
+.persona .disp li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ok-t { color: var(--disco); font-weight: 700; }

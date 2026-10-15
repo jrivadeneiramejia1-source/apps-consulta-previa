@@ -31,11 +31,19 @@ service cloud.firestore {
   match /databases/{database}/documents {
     match /espacios/{espacio}/{coleccion}/{id} {
       allow read, write: if espacio.size() == 40
-        && coleccion in ['comunidades', 'evidencias', 'equipos', 'recibidos', 'entregas', 'archivos', 'avisos'];
+        && coleccion in ['comunidades', 'evidencias', 'equipos', 'recibidos', 'entregas', 'archivos', 'avisos', 'tareas'];
     }
   }
 }
 ```
+
+## Agenda de Equipos
+- Colección `tareas`: `{ serial, tipo: fisico|remoto|backup, fecha, nota, resp, creadoPor, estado, hist[], hecho }`.
+- Estados: pendiente → (remoto o backup) `encender` "prende el equipo" → `encendido` → `hecho`; `nopudo` deja la tarea activa con el motivo.
+- Cada paso avisa a quien corresponde: al programar, al responsable; al pedir prender, a quien la programó; al prender, a quien pidió; al terminar, a quien la programó.
+- Al terminar: físico actualiza `fechaMtto`, remoto `fechaRemoto`, backup `fechaBackup`, y se agrega a `mttos` del equipo.
+- El equipo guarda su número de `anydesk`.
+- Colección `avisos`: un documento por teléfono que abrió Equipos `{ nombre, equipo, visto, sub }`. De ahí sale la lista de personas para escoger el responsable.
 
 ## Notificaciones (Agenda de Equipos)
 - `avisos/worker.js`: Cloudflare Worker **avisos-equipos** que cifra y firma (Web Push, RFC 8291 y 8292) los avisos. No guarda nada.

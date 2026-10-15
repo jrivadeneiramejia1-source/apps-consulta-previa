@@ -12,9 +12,9 @@ const err = [];
 const { ctx, page } = await pagina(br, { semilla: semillaEquipos(), errores: err });
 // Permiso y suscripción simulados (en un teléfono real los da Chrome)
 await ctx.addInitScript(() => {
-  let permiso = 'default', sub = null;
+  let permiso = localStorage.getItem('__permiso') || 'default', sub = null;   // el permiso queda guardado, como en Chrome
   window.Notification = function () {}; Object.defineProperty(Notification, 'permission', { get: () => permiso });
-  Notification.requestPermission = async () => (permiso = 'granted');
+  Notification.requestPermission = async () => { localStorage.setItem('__permiso', 'granted'); return (permiso = 'granted'); };
   window.PushManager = function () {};
   const pm = {
     getSubscription: async () => sub,
@@ -32,67 +32,97 @@ await ctx.route('https://avisos-equipos.jrivadeneiramejia1.workers.dev/**', asyn
 });
 const st = () => page.evaluate(() => JSON.parse(localStorage.getItem('__fs_falso')));
 const avisos = s => Object.entries(s).filter(([k]) => k.startsWith(B + '/avisos/'));
-const nombre = n => page.evaluate(n => localStorage.setItem('nube_equipos_nombre', n), n);
+const tareas = s => Object.entries(s).filter(([k]) => k.startsWith(B + '/tareas/'));
+// Cada persona en "su teléfono": otro nombre y otro identificador de teléfono.
+async function como(n, extra) {
+  if (!page.url().startsWith('http')) await page.goto(URL + '/equipos/');
+  await page.evaluate(([n, extra]) => { localStorage.setItem('nube_equipos_nombre', n); localStorage.setItem('eqcp_disp', JSON.stringify('d-' + n.toLowerCase())); Object.entries(extra || {}).forEach(([k, v]) => localStorage.setItem(k, JSON.stringify(v))); }, [n, extra]);
+  await page.goto(URL + '/equipos/'); await page.waitForSelector('#recList .card.rec'); await esp(400);
+}
+const ultimoEnvio = () => envios[envios.length - 1];
 
-await page.goto(URL + '/equipos/'); await page.waitForSelector('#recList .card.rec');
-await page.click('#tabMt'); await esp(200);
-log('1. la Agenda invita a activar las notificaciones', await page.locator('#notiAviso').isVisible());
-await page.addScriptTag({ content: AXE }); await esp(300);
-const v = await page.evaluate(async () => (await axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'best-practice'] })).violations.map(x => x.id));
-log('2. accesible (axe)', !v.length, v.join(', '));
-await page.click('#notiAviso [data-noti="activar"]'); await esp(400);
+await como('Jeiler');
 let s = await st();
-log('3. al activar se guarda este teléfono a nombre de Jeiler', avisos(s).length === 1 && avisos(s)[0][1].nombre === 'Jeiler' && avisos(s)[0][1].sub.endpoint.includes('/send/Jeiler'));
-log('4. el aviso de activar desaparece', !(await page.locator('#notiAviso').isVisible()));
-await page.click('#tabDb'); await esp(100);
-log('5. Base de datos dice que están activadas', (await page.textContent('#notiInfo')).startsWith('Activadas para Jeiler'));
+log('1. al abrir la app queda anotado este teléfono a nombre de Jeiler', avisos(s).length === 1 && avisos(s)[0][1].nombre === 'Jeiler' && avisos(s)[0][1].sub === null && !!avisos(s)[0][1].visto);
+await page.click('#tabMt'); await esp(200);
+log('2. la Agenda invita a activar las notificaciones', await page.locator('#notiAviso').isVisible());
+await page.addScriptTag({ content: AXE }); await esp(300);
+let v = await page.evaluate(async () => (await axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'best-practice'] })).violations.map(x => x.id));
+log('3. accesible (axe)', !v.length, v.join(', '));
+await page.click('#notiAviso [data-noti="activar"]'); await esp(400);
+s = await st();
+log('4. al activar se guarda la suscripción en el mismo registro del teléfono', avisos(s).length === 1 && avisos(s)[0][1].sub && avisos(s)[0][1].sub.endpoint.includes('/send/Jeiler'));
+await page.click('#tabDb'); await esp(150);
+log('5. Base de datos: avisos activos y la lista de personas', (await page.textContent('#notiInfo')).startsWith('Activadas para Jeiler') && (await page.textContent('#personasLista')).includes('avisos activos'));
 await page.click('#notiBtns [data-noti="probar"]'); await esp(400);
-log('6. Probar envía un aviso a este mismo teléfono', envios.length === 1 && envios[0].subs[0].endpoint.includes('/send/Jeiler') && envios[0].titulo === 'Prueba de avisos');
+log('6. Probar envía un aviso a este mismo teléfono', envios.length === 1 && ultimoEnvio().titulo === 'Prueba de avisos');
 
-// Otra persona (el encargado) programa un mantenimiento para Jeiler
-await nombre('Carlos'); await page.reload(); await page.waitForSelector('#recList .card.rec');
+// Carlos (uno de los encargados) entra y programa un backup para Jeiler
+await como('Carlos');
+s = await st();
+log('7. Carlos queda anotado en su propio registro', avisos(s).length === 2);
 await page.click('#tabMt'); await page.click('#btnNewMt'); await page.waitForSelector('#mtSheet:not([hidden])');
-await page.fill('#mtSerial', 'GPS778812'); await page.fill('#mtFecha', '2026-10-20'); await page.fill('#mtNota', 'Comunicarse con Luis');
-await page.fill('#mtResp', 'jeiler'); await esp(80);
-log('7. al escribir el responsable dice que le llegará el aviso', (await page.textContent('#mtRespInfo')).includes('le llegará el aviso'));
-log('8. sugiere los nombres que tienen notificaciones', (await page.locator('#dlResp option').evaluateAll(o => o.map(x => x.value))).includes('Jeiler'));
+const opc = await page.locator('#mtResp option').allTextContents();
+log('8. el responsable se escoge de las personas con sesión, con su estado de avisos', opc.some(o => o.startsWith('Jeiler · avisos activos')) && opc.some(o => o.startsWith('Carlos (tú) · sin avisos')) && opc.includes('Otra persona (escribir el nombre)'), opc.join(' | '));
+await page.click('#mtTipo [data-tipo="backup"]'); await page.fill('#mtSerial', 'GPS778812'); await page.fill('#mtFecha', '2026-10-20'); await page.fill('#mtAnydesk', '987654321');
+await page.selectOption('#mtResp', 'Jeiler'); await esp(80);
+log('9. dice que a Jeiler le llegará el aviso', (await page.textContent('#mtRespInfo')).includes('le llegará el aviso'));
+await page.addScriptTag({ content: AXE }); await esp(200);
+v = await page.evaluate(async () => (await axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'best-practice'] })).violations.map(x => x.id));
+log('10. la hoja de la tarea es accesible (axe)', !v.length, v.join(', '));
 await page.click('#mtGuardar'); await esp(500);
-const ult = envios[envios.length - 1];
-log('9. se envía el aviso solo al teléfono de Jeiler', envios.length === 2 && ult.subs.length === 1 && ult.subs[0].endpoint.includes('/send/Jeiler'));
-log('10. el aviso dice qué equipo, para cuándo y quién lo programó', ult.titulo.includes('GPS778812') && ult.cuerpo.includes('20/10/2026') && ult.cuerpo.includes('Comunicarse con Luis') && ult.cuerpo.includes('programó Carlos') && ult.url === './?agenda=1', JSON.stringify(ult));
+log('11. aviso a Jeiler: qué tarea, de qué equipo, AnyDesk y quién la programó', envios.length === 2 && ultimoEnvio().subs[0].endpoint.includes('/send/Jeiler') && ultimoEnvio().titulo === 'Te asignaron: backup de GPS778812' && ultimoEnvio().cuerpo.includes('AnyDesk 987 654 321') && ultimoEnvio().cuerpo.includes('programó Carlos'), JSON.stringify(ultimoEnvio()));
+s = await st(); const tid = tareas(s).find(([, x]) => x.tipo === 'backup')[0].split('/').pop();
+await page.click('#btnNewMt'); await page.fill('#mtSerial', 'PF2XYZ01'); await page.fill('#mtFecha', '2026-10-25');
+await page.selectOption('#mtResp', '__otro'); await page.fill('#mtRespOtro', 'Pedro'); await esp(80);
+log('12. si escribe otra persona sin avisos lo dice', (await page.textContent('#mtRespInfo')).includes('no tiene notificaciones'));
+await page.click('#mtGuardar'); await esp(400);
+log('13. y no intenta enviar (dice que lo verá al abrir la app)', envios.length === 2 && (await page.textContent('#toast')).includes('Pedro no tiene notificaciones'));
+await page.click('#tabDb'); await page.click('#notiBtns [data-noti="activar"]'); await esp(400);
+
+// Jeiler abre la app: le dice lo que le asignaron y pide prender el equipo
+await como('Jeiler', { eqcp_agenda_vista: '2000-01-01' }); await esp(1200);
+log('14. al abrir, Jeiler ve "Te asignaron una tarea"', (await page.textContent('#toast')).includes('Te asignaron una tarea: backup de GPS778812'));
+log('15. la pestaña Agenda cuenta lo que le toca', (await page.textContent('#badgeMt')) === '1');
+await page.click('#tabMt'); await page.click('#sumMt [data-filtro="mias"]'); await esp(100);
+log('16. "Para mí" muestra su tarea', (await page.locator('#mtList .card.mt').count()) === 1);
+await page.click(`[data-t-acc="encender"][data-t="${tid}"]`); await page.waitForSelector('#cfSheet:not([hidden])');
+log('17. pregunta antes y dice a quién le avisa', (await page.textContent('#cfText')).includes('Se le avisa a Carlos'));
+await page.click('#cfYes'); await esp(500);
+log('18. Carlos recibe "Prende el equipo"', ultimoEnvio().subs[0].endpoint.includes('/send/Carlos') && ultimoEnvio().titulo === 'Prende el equipo GPS778812' && ultimoEnvio().cuerpo.includes('Jeiler va a conectarse'), JSON.stringify(ultimoEnvio()));
+
+// Carlos prende el equipo
+await como('Carlos', { eqcp_agenda_vista: '2000-01-01' }); await esp(1200);
+const t19 = await page.textContent('#toast');
+log('19. al abrir, Carlos ve "Te pidieron prender un equipo"', t19.includes('Te pidieron prender un equipo'), t19);
+await page.click('#tabMt'); await page.click(`[data-t-acc="encendido"][data-t="${tid}"]`); await esp(500);
+log('20. Jeiler recibe "Ya puedes entrar" con el AnyDesk', ultimoEnvio().subs[0].endpoint.includes('/send/Jeiler') && ultimoEnvio().titulo === 'Ya puedes entrar a GPS778812' && ultimoEnvio().cuerpo.includes('987 654 321'));
+
+// Jeiler termina el backup
+await como('Jeiler');
+await page.click('#tabMt'); await page.click(`[data-t-acc="hecho"][data-t="${tid}"]`); await page.waitForSelector('#cfSheet:not([hidden])'); await page.click('#cfYes'); await esp(500);
+log('21. Carlos recibe "Backup hecho"', ultimoEnvio().subs[0].endpoint.includes('/send/Carlos') && ultimoEnvio().titulo === 'Backup hecho: GPS778812');
 s = await st();
-log('11. el responsable queda guardado', s[`${B}/equipos/GPS778812`].prog.resp === 'jeiler');
-const t12 = await page.locator('#mtList .card.mt', { hasText: 'GPS778812' }).innerText();
-log('12. la tarjeta muestra el responsable', /Responsable:\s*jeiler/.test(t12), t12.replace(/\n/g, ' | '));
-await page.click('[data-mt="GPS778812"]'); await page.waitForSelector('#mtSheet:not([hidden])'); await page.click('#mtGuardar'); await esp(300);
-log('13. guardar sin cambios no repite el aviso', envios.length === 2);
-await page.click('#btnNewMt'); await page.fill('#mtSerial', 'PF2XYZ01'); await page.fill('#mtResp', 'Pedro'); await esp(80);
-log('14. si el responsable no tiene notificaciones lo dice', (await page.textContent('#mtRespInfo')).includes('todavía no activó'));
-await page.click('#mtGuardar'); await esp(300);
-log('15. y no intenta enviar', envios.length === 2 && (await page.textContent('#toast')).includes('todavía no activó'));
+log('22. la tarea queda con todo su recorrido', s[`${B}/tareas/${tid}`].hist.map(h => h.quien + ':' + h.que).join(',') === 'Carlos:programada,Jeiler:encender,Carlos:encendido,Jeiler:hecho');
 
-// Jeiler abre la app después: le dice que le programaron
-await nombre('Jeiler'); await page.evaluate(() => localStorage.setItem('eqcp_agenda_vista', JSON.stringify('2000-01-01'))); await page.reload(); await page.waitForSelector('#recList .card.rec'); await esp(1500);
-log('16. al abrir la app avisa "Te programaron un mantenimiento"', (await page.textContent('#toast')).includes('Te programaron un mantenimiento: GPS778812'));
-await page.goto(URL + '/equipos/?agenda=1'); await page.waitForSelector('#vMt:not([hidden])');
-log('17. tocar la notificación abre la Agenda', await page.locator('#vMt').isVisible());
-
-// Suscripción vencida: se borra sola
+// Suscripción vencida: se apaga sola en ese teléfono
 vencer = true;
-await nombre('Carlos'); await page.goto(URL + '/equipos/'); await page.waitForSelector('#recList .card.rec');
-await page.click('#tabMt'); await page.click('[data-mt="GPS778812"]'); await page.waitForSelector('#mtSheet:not([hidden])');
-await page.fill('#mtFecha', '2026-10-21'); await page.click('#mtGuardar'); await esp(600);
+await como('Carlos');
+await page.click('#tabMt'); await page.click('#btnNewMt'); await page.click('#mtTipo [data-tipo="remoto"]'); await page.fill('#mtSerial', 'GPS778812'); await page.selectOption('#mtResp', 'Jeiler'); await page.click('#mtGuardar'); await esp(600);
 s = await st();
-log('18. si el teléfono ya no recibe avisos, se quita de la lista y lo dice', avisos(s).length === 0 && (await page.textContent('#toast')).includes('vencieron'));
+log('23. si el teléfono ya no recibe avisos, se marca sin avisos (sin borrar la persona)', avisos(s).find(([k]) => k.endsWith('d-jeiler'))[1].sub === null && (await page.textContent('#toast')).includes('Jeiler no tiene notificaciones'));
 vencer = false;
 
-// Desactivar
-await nombre('Jeiler'); await page.reload(); await page.waitForSelector('#recList .card.rec');
-await page.click('#tabDb'); await page.click('#notiBtns [data-noti="activar"]'); await esp(400);
+// Lista de personas: quitar un teléfono viejo y desactivar
+await page.click('#tabDb'); await page.click('#personasLista [data-quitar-disp="d-jeiler"]'); await page.waitForSelector('#cfSheet:not([hidden])'); await page.click('#cfYes'); await esp(300);
+s = await st();
+log('24. se puede quitar un teléfono de la lista', !avisos(s).some(([k]) => k.endsWith('d-jeiler')));
 await page.click('#notiBtns [data-noti="quitar"]'); await page.waitForSelector('#cfSheet:not([hidden])'); await page.click('#cfYes'); await esp(300);
 s = await st();
-log('19. desactivar quita el teléfono', avisos(s).length === 0 && (await page.textContent('#notiInfo')).startsWith('Desactivadas'));
-log('20. sin errores ni diálogos nativos', !err.length, err.join(' | '));
+log('25. desactivar deja el teléfono en la lista pero sin avisos', avisos(s).find(([k]) => k.endsWith('d-carlos'))[1].sub === null && (await page.textContent('#notiInfo')).startsWith('Desactivadas'));
+await page.goto(URL + '/equipos/?agenda=1'); await page.waitForSelector('#vMt:not([hidden])');
+log('26. tocar la notificación abre la Agenda en "Para mí"', await page.locator('#sumMt [data-filtro="mias"][aria-pressed="true"]').count() === 1);
+log('27. sin errores ni diálogos nativos', !err.length, err.join(' | '));
 await br.close(); srv.close();
 
 // sw.js: lo que hace el teléfono al recibir y tocar la notificación
@@ -105,8 +135,8 @@ const self = {
 vm.runInNewContext(fs.readFileSync(RAIZ + '/equipos/sw.js', 'utf8'), { self, caches: {}, fetch: () => {}, URL: globalThis.URL, console });
 let espera = null;
 oyentes.push({ data: { json: () => ({ titulo: 'Mantenimiento programado: GPS778812', cuerpo: 'para el 20/10/2026', url: './?agenda=1', etiqueta: 'mt-GPS' }) }, waitUntil: p => (espera = p) }); await espera;
-log('21. sw.js muestra la notificación con título, texto e ícono', mostradas.length === 1 && mostradas[0][0].includes('GPS778812') && mostradas[0][1].body === 'para el 20/10/2026' && mostradas[0][1].icon.includes('equipos-192'));
+log('28. sw.js muestra la notificación con título, texto e ícono', mostradas.length === 1 && mostradas[0][0].includes('GPS778812') && mostradas[0][1].body === 'para el 20/10/2026' && mostradas[0][1].icon.includes('equipos-192'));
 oyentes.notificationclick({ notification: { close() {}, data: mostradas[0][1].data }, waitUntil: p => (espera = p) }); await espera;
-log('22. tocarla abre la app en la Agenda', abiertas[0] === 'https://x.github.io/apps/equipos/?agenda=1', abiertas[0]);
+log('29. tocarla abre la app en la Agenda', abiertas[0] === 'https://x.github.io/apps/equipos/?agenda=1', abiertas[0]);
 console.log(`\n${ok} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

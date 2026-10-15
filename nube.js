@@ -273,7 +273,8 @@
   async function leerTodo() {
     const out = {};
     for (const col of APP.colecciones) {
-      const s = await F.getDocs(F.collection(fs, ...ruta(col)));
+      // Si las reglas todavía no permiten una colección nueva (por ejemplo "tareas"), la copia sigue con las demás.
+      let s; try { s = await F.getDocs(F.collection(fs, ...ruta(col))); } catch (e) { if (e && e.code === 'permission-denied') continue; throw e; }
       out[col] = {}; s.docs.forEach(d => { out[col][d.id] = d.data(); });
     }
     return out;
