@@ -12,6 +12,8 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - `config.js`: datos del proyecto de Firebase.
 - `nube.js`: conexión con Firebase, pantalla de clave, copia de seguridad e instalación.
 - `sw.js`: guarda la app en el teléfono para abrir sin internet.
+- `comun.css`, `comun.js`, `iconos.js`, `fuentes/`: diseño compartido de Equipos y Entregas (ver `DESIGN.md`).
+- `pruebas/`: banco de pruebas con Firebase falso. `node pruebas/prueba.mjs` prueba Equipos y Entregas en tema claro y oscuro.
 
 ## Reglas de Firestore
 ```

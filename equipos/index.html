@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0d6b5b">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F5F2EA">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1412">
 <meta name="description" content="Equipos recibidos, mantenimiento y backup">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="../iconos/equipos-192.png">
@@ -12,339 +13,42 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Equipos">
 <title>Equipos Consulta Previa</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@500&display=swap">
-<style>
-/* Diseño: herramienta de bolsillo. Encabezado fijo + una columna de tarjetas + barra inferior con 3 secciones. */
-:root {
-  --bg: #f3f5f2;
-  --surface: #ffffff;
-  --surface-2: #e9ede8;
-  --line: #d3dad2;
-  --fg: #18211d;
-  --muted: #5b6862;
-  --accent: #0d6b5b;
-  --accent-ink: #ffffff;
-  --accent-soft: #d6ebe5;
-  --pend: #8a948f;  --pend-bg: #eceeed;
-  --org: #9a5b00;   --org-bg: #fbecd2;
-  --listo: #1f5fae; --listo-bg: #dde8f7;
-  --disco: #157046; --disco-bg: #d8efe1;
-  --warn: #8a5a00;  --warn-bg: #fff3d4;
-  --danger: #b3261e; --danger-bg: #fbe3e1;
-  --shadow: 0 10px 30px rgba(20, 35, 28, .18);
-  --f-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
-  --f-body: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
-  --f-mono: "JetBrains Mono", ui-monospace, Consolas, monospace;
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #101513; --surface: #182019; --surface-2: #212a24; --line: #2f3a33;
-    --fg: #e7eee9; --muted: #9aa8a0; --accent: #46c2a6; --accent-ink: #062019; --accent-soft: #173a31;
-    --pend: #8f9a94; --pend-bg: #252d28;
-    --org: #f2b552; --org-bg: #3a2c12;
-    --listo: #7fb0f0; --listo-bg: #182a43;
-    --disco: #5fd394; --disco-bg: #143323;
-    --warn: #f2c25a; --warn-bg: #352a10;
-    --danger: #ff8a80; --danger-bg: #3d1916;
-    --shadow: 0 10px 30px rgba(0,0,0,.5);
-    color-scheme: dark;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #101513; --surface: #182019; --surface-2: #212a24; --line: #2f3a33;
-  --fg: #e7eee9; --muted: #9aa8a0; --accent: #46c2a6; --accent-ink: #062019; --accent-soft: #173a31;
-  --pend: #8f9a94; --pend-bg: #252d28;
-  --org: #f2b552; --org-bg: #3a2c12;
-  --listo: #7fb0f0; --listo-bg: #182a43;
-  --disco: #5fd394; --disco-bg: #143323;
-  --warn: #f2c25a; --warn-bg: #352a10;
-  --danger: #ff8a80; --danger-bg: #3d1916;
-  --shadow: 0 10px 30px rgba(0,0,0,.5);
-  color-scheme: dark;
-}
+<link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="../comun.css?v=11">
 
-* { box-sizing: border-box; }
-body {
-  background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 16px; line-height: 1.45;
-  margin: 0; padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px));
-}
-button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
-button:disabled, input:disabled, select:disabled, textarea:disabled { cursor: not-allowed; opacity: .65; }
-:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
-.num, .mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
-
-.top {
-  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
-  background: var(--bg); border-bottom: 1px solid var(--line);
-  padding-block: 12px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-}
-.top-in { max-width: 760px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.brand { min-width: 0; }
-.brand h1 { font-family: var(--f-display); font-weight: 800; font-size: 1.15rem; letter-spacing: -.01em; margin: 0; line-height: 1.1; }
-.brand p { margin: 2px 0 0; font-size: .8rem; color: var(--muted); }
-.conn { font-size: .75rem; color: var(--muted); white-space: nowrap; display: flex; align-items: center; gap: 6px; }
-.conn i { width: 8px; height: 8px; border-radius: 50%; background: var(--pend); display: inline-block; }
-.conn[data-s="vivo"] i { background: var(--disco); }
-.conn[data-s="cargando"] i { background: var(--listo); }
-.conn[data-s="off"] i { background: var(--org); }
-
-main {
-  max-width: 760px; margin: 0 auto; padding-block: 14px;
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-}
-.view { display: flex; flex-direction: column; gap: 14px; }
-
-.note { font-size: .82rem; color: var(--muted); background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
-.note b { color: var(--fg); }
-.aviso { font-size: .85rem; border-radius: 10px; padding: 10px 12px; display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
-.aviso.warn { color: var(--warn); background: var(--warn-bg); }
-.aviso.info { color: var(--listo); background: var(--listo-bg); }
-
-.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.sum { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
-.sum .num { font-size: 1.35rem; font-weight: 500; display: block; }
-.sum span:last-child { font-size: .75rem; color: var(--muted); }
-.bar { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--surface-2); }
-.bar span { display: block; height: 100%; }
-.bar .s-pend { background: var(--pend); } .bar .s-org { background: var(--org); } .bar .s-listo { background: var(--listo); } .bar .s-disco { background: var(--disco); }
-.progress { display: flex; flex-direction: column; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
-.progress .row { font-size: .78rem; color: var(--muted); gap: 4px 14px; }
-.progress .row b { color: var(--fg); font-family: var(--f-mono); font-weight: 500; }
-
-.search { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); font-size: 16px; }
-.chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
-.chips::-webkit-scrollbar { display: none; }
-.chip { flex: 0 0 auto; border: 1px solid var(--line); background: var(--surface); padding: 7px 12px; border-radius: 999px; font-size: .85rem; }
-.chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
-
-.list { display: flex; flex-direction: column; gap: 10px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px; text-align: left; width: 100%; display: flex; flex-direction: column; gap: 10px; }
-button.card:active { transform: scale(.995); }
-.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
-.card-title { font-family: var(--f-display); font-weight: 800; font-size: 1.05rem; letter-spacing: .01em; min-width: 0; }
-.card-title small { font-family: var(--f-mono); font-weight: 500; color: var(--muted); font-size: .8rem; margin-right: 6px; }
-.meta { font-size: .82rem; color: var(--muted); }
-.count { font-size: .8rem; color: var(--muted); }
-
-/* Fila de etapas: cuadro vacío = sin reunión; relleno = color del estado */
-.dots { display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; }
-.dot { height: 14px; border-radius: 4px; border: 1.5px dashed var(--line); }
-.dot.s-pend { background: var(--pend); border: 0; }
-.dot.s-org { background: var(--org); border: 0; }
-.dot.s-listo { background: var(--listo); border: 0; }
-.dot.s-disco { background: var(--disco); border: 0; }
-.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: .75rem; color: var(--muted); }
-.legend span { display: inline-flex; align-items: center; gap: 6px; }
-.legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
-
-.pill { display: inline-flex; align-items: center; font-size: .75rem; font-weight: 700; padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-.pill.s-pend { color: var(--pend); background: var(--pend-bg); }
-.pill.s-org { color: var(--org); background: var(--org-bg); }
-.pill.s-listo { color: var(--listo); background: var(--listo-bg); }
-.pill.s-disco { color: var(--disco); background: var(--disco-bg); }
-.pill.none { color: var(--muted); background: transparent; border: 1px dashed var(--line); font-weight: 400; }
-.pill.rev { color: var(--warn); background: var(--warn-bg); }
-.tag-shared { font-size: .75rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 3px 9px; border-radius: 999px; white-space: nowrap; }
-.warn { font-size: .8rem; color: var(--warn); background: var(--warn-bg); border-radius: 8px; padding: 6px 9px; }
-
-.btn { border: 1px solid var(--line); background: var(--surface); padding: 10px 14px; border-radius: 10px; font-weight: 700; font-size: .9rem; }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.btn.danger { background: var(--danger-bg); border-color: transparent; color: var(--danger); }
-.btn.ghost { background: transparent; }
-.btn.small { padding: 6px 10px; font-size: .8rem; }
-.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
-.row.between { justify-content: space-between; }
-body.ro .solo-editar { display: none !important; }
-
-.section-label { font-family: var(--f-display); font-weight: 600; font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 6px 0 -4px; }
-
-/* Detalle */
-.detail-head h2 { font-family: var(--f-display); font-weight: 800; font-size: 1.5rem; margin: 0; text-wrap: balance; }
-.fields { display: grid; gap: 12px; }
-.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.field label, .field .lbl { font-size: .8rem; font-weight: 700; color: var(--muted); }
-.field input, .field select, .field textarea { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; }
-.field textarea { resize: vertical; min-height: 70px; }
-.two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-
-.stage { padding: 12px 14px; gap: 6px; }
-.stage .card-title { font-size: .98rem; }
-.stage.empty { background: transparent; border-style: dashed; }
-.stage.empty .card-title { color: var(--muted); font-weight: 600; }
-.facts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: .85rem; }
-.facts b { font-weight: 700; }
-.obs { font-size: .85rem; color: var(--muted); border-left: 3px solid var(--line); padding-left: 8px; white-space: pre-wrap; }
-
-/* Evidencias */
-.month { font-family: var(--f-mono); font-size: .8rem; color: var(--muted); padding: 4px 0; border-bottom: 1px solid var(--line); }
-.filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.filters select { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 16px; min-width: 0; }
-
-/* Base de datos */
-.seg { display: grid; grid-template-columns: 1fr 1fr; background: var(--surface-2); border-radius: 12px; padding: 4px; gap: 4px; }
-.seg button { border: 0; background: transparent; padding: 9px; border-radius: 9px; font-weight: 700; font-size: .9rem; color: var(--muted); }
-.seg button[aria-pressed="true"] { background: var(--surface); color: var(--fg); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
-.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-table { border-collapse: collapse; font-size: .85rem; min-width: 100%; }
-th, td { padding: 6px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: middle; }
-th { background: var(--surface-2); font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); white-space: nowrap; }
-td input, td select { width: 100%; min-width: 80px; padding: 7px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); font-size: 15px; }
-td input.n { min-width: 64px; width: 70px; }
-td input.w { min-width: 190px; }
-td .cell { min-width: 150px; font-size: .8rem; }
-.icon-btn { border: 0; background: var(--danger-bg); color: var(--danger); border-radius: 8px; padding: 7px 10px; font-weight: 700; }
-.tev td:first-child, .tev th:first-child { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 2px 0 0 var(--line); }
-.tev th:first-child { background: var(--surface-2); z-index: 2; }
-/* Tabla de comunidades: la columna Comunidad queda fija al deslizar */
-.tcom .stk1 input { min-width: 56px; width: 60px; }
-.tcom .stk2 { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 2px 0 0 var(--line); }
-.tcom .stk2 input { min-width: 0; width: 112px; font-weight: 700; font-size: 14px; padding-inline: 6px; }
-.tcom th.stk2 { background: var(--surface-2); z-index: 2; }
-.tcom .g0 { border-left: 2px solid var(--line); }
-.tcom th.grp { text-align: left; color: var(--fg); font-family: var(--f-display); font-size: .78rem; }
-.tcom td select { min-width: 150px; }
-.grp-lbl { position: sticky; left: 140px; display: inline-block; padding-inline: 4px; }
-.cellnote { font-size: .72rem; color: var(--muted); margin-top: 3px; white-space: nowrap; }
-.shared-mini { color: var(--accent); font-weight: 700; }
-.rev-mini { color: var(--warn); font-weight: 700; }
-.sinreu { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 260px; padding: 4px; }
-.mini { border: 1px dashed var(--accent); color: var(--accent); background: transparent; border-radius: 8px; padding: 5px 9px; font-weight: 700; font-size: .8rem; }
-body.ro .mini { display: none; }
-
-/* Barra inferior */
-.tabs {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; background: var(--surface); border-top: 1px solid var(--line);
-  padding-top: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
-  padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px));
-}
-.tabs-in { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
-.tab { border: 0; background: transparent; padding: 8px 4px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: .78rem; font-weight: 700; color: var(--muted); }
-.tab svg { width: 22px; height: 22px; }
-.tab[aria-current="page"] { color: var(--accent); background: var(--accent-soft); }
-
-/* Hoja inferior (formularios) */
-.backdrop { position: fixed; inset: 0; z-index: 50; background: rgba(8, 14, 11, .55); display: flex; align-items: flex-end; justify-content: center; }
-.sheet {
-  background: var(--surface); width: 100%; max-width: 620px; max-height: 92vh; overflow-y: auto;
-  border-radius: 18px 18px 0 0; box-shadow: var(--shadow);
-  padding-top: 16px; padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
-  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
-  display: flex; flex-direction: column; gap: 12px;
-}
-.sheet h3 { font-family: var(--f-display); font-weight: 800; margin: 0; font-size: 1.2rem; }
-.sheet .sub { margin: -6px 0 0; color: var(--muted); font-size: .85rem; }
-.grab { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: -4px auto 2px; }
-.checks { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; overscroll-behavior: contain; }
-.check { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border: 1px solid var(--line); border-radius: 10px; }
-.check input { width: 20px; height: 20px; accent-color: var(--accent); flex: 0 0 auto; }
-.err { color: var(--danger); font-size: .85rem; }
-.sheet-actions { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; position: sticky; bottom: calc(-18px - env(safe-area-inset-bottom, 0px)); background: var(--surface); padding-block: 10px; border-top: 1px solid var(--line); }
-.sheet-actions .row { margin-left: auto; }
-.confirm .sheet { max-width: 460px; }
-
-.toast {
-  position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); z-index: 60;
-  background: var(--fg); color: var(--bg); padding: 9px 16px; border-radius: 999px; font-size: .85rem; font-weight: 700; max-width: calc(100% - 32px); text-align: center;
-}
-.empty-state { text-align: center; padding: 28px 16px; color: var(--muted); }
-.empty-state b { display: block; color: var(--fg); font-family: var(--f-display); font-size: 1.05rem; margin-bottom: 4px; }
-@media (min-width: 640px) {
-  .backdrop { align-items: center; }
-  .sheet { border-radius: 18px; }
-  .fields.cols { grid-template-columns: 1fr 1fr; }
-}
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-[hidden] { display: none !important; }
-/* --- Equipos --- */
-.task select, .task input[type=date] { padding: 9px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); font-size: 16px; min-width: 0; }
-.task select { flex: 1 1 130px; font-weight: 700; }
-.task input[type=date] { flex: 1 1 150px; }
-.btn.big { padding: 14px; font-size: 1rem; border-radius: 12px; }
-.cab { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.cab-t { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.cab-t .meta { overflow: hidden; text-overflow: ellipsis; }
-.ico { flex: 0 0 auto; width: 38px; height: 38px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; background: var(--accent-soft); color: var(--accent); }
-.ico svg { width: 22px; height: 22px; }
-.grupo .ico { width: 28px; height: 28px; border-radius: 8px; }
-.grupo .ico svg { width: 17px; height: 17px; }
-.i-gps { background: var(--listo-bg); color: var(--listo); }
-.i-cel, .i-tablet { background: var(--org-bg); color: var(--org); }
-.i-imp, .i-esc { background: var(--pend-bg); color: var(--fg); }
-.i-vb, .i-ant { background: var(--disco-bg); color: var(--disco); }
-.card.rec { border-left-width: 5px; }
-.card.st-espera { border-left-color: var(--org); }
-.card.st-parcial { border-left-color: var(--listo); }
-.card.st-listo { border-left-color: var(--disco); }
-.card.st-pasado { border-left-color: var(--line); opacity: .8; }
-.espera { font-size: .78rem; font-weight: 700; color: var(--muted); }
-.espera.larga { color: var(--danger); }
-.prog { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
-.prog span { display: block; height: 100%; background: var(--disco); transition: width .3s; }
-.acc-mini { font-size: .8rem; color: var(--muted); }
-.acc { display: flex; flex-wrap: wrap; gap: 6px; }
-.acc .chip:disabled { opacity: .6; }
-.hist { display: flex; flex-direction: column; gap: 6px; }
-.hist-it { display: flex; flex-direction: column; gap: 4px; text-align: left; border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 9px 11px; width: 100%; }
-.card-head .pill { align-self: flex-start; }
-.grupo { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-family: var(--f-display); font-weight: 800; font-size: .95rem; padding: 10px 2px 4px; border-bottom: 2px solid var(--accent); margin-top: 4px; }
-.grupo .num { font-family: var(--f-mono); font-weight: 500; font-size: .78rem; color: var(--muted); }
-#fOrden { padding: 10px 12px; }
-.tabs-in { grid-template-columns: repeat(3, 1fr); }
-.badge { background: var(--org); color: #fff; font-family: var(--f-mono); font-size: .7rem; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; margin-left: 4px; }
-.tab-lbl { display: inline-flex; align-items: center; }
-.task { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
-.task .tl { font-size: .85rem; font-weight: 700; min-width: 96px; }
-.seg3 { display: inline-grid; grid-template-columns: repeat(3, auto); background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 3px; }
-.seg3 button { border: 0; background: transparent; padding: 7px 10px; border-radius: 8px; font-size: .8rem; font-weight: 700; color: var(--muted); }
-.seg3 button[aria-pressed="true"].v-pend { background: var(--org-bg); color: var(--org); }
-.seg3 button[aria-pressed="true"].v-hecho { background: var(--disco-bg); color: var(--disco); }
-.seg3 button[aria-pressed="true"].v-na { background: var(--pend-bg); color: var(--fg); }
-.seg3 button:disabled { opacity: .55; }
-.tfecha { font-size: .75rem; color: var(--muted); font-family: var(--f-mono); }
-.viejo { color: var(--warn); font-weight: 700; }
-.sinfecha { color: var(--danger); font-weight: 700; }
-.card.pasado { opacity: .75; }
-.card-top { background: transparent; border: 0; padding: 0; text-align: left; width: 100%; display: flex; flex-direction: column; gap: 6px; }
-.serial { font-family: var(--f-mono); font-weight: 500; letter-spacing: .02em; }
-.tcom .stk1, .teq .stk1 { position: sticky; left: 0; z-index: 1; background: var(--surface); box-shadow: 2px 0 0 var(--line); }
-.teq th.stk1 { background: var(--surface-2); z-index: 2; }
-.teq td.stk1 { font-family: var(--f-mono); font-size: .82rem; font-weight: 500; white-space: nowrap; padding-inline: 8px; }
-.teq td input[type=date] { min-width: 140px; }
-.teq td input.m { min-width: 120px; }
-.btn.ok { background: var(--disco-bg); color: var(--disco); border-color: transparent; }
-</style>
-
+<a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
   <div class="top-in">
     <div class="brand">
-      <h1>Equipos Consulta Previa</h1>
-      <p id="subtitulo">Recibidos, mantenimiento y backup</p>
+      <img class="marca" src="../iconos/equipos-192.png" alt="" width="42" height="42">
+      <div class="brand-t">
+        <h1>Equipos <span class="sr">Consulta Previa</span></h1>
+        <p id="subtitulo">Consulta Previa</p>
+      </div>
     </div>
-    <div class="conn" id="conn" data-s="cargando"><i></i><span>Conectando…</span></div>
+    <div class="conn" id="conn" data-s="cargando" role="status"><i aria-hidden="true"></i><span>Conectando…</span></div>
   </div>
 </header>
 
-<main>
+<main id="contenido" tabindex="-1">
   <div class="aviso warn" id="avisoRo" hidden><span>Solo lectura: en este teléfono no se puede editar.</span></div>
   <div class="aviso warn" id="avisoOff" hidden><span id="avisoOffTxt"></span></div>
-  <div class="aviso info" id="avisoPend" hidden><span id="avisoPendTxt"></span><button class="btn small" type="button" id="btnReintentar">Reintentar ahora</button></div>
+  <div class="aviso info" id="avisoPend" hidden><span id="avisoPendTxt"></span><button class="btn small" type="button" id="btnReintentar"><span data-ico="reintentar"></span>Reintentar ahora</button></div>
 
   <!-- SECCIÓN 1: RECIBIDOS -->
-  <section class="view" id="vRec">
+  <section class="view" id="vRec" aria-labelledby="tRec">
+    <h2 class="titulo-vista" id="tRec">Recibidos</h2>
     <div class="summary" id="sumRec"></div>
-    <button class="btn primary big solo-editar" id="btnNewRec" type="button">+ Registrar equipo recibido</button>
+    <button class="btn primary big solo-editar" id="btnNewRec" type="button"><span data-ico="mas"></span>Registrar equipo recibido</button>
     <input class="search" id="qRec" type="search" placeholder="Buscar serial, persona o modelo" autocomplete="off" aria-label="Buscar equipo recibido">
     <div class="chips" id="chipsRec" role="group" aria-label="Filtrar recibidos"></div>
-    <div class="count" id="recCount"></div>
+    <div class="count" id="recCount" aria-live="polite"></div>
     <div class="list" id="recList"></div>
   </section>
 
   <!-- SECCIÓN 2: EQUIPOS -->
-  <section class="view" id="vEq" hidden>
+  <section class="view" id="vEq" aria-labelledby="tEq" hidden>
+    <h2 class="titulo-vista" id="tEq">Equipos</h2>
     <div class="summary" id="sumEq"></div>
     <input class="search" id="qEq" type="search" placeholder="Buscar serial, persona o modelo" autocomplete="off" aria-label="Buscar equipo">
     <div class="filters">
@@ -352,35 +56,36 @@ body.ro .mini { display: none; }
       <div class="field"><label for="fEqEst">Ubicación y mantenimiento</label><select id="fEqEst"></select></div>
     </div>
     <div class="field"><label for="fOrden">Ordenar por</label><select id="fOrden" class="search"></select></div>
-    <div class="count" id="eqCount"></div>
+    <div class="count" id="eqCount" aria-live="polite"></div>
     <div class="list" id="eqList"></div>
-    <button class="btn solo-editar" id="btnNewEq" type="button">+ Agregar equipo</button>
+    <button class="btn solo-editar" id="btnNewEq" type="button"><span data-ico="mas"></span>Agregar equipo</button>
   </section>
 
   <!-- SECCIÓN 3: BASE DE DATOS -->
-  <section class="view" id="vDb" hidden>
+  <section class="view" id="vDb" aria-labelledby="tDb" hidden>
+    <h2 class="titulo-vista" id="tDb">Base de datos</h2>
     <div class="note">Tabla directa de la base de datos. Lo que cambies o borres aquí cambia en la app y en los teléfonos de todos. Desliza la tabla hacia los lados para ver todas las columnas.</div>
     <div class="seg" role="group" aria-label="Tabla">
       <button type="button" id="segEq" aria-pressed="true">Equipos</button>
       <button type="button" id="segRec" aria-pressed="false">Recibidos</button>
     </div>
     <input class="search" id="qDb" type="search" placeholder="Buscar en la tabla" autocomplete="off" aria-label="Buscar en la tabla">
-    <div class="count" id="dbCount"></div>
-    <div class="table-wrap" id="dbTable"></div>
+    <div class="count" id="dbCount" aria-live="polite"></div>
+    <div class="table-wrap" id="dbTable" tabindex="0" role="region" aria-label="Tabla de la base de datos"></div>
     <div class="row">
-      <button class="btn solo-editar" id="btnDbAdd" type="button">+ Agregar fila</button>
-      <button class="btn" id="btnExcel" type="button" hidden>Descargar Excel</button>
+      <button class="btn solo-editar" id="btnDbAdd" type="button"><span data-ico="mas"></span>Agregar fila</button>
+      <button class="btn" id="btnExcel" type="button" hidden><span data-ico="excel"></span><span>Descargar Excel</span></button>
     </div>
     <div class="card nube-card">
-      <div class="card-title">Copia de seguridad y acceso</div>
+      <h3 class="card-title"><span data-ico="nube"></span>Copia de seguridad y acceso</h3>
       <div class="meta" id="nubeInfo"></div>
       <div class="row">
-        <button class="btn" type="button" onclick="nube.exportar()">Descargar copia (JSON)</button>
-        <label class="btn solo-editar">Importar copia<input type="file" accept=".json,application/json" hidden onchange="nube.importar(this)"></label>
+        <button class="btn" type="button" id="btnCopia"><span data-ico="descargar"></span>Descargar copia (JSON)</button>
+        <label class="btn solo-editar"><span data-ico="importar"></span>Importar copia<input type="file" id="archivoCopia" accept=".json,application/json" hidden></label>
       </div>
       <div class="row">
-        <button class="btn" type="button" onclick="nube.cambiarNombre()">Cambiar mi nombre</button>
-        <button class="btn danger" type="button" onclick="nube.salir()">Salir de este teléfono</button>
+        <button class="btn" type="button" id="btnNombre"><span data-ico="persona"></span>Cambiar mi nombre</button>
+        <button class="btn danger" type="button" id="btnSalir"><span data-ico="salir"></span>Salir de este teléfono</button>
       </div>
     </div>
   </section>
@@ -389,57 +94,57 @@ body.ro .mini { display: none; }
 <nav class="tabs" aria-label="Secciones">
   <div class="tabs-in">
     <button class="tab" id="tabRec" type="button" aria-current="page">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8v13H3V8"/><path d="M1 3h22v5H1z"/><path d="M10 12h4"/></svg>
-      <span class="tab-lbl">Recibidos<span class="badge" id="badgeRec" hidden>0</span></span>
+      <span class="tab-ico"><span class="ico-off" data-ico="recibidos"></span><span class="ico-on" data-ico="recibidosF"></span><span class="badge" id="badgeRec" hidden>0</span></span>
+      <span class="tab-lbl">Recibidos</span>
     </button>
     <button class="tab" id="tabEq" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M2 20h20"/></svg>
-      Equipos
+      <span class="tab-ico"><span class="ico-off" data-ico="equipos"></span><span class="ico-on" data-ico="equiposF"></span></span>
+      <span class="tab-lbl">Equipos</span>
     </button>
     <button class="tab" id="tabDb" type="button">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/></svg>
-      Base de datos
+      <span class="tab-ico"><span class="ico-off" data-ico="base"></span><span class="ico-on" data-ico="baseF"></span></span>
+      <span class="tab-lbl">Base de datos</span>
     </button>
   </div>
 </nav>
 
 <!-- HOJA: EQUIPO RECIBIDO -->
 <div class="backdrop" id="rcSheet" hidden>
-  <form class="sheet" id="rcForm" novalidate>
-    <div class="grab"></div>
-    <h3 id="rcTitle">Registrar equipo recibido</h3>
+  <form class="sheet" id="rcForm" novalidate aria-labelledby="rcTitle">
+    <div class="grab" aria-hidden="true"></div>
+    <h2 id="rcTitle">Registrar equipo recibido</h2>
     <p class="sub" id="rcSub"></p>
     <div class="note" id="rcConocido" hidden></div>
     <div class="fields cols">
-      <div class="field"><label for="rcSerial">Serial</label><input id="rcSerial" type="text" list="dlSeriales" autocomplete="off" autocapitalize="characters" placeholder="Escribe o busca el serial"></div>
+      <div class="field"><label for="rcSerial">Serial</label><input id="rcSerial" type="text" list="dlSeriales" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe o busca el serial"></div>
       <div class="field"><label for="rcIngreso">Fecha en que lo trajeron</label><input id="rcIngreso" type="date"></div>
     </div>
     <datalist id="dlSeriales"></datalist>
     <div class="fields cols">
-      <div class="field"><label for="rcTipo">Tipo de equipo</label><input id="rcTipo" type="text" list="dlTipos" placeholder="Ej: PC Portátil"></div>
-      <div class="field"><label for="rcMarca">Marca</label><input id="rcMarca" type="text" list="dlMarcas" placeholder="Ej: HP"></div>
+      <div class="field"><label for="rcTipo">Tipo de equipo</label><input id="rcTipo" type="text" list="dlTipos" autocomplete="off" placeholder="Ej: PC Portátil"></div>
+      <div class="field"><label for="rcMarca">Marca</label><input id="rcMarca" type="text" list="dlMarcas" autocomplete="off" placeholder="Ej: HP"></div>
     </div>
     <datalist id="dlTipos"></datalist><datalist id="dlMarcas"></datalist>
-    <div class="field"><label for="rcModelo">Modelo</label><input id="rcModelo" type="text" placeholder="Ej: Probook 440 G5"></div>
+    <div class="field"><label for="rcModelo">Modelo</label><input id="rcModelo" type="text" autocomplete="off" placeholder="Ej: ProBook 440 G5"></div>
     <div class="field"><label for="rcPersona">A nombre de quién (asignado a)</label><input id="rcPersona" type="text" list="dlPersonas" autocomplete="off" placeholder="Nombre de quien lo trajo o lo tiene asignado"></div>
-    <div class="field"><label for="rcProyecto">Proyecto</label><input id="rcProyecto" type="text" list="dlProyectos" placeholder="Ej: Consulta Previa"></div>
+    <div class="field"><label for="rcProyecto">Proyecto</label><input id="rcProyecto" type="text" list="dlProyectos" autocomplete="off" placeholder="Ej: Consulta Previa"></div>
     <datalist id="dlProyectos"></datalist>
 
     <div class="section-label">Qué falta hacerle</div>
     <div class="card" style="gap:12px">
-      <div class="task"><span class="tl">Mantenimiento</span><select id="rcMtto" aria-label="Estado del mantenimiento"></select><input id="rcMttoF" type="date" aria-label="Fecha del mantenimiento"></div>
-      <div class="task"><span class="tl">Backup</span><select id="rcBackup" aria-label="Estado del backup"></select><input id="rcBackupF" type="date" aria-label="Fecha del backup"></div>
+      <div class="task"><label class="tl" for="rcMtto"><span data-ico="mantenimiento"></span>Mantenimiento</label><select id="rcMtto"></select><input id="rcMttoF" type="date" aria-label="Fecha del mantenimiento"></div>
+      <div class="task"><label class="tl" for="rcBackup"><span data-ico="backup"></span>Backup</label><select id="rcBackup"></select><input id="rcBackupF" type="date" aria-label="Fecha del backup"></div>
     </div>
 
-    <div class="field"><span class="lbl">Accesorios que trajo</span><div class="acc" id="rcAcc" role="group" aria-label="Accesorios que trajo"></div></div>
-    <div class="field"><label for="rcObs">Observaciones</label><textarea id="rcObs" placeholder="Ej: viene con falla de batería, cliente pide backup antes de formatear"></textarea></div>
+    <div class="field"><span class="lbl" id="rcAccT">Accesorios que trajo</span><div class="acc" id="rcAcc" role="group" aria-labelledby="rcAccT"></div></div>
+    <div class="field"><label for="rcObs">Observaciones</label><textarea id="rcObs" placeholder="Ej: viene con falla de batería, pide backup antes de formatear"></textarea></div>
     <div class="meta" id="rcEditado"></div>
-    <div class="err" id="rcErr" hidden></div>
+    <div class="err" id="rcErr" role="alert" hidden></div>
     <div class="sheet-actions">
-      <button class="btn danger solo-editar" type="button" id="rcDel">Eliminar</button>
+      <button class="btn danger solo-editar" type="button" id="rcDel"><span data-ico="borrar"></span>Eliminar</button>
       <div class="row">
         <button class="btn" type="button" id="rcCancel">Cerrar</button>
-        <button class="btn primary solo-editar" type="submit" id="rcGuardar">Guardar</button>
+        <button class="btn primary solo-editar" type="submit" id="rcGuardar"><span data-ico="check"></span>Guardar</button>
       </div>
     </div>
   </form>
@@ -447,39 +152,39 @@ body.ro .mini { display: none; }
 
 <!-- HOJA: EQUIPO (BASE PRINCIPAL) -->
 <div class="backdrop" id="eqSheet" hidden>
-  <form class="sheet" id="eqForm" novalidate>
-    <div class="grab"></div>
-    <h3 id="eqTitle"></h3>
+  <form class="sheet" id="eqForm" novalidate aria-labelledby="eqTitle">
+    <div class="grab" aria-hidden="true"></div>
+    <h2 id="eqTitle" class="serial"></h2>
     <p class="sub" id="eqSub"></p>
-    <button class="btn ok big solo-editar" type="button" id="eqARec">Lo trajeron: registrar como recibido</button>
+    <button class="btn ok big solo-editar" type="button" id="eqARec"><span data-ico="recibidos"></span><span id="eqARecTxt">Lo trajeron: registrar como recibido</span></button>
     <div class="fields cols">
-      <div class="field"><label for="eqSerial">Serial</label><input id="eqSerial" type="text" autocomplete="off" autocapitalize="characters"></div>
-      <div class="field"><label for="eqTipo">Tipo de equipo</label><input id="eqTipo" type="text" list="dlTipos"></div>
+      <div class="field"><label for="eqSerial">Serial</label><input id="eqSerial" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      <div class="field"><label for="eqTipo">Tipo de equipo</label><input id="eqTipo" type="text" list="dlTipos" autocomplete="off"></div>
     </div>
     <div class="fields cols">
-      <div class="field"><label for="eqMarca">Marca</label><input id="eqMarca" type="text" list="dlMarcas"></div>
-      <div class="field"><label for="eqModelo">Modelo</label><input id="eqModelo" type="text"></div>
+      <div class="field"><label for="eqMarca">Marca</label><input id="eqMarca" type="text" list="dlMarcas" autocomplete="off"></div>
+      <div class="field"><label for="eqModelo">Modelo</label><input id="eqModelo" type="text" autocomplete="off"></div>
     </div>
     <div class="field"><label for="eqAsignado">Asignado a</label><input id="eqAsignado" type="text" list="dlPersonas" autocomplete="off"><datalist id="dlPersonas"></datalist></div>
-    <div class="field"><label for="eqMail">Correo</label><input id="eqMail" type="text" inputmode="email"></div>
+    <div class="field"><label for="eqMail">Correo</label><input id="eqMail" type="text" inputmode="email" autocomplete="off" spellcheck="false"></div>
     <div class="fields cols">
-      <div class="field"><label for="eqCliente">Cliente</label><input id="eqCliente" type="text"></div>
-      <div class="field"><label for="eqProyecto">Proyecto</label><input id="eqProyecto" type="text" list="dlProyectos"></div>
+      <div class="field"><label for="eqCliente">Cliente</label><input id="eqCliente" type="text" autocomplete="off"></div>
+      <div class="field"><label for="eqProyecto">Proyecto</label><input id="eqProyecto" type="text" list="dlProyectos" autocomplete="off"></div>
     </div>
     <div class="fields cols">
-      <div class="field"><label for="eqDepto">Departamento</label><input id="eqDepto" type="text"></div>
-      <div class="field"><label for="eqMun">Municipio</label><input id="eqMun" type="text"></div>
+      <div class="field"><label for="eqDepto">Departamento</label><input id="eqDepto" type="text" autocomplete="off"></div>
+      <div class="field"><label for="eqMun">Municipio</label><input id="eqMun" type="text" autocomplete="off"></div>
     </div>
     <div class="field"><label for="eqMtto">Fecha del último mantenimiento preventivo</label><input id="eqMtto" type="date"></div>
     <div class="field"><label for="eqObs">Observaciones</label><textarea id="eqObs"></textarea></div>
     <div class="field" id="eqHistBox" hidden><span class="lbl" id="eqHistTit">Historial de mantenimientos</span><div class="hist" id="eqHist"></div></div>
     <div class="meta" id="eqEditado"></div>
-    <div class="err" id="eqErr" hidden></div>
+    <div class="err" id="eqErr" role="alert" hidden></div>
     <div class="sheet-actions">
-      <button class="btn danger solo-editar" type="button" id="eqDel">Eliminar</button>
+      <button class="btn danger solo-editar" type="button" id="eqDel"><span data-ico="borrar"></span>Eliminar</button>
       <div class="row">
         <button class="btn" type="button" id="eqCancel">Cerrar</button>
-        <button class="btn primary solo-editar" type="submit" id="eqGuardar">Guardar</button>
+        <button class="btn primary solo-editar" type="submit" id="eqGuardar"><span data-ico="check"></span>Guardar</button>
       </div>
     </div>
   </form>
@@ -488,20 +193,22 @@ body.ro .mini { display: none; }
 <!-- CONFIRMACIÓN -->
 <div class="backdrop confirm" id="cfSheet" hidden>
   <div class="sheet" role="alertdialog" aria-labelledby="cfTitle" aria-describedby="cfText">
-    <h3 id="cfTitle">¿Seguro?</h3>
-    <p id="cfText" style="margin:0;white-space:pre-line"></p>
-    <div class="row" style="justify-content:flex-end">
+    <h2 id="cfTitle">¿Seguro?</h2>
+    <p id="cfText"></p>
+    <div class="row">
       <button class="btn" type="button" id="cfNo">Cancelar</button>
       <button class="btn danger" type="button" id="cfYes">Eliminar</button>
     </div>
   </div>
 </div>
 
-<div class="toast" id="toast" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "v": "10"};</script>
-<script src="../config.js?v=10"></script>
-<script src="../nube.js?v=10"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "v": "11"};</script>
+<script src="../iconos.js?v=11"></script>
+<script src="../comun.js?v=11"></script>
+<script src="../config.js?v=11"></script>
+<script src="../nube.js?v=11"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos';
@@ -511,24 +218,12 @@ const TAREAS = [{ k: 'pend', n: 'Pendiente' }, { k: 'hecho', n: 'Hecho' }, { k: 
 const MESES_ALERTA = 6;
 const DIAS_ALERTA = 3;   // días en espera para marcarlo en rojo
 const ACCESORIOS = ['Cargador', 'Mouse', 'Morral', 'Base portátil', 'Teclado', 'Disco duro', 'Diadema', 'Estuche'];
-const P = 'fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
-const ICONOS = {
-  pc: `<svg viewBox="0 0 24 24" ${P}><rect x="4" y="5" width="16" height="10" rx="1.5"/><path d="M2 19h20"/></svg>`,
-  gps: `<svg viewBox="0 0 24 24" ${P}><path d="M12 21s-6-5.6-6-11a6 6 0 0 1 12 0c0 5.4-6 11-6 11z"/><circle cx="12" cy="10" r="2.2"/></svg>`,
-  cel: `<svg viewBox="0 0 24 24" ${P}><rect x="7" y="2.5" width="10" height="19" rx="2"/><path d="M11 18h2"/></svg>`,
-  tablet: `<svg viewBox="0 0 24 24" ${P}><rect x="4.5" y="2.5" width="15" height="19" rx="2"/><path d="M11 18h2"/></svg>`,
-  imp: `<svg viewBox="0 0 24 24" ${P}><path d="M7 8V3h10v5"/><rect x="3" y="8" width="18" height="8" rx="1.5"/><path d="M7 14h10v7H7z"/></svg>`,
-  vb: `<svg viewBox="0 0 24 24" ${P}><rect x="2.5" y="7" width="19" height="10" rx="2"/><circle cx="15.5" cy="12" r="2.6"/><path d="M6 12h4M6 19h2M16 19h2"/></svg>`,
-  ant: `<svg viewBox="0 0 24 24" ${P}><path d="M5 12.5a9 9 0 0 1 14 0"/><path d="M8.5 15.5a4.5 4.5 0 0 1 7 0"/><circle cx="12" cy="19" r="1.2"/></svg>`,
-  esc: `<svg viewBox="0 0 24 24" ${P}><path d="M3 15h18v4H3z"/><path d="M5 15 15 6"/><path d="M7 17.5h2"/></svg>`,
-  otro: `<svg viewBox="0 0 24 24" ${P}><path d="M21 8v13H3V8"/><path d="M1.5 3h21v5h-21z"/><path d="M10 12h4"/></svg>`
-};
 function iconoDe(tipo) {
   const t = sinTildes(tipo);
   const k = /gps/.test(t) ? 'gps' : /celular|telefono|movil/.test(t) ? 'cel' : /tablet/.test(t) ? 'tablet' : /impresora/.test(t) ? 'imp'
     : /video|beam|proyector/.test(t) ? 'vb' : /antena|starlink|router/.test(t) ? 'ant' : /escaner|scanner/.test(t) ? 'esc'
     : /pc|portatil|computador|laptop|monitor/.test(t) ? 'pc' : 'otro';
-  return `<span class="ico i-${k}" aria-hidden="true">${ICONOS[k]}</span>`;
+  return `<span class="ico i-${k}" aria-hidden="true">${ico(k)}</span>`;
 }
 function diasDesde(f) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(f || '')) return null;
@@ -538,7 +233,7 @@ function diasDesde(f) {
 function textoEspera(r) {
   const n = diasDesde(r.fechaIngreso); if (n === null) return '';
   const t = n === 0 ? 'Hoy' : n === 1 ? 'Lleva 1 día' : `Lleva ${n} días`;
-  return `<span class="espera ${n >= DIAS_ALERTA ? 'larga' : ''}">${t}</span>`;
+  return `<span class="espera ${n >= DIAS_ALERTA ? 'larga' : ''}">${ico('reloj')}${t}</span>`;
 }
 const CAB_EXCEL = ['SERIAL', 'TIPO DE EQUIPO', 'MARCA', 'MODELO', 'ASIGNADO A', 'MAIL', 'CLIENTE', 'PROYECTO', 'DEPARTAMENTO', 'MUNICIPIO', 'FECHA ULTIMO MTTO PREVENTIVO', 'OBSERVACIONES'];
 
@@ -732,7 +427,7 @@ function pintarConexion() {
   const el = $('conn'); el.dataset.s = conexion;
   el.querySelector('span').textContent = conexion === 'vivo' ? 'En vivo' : conexion === 'cargando' ? 'Conectando…' : 'Sin conexión';
   const pend = recibidosLista().filter(r => !r.cerrado).length;
-  $('subtitulo').textContent = Q.size || R.size ? `${Q.size} equipos · ${pend} en espera` : 'Recibidos, mantenimiento y backup';
+  $('subtitulo').textContent = Q.size || R.size ? `${Q.size} equipos · ${pend} en espera` : 'Consulta Previa';
   $('badgeRec').hidden = !pend; $('badgeRec').textContent = pend;
 }
 function pintarAvisos() {
@@ -800,7 +495,7 @@ function textoRec(r) { return sinTildes([r.serial, r.persona, r.marca, r.modelo,
 function controlTarea(r, t, nombre) {
   const v = r[t] || 'pend', f = r[t + 'Fecha'];
   const ro = soloLectura || r.cerrado ? 'disabled' : '';
-  return `<div class="task"><span class="tl">${nombre}</span>
+  return `<div class="task"><span class="tl">${ico(t === 'mtto' ? 'mantenimiento' : 'backup')}${nombre}</span>
     <div class="seg3" role="group" aria-label="${nombre}">${TAREAS.map(o => `<button type="button" class="v-${o.k}" data-rid="${esc(r.id)}" data-tarea="${t}" data-v="${o.k}" aria-pressed="${v === o.k}" ${ro}>${o.n}</button>`).join('')}</div>
     <span class="tfecha">${v === 'hecho' && f ? fechaBonita(f) : ''}</span></div>`;
 }
@@ -810,6 +505,7 @@ function renderRec() {
     <div class="sum"><span class="num">${pend.length}</span><span>En espera</span></div>
     <div class="sum"><span class="num">${pend.filter(r => (r.mtto || 'pend') === 'pend').length}</span><span>Sin mantenimiento</span></div>
     <div class="sum"><span class="num">${pend.filter(r => (r.backup || 'pend') === 'pend').length}</span><span>Sin backup</span></div>`;
+  $('sumRec').querySelector('.sum').classList.toggle('alerta', pend.some(r => (diasDesde(r.fechaIngreso) || 0) >= DIAS_ALERTA));
   $('chipsRec').innerHTML = FILTROS_REC.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtroRec === f.k}">${f.n}</button>`).join('');
   const q = sinTildes($('qRec').value.trim());
   const lista = todos.filter(r => filtraRec(r, filtroRec) && (!q || textoRec(r).includes(q)))
@@ -817,9 +513,9 @@ function renderRec() {
   $('recCount').textContent = todos.length ? `Mostrando ${lista.length} de ${todos.length} registros` : '';
   if (!todos.length) {
     $('recList').innerHTML = conexion === 'cargando'
-      ? `<div class="empty-state"><b>Cargando la base de datos…</b></div>`
-      : !DB ? `<div class="empty-state"><b>No se pudo abrir la base de datos</b>Revisa tu internet y vuelve a abrir la app.</div>`
-      : `<div class="empty-state"><b>No hay equipos en espera</b>Cuando te traigan uno, toca "Registrar equipo recibido".</div>`;
+      ? UI.esqueleto(3)
+      : !DB ? UI.vacio('sinRed', 'No se pudo abrir la base de datos', 'Revisa tu internet y vuelve a abrir la app.')
+      : UI.vacio('vacio', 'No hay equipos en espera', 'Cuando te traigan uno, toca “Registrar equipo recibido”.');
     return;
   }
   $('recList').innerHTML = lista.length ? lista.map(r => {
@@ -829,19 +525,19 @@ function renderRec() {
       <button type="button" class="card-top" data-rec="${esc(r.id)}">
         <div class="card-head"><div class="cab">${iconoDe(r.tipo)}<div class="cab-t"><div class="card-title serial">${esc(r.serial)}</div><div class="meta">${esc([r.tipo, r.marca, r.modelo].filter(Boolean).join(' · ') || 'Sin datos del equipo')}</div></div></div><span class="pill ${e.clase}">${e.n}</span></div>
         <div class="facts"><span><b>${esc(r.persona || 'Sin persona')}</b></span><span class="mono">Llegó ${fechaBonita(r.fechaIngreso)}</span>${r.cerrado ? '' : textoEspera(r)}${!eq && !r.cerrado ? '<span class="tag-shared">Equipo nuevo</span>' : ''}${r.origen === 'entregas' ? '<span class="tag-shared">Devolución</span>' : ''}</div>
-        ${(r.acc || []).length ? `<div class="acc-mini">Trajo: ${esc(r.acc.join(', '))}</div>` : ''}
+        ${(r.acc || []).length ? `<div class="acc-mini">${ico('bolsa')}Trajo: ${esc(r.acc.join(', '))}</div>` : ''}
         ${r.cerrado ? '' : `<div class="prog" aria-label="${hechas} de 2 tareas resueltas"><span style="width:${hechas * 50}%"></span></div>`}
       </button>
-      ${controlTarea(r, 'mtto', 'Mantenimiento')}${controlTarea(r, 'backup', 'Backup')}
+      <div class="tareas">${controlTarea(r, 'mtto', 'Mantenimiento')}${controlTarea(r, 'backup', 'Backup')}</div>
       ${r.obs ? `<div class="obs">${esc(r.obs)}</div>` : ''}
       ${r.cerrado ? '' : e.k === 'listo'
-        ? `<button type="button" class="btn ok solo-editar" data-pasar="${esc(r.id)}">✓ Listo: pasar a ${esc(destinoDe(r))}</button>`
-        : `<button type="button" class="btn ok solo-editar" data-listo="${esc(r.id)}">✓ Listo: ${faltanDe(r).join(' y ')} ${faltanDe(r).length > 1 ? 'hechos' : 'hecho'} → ${esc(destinoDe(r))}</button>`}
+        ? `<button type="button" class="btn ok solo-editar" data-pasar="${esc(r.id)}">${ico('checkCirculo')}Listo: pasar a ${esc(destinoDe(r))}</button>`
+        : `<button type="button" class="btn ok solo-editar" data-listo="${esc(r.id)}">${ico('checkCirculo')}Listo: ${faltanDe(r).join(' y ')} ${faltanDe(r).length > 1 ? 'hechos' : 'hecho'}, pasar a ${esc(destinoDe(r))}</button>`}
       ${r.cerrado ? `<div class="meta">Pasado a Equipos ${hace(r.cerradoEn)}${r.persona ? ', asignado a ' + esc(r.persona) : ''}.</div>` : ''}
     </div>`;
   }).join('') : (filtroRec === 'pendientes' && !q
-    ? `<div class="empty-state"><b>Todo al día</b>No hay equipos esperando mantenimiento ni backup.</div>`
-    : `<div class="note">No hay registros con ese filtro o búsqueda.</div>`);
+    ? UI.vacio('checkCirculo', 'Todo al día', 'No hay equipos esperando mantenimiento ni backup.', 'bien')
+    : UI.vacio('buscar', 'Nada coincide', 'Prueba con otro filtro o borra la búsqueda.'));
 }
 function setTarea(rid, t, v) {
   const r = R.get(rid); if (!r || r.cerrado || (r[t] || 'pend') === v) return;
@@ -939,6 +635,7 @@ function abrirRec(id, serialInicial) {
   $('rcForm').querySelectorAll('input, select, textarea').forEach(el => { el.disabled = soloLectura || !!r.cerrado; });
   $('rcSerial').disabled = soloLectura || !!id;
   $('rcSheet').hidden = false;
+  fotoRc = UI.foto($('rcForm'));
 }
 // Si el serial ya está en la lista principal, rellena los campos vacíos con sus datos.
 function conocerSerial(rellenar) {
@@ -946,12 +643,21 @@ function conocerSerial(rellenar) {
   if (!eq) { box.hidden = !idSerial($('rcSerial').value) || !!rcActual; box.textContent = 'Este serial no está en la lista principal: se agregará como equipo nuevo cuando termines.'; return; }
   const m = mesesDesde(eq.fechaMtto);
   box.hidden = false;
-  box.innerHTML = `<b>Equipo ya registrado</b> · ${esc([eq.tipo, eq.marca, eq.modelo].filter(Boolean).join(' · '))}<br>Asignado a ${esc(eq.asignado || '—')} · último mantenimiento ${eq.fechaMtto ? fechaBonita(eq.fechaMtto) + ' (' + haceMeses(m) + ')' : 'sin fecha'}`;
+  box.innerHTML = `<b>Equipo ya registrado</b> · ${esc([eq.tipo, eq.marca, eq.modelo].filter(Boolean).join(' · '))}<br>Asignado a ${esc(eq.asignado || 'nadie')} · último mantenimiento ${eq.fechaMtto ? fechaBonita(eq.fechaMtto) + ' (' + haceMeses(m) + ')' : 'sin fecha'}`;
   if (rellenar) {
     [['rcTipo', 'tipo'], ['rcMarca', 'marca'], ['rcModelo', 'modelo'], ['rcPersona', 'asignado'], ['rcProyecto', 'proyecto']].forEach(([i, k]) => { if (!$(i).value.trim()) $(i).value = eq[k] || ''; });
   }
 }
-function cerrarRec() { $('rcSheet').hidden = true; rcActual = null; }
+function cerrarRec() { $('rcSheet').hidden = true; rcActual = null; fotoRc = ''; }
+// Cerrar con Cerrar, Escape o tocando afuera: si hay cambios sin guardar, pregunta antes.
+let fotoRc = '', fotoEq = '';
+function pedirCerrar(hoja, foto, cerrar) {
+  if (!soloLectura && foto && UI.foto(hoja) !== foto) confirmar('Descartar cambios', 'Tienes cambios sin guardar. Si cierras, se pierden.', 'Descartar', cerrar);
+  else cerrar();
+}
+const pedirCerrarRec = () => pedirCerrar($('rcForm'), fotoRc, cerrarRec);
+const pedirCerrarEq = () => pedirCerrar($('eqForm'), fotoEq, cerrarEq);
+window.hayCambiosSinGuardar = () => (!$('rcSheet').hidden && UI.foto($('rcForm')) !== fotoRc) || (!$('eqSheet').hidden && UI.foto($('eqForm')) !== fotoEq);
 function guardarRec(e) {
   e.preventDefault();
   if (soloLectura) return cerrarRec();
@@ -1028,14 +734,14 @@ function renderEq() {
   $('sumEq').innerHTML = `
     <div class="sum"><span class="num">${todos.length}</span><span>Equipos</span></div>
     <div class="sum"><span class="num">${todos.filter(esBodega).length}</span><span>En bodega</span></div>
-    <div class="sum"><span class="num">${todos.filter(e => { const m = mesesDesde(e.fechaMtto); return m !== null && m >= MESES_ALERTA; }).length}</span><span>Mantenimiento de hace +${MESES_ALERTA} meses</span></div>`;
+    <div class="sum"><span class="num">${todos.filter(e => { const m = mesesDesde(e.fechaMtto); return m !== null && m >= MESES_ALERTA; }).length}</span><span>Mantenimiento de hace ${MESES_ALERTA} meses o más</span></div>`;
   const q = sinTildes($('qEq').value.trim()), tipo = $('fTipo').value || 'todos', est = $('fEqEst').value || 'todos';
   const lista = todos.filter(e => filtraEq(e, q, tipo, est));
   $('eqCount').textContent = todos.length ? `Mostrando ${lista.length} de ${todos.length} equipos` : '';
   if (!todos.length) {
-    $('eqList').innerHTML = conexion === 'cargando' ? `<div class="empty-state"><b>Cargando la base de datos…</b></div>`
-      : !DB ? `<div class="empty-state"><b>No se pudo abrir la base de datos</b>Revisa tu internet y vuelve a abrir la app.</div>`
-      : `<div class="empty-state"><b>Todavía no hay equipos</b>Toca "Agregar equipo" para crear el primero.</div>`;
+    $('eqList').innerHTML = conexion === 'cargando' ? UI.esqueleto(4)
+      : !DB ? UI.vacio('sinRed', 'No se pudo abrir la base de datos', 'Revisa tu internet y vuelve a abrir la app.')
+      : UI.vacio('equipos', 'Todavía no hay equipos', 'Toca “Agregar equipo” para crear el primero.');
     return;
   }
   const cuantos = new Map();
@@ -1049,9 +755,9 @@ function renderEq() {
       <div class="card-head"><div class="cab">${iconoDe(e.tipo)}<div class="cab-t"><div class="card-title serial">${esc(e.serial)}</div><div class="meta">${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · '))}</div></div></div></div>
       <div class="facts"><span>${esc(e.asignado || 'Sin asignar')}</span>${e.proyecto ? `<span class="meta">${esc(e.proyecto)}</span>` : ''}</div>
       <div class="facts">${textoMtto(e)}</div>
-      ${rec ? `<div><span class="pill s-org">Ahora en recibidos · ${estadoRec(rec).n}</span></div>` : ''}
+      ${rec ? `<div><span class="pill s-org">${ico('recibidos')}En Recibidos · ${estadoRec(rec).n}</span></div>` : ''}
     </button>`;
-  }).join('') : `<div class="note">No hay equipos con ese filtro o búsqueda.</div>`;
+  }).join('') : UI.vacio('buscar', 'Nada coincide', 'Prueba con otro tipo, otro filtro o borra la búsqueda.');
 }
 
 /* ================= HOJA: EQUIPO ================= */
@@ -1065,7 +771,7 @@ function abrirEq(id) {
   $('eqSerial').value = e.serial || ''; $('eqSerial').disabled = !!id || soloLectura;
   CAMPOS_EQ.forEach(([i, k]) => { $(i).value = e[k] || ''; $(i).disabled = soloLectura; });
   const pend = id ? pendienteDe(e.serial) : null;
-  $('eqARec').textContent = pend ? `Está en Recibidos (${estadoRec(pend).n}): ver` : 'Lo trajeron: registrar como recibido';
+  $('eqARecTxt').textContent = pend ? `Está en Recibidos (${estadoRec(pend).n}): ver` : 'Lo trajeron: registrar como recibido';
   $('eqDel').hidden = !id; $('eqARec').hidden = !id; $('eqErr').hidden = true; $('eqEditado').textContent = '';
   if (id && e.actualizado) {
     const base = 'Última edición ' + hace(e.actualizado);
@@ -1084,8 +790,9 @@ function abrirEq(id) {
       <span class="meta">Mantenimiento: ${lab[r.mtto || 'pend']}${r.mtto === 'hecho' && r.mttoFecha ? ' (' + fechaBonita(r.mttoFecha) + ')' : ''} · Backup: ${lab[r.backup || 'pend']}${r.backup === 'hecho' && r.backupFecha ? ' (' + fechaBonita(r.backupFecha) + ')' : ''}${r.persona ? ' · ' + esc(r.persona) : ''}</span>
       ${r.obs ? `<span class="obs">${esc(r.obs)}</span>` : ''}</button>`; }).join('');
   $('eqSheet').hidden = false;
+  fotoEq = UI.foto($('eqForm'));
 }
-function cerrarEq() { $('eqSheet').hidden = true; eqActual = null; }
+function cerrarEq() { $('eqSheet').hidden = true; eqActual = null; fotoEq = ''; }
 function guardarEq(ev) {
   ev.preventDefault();
   if (soloLectura) return cerrarEq();
@@ -1119,7 +826,7 @@ let cfAccion = null;
 function confirmar(titulo, texto, boton, accion, estilo) {
   $('cfTitle').textContent = titulo; $('cfText').textContent = texto; $('cfYes').textContent = boton;
   $('cfYes').className = 'btn ' + (estilo === 'ok' ? 'primary' : 'danger');
-  cfAccion = accion; $('cfSheet').hidden = false; $('cfNo').focus();
+  cfAccion = accion; $('cfSheet').hidden = false; requestAnimationFrame(() => $('cfNo').focus());
 }
 
 /* ================= BASE DE DATOS (TABLAS) ================= */
@@ -1147,7 +854,7 @@ function renderDb() {
       <td><input type="text" class="w" data-f="obs" value="${esc(r.obs)}" ${blq} aria-label="Observaciones"></td>
       <td class="solo-editar"><button type="button" class="icon-btn" data-del-rec="${esc(r.id)}">Borrar</button></td>
     </tr>`; }).join('');
-    $('dbTable').innerHTML = `<table class="teq"><thead><tr><th class="stk1">Serial</th><th>Tipo</th><th>Marca</th><th>Modelo</th><th>A nombre de</th><th>Lo trajeron</th><th>Mantenimiento</th><th>Fecha mantenimiento</th><th>Backup</th><th>Fecha backup</th><th>Estado</th><th>Accesorios</th><th>Observaciones</th><th class="solo-editar"></th></tr></thead><tbody>${filas || '<tr><td colspan="14">Sin filas</td></tr>'}</tbody></table>`;
+    $('dbTable').innerHTML = `<table class="teq"><thead><tr><th class="stk1">Serial</th><th>Tipo</th><th>Marca</th><th>Modelo</th><th>A nombre de</th><th>Lo trajeron</th><th>Mantenimiento</th><th>Fecha mantenimiento</th><th>Backup</th><th>Fecha backup</th><th>Estado</th><th>Accesorios</th><th>Observaciones</th><th class="solo-editar"><span class="sr">Borrar</span></th></tr></thead><tbody>${filas || '<tr><td colspan="14">Sin filas</td></tr>'}</tbody></table>`;
     return;
   }
   const lista = equiposOrdenados().filter(e => !q || sinTildes([e.serial, e.asignado, e.marca, e.modelo, e.tipo, e.mail, e.proyecto, e.obs].join(' ')).includes(q));
@@ -1160,7 +867,7 @@ function renderDb() {
     ${inp(e, 'fechaMtto', '', 'Fecha del último mantenimiento', 'date')}${inp(e, 'obs', 'w', 'Observaciones')}
     <td class="solo-editar"><button type="button" class="icon-btn" data-del-eq="${esc(e.id)}">Borrar</button></td>
   </tr>`).join('');
-  $('dbTable').innerHTML = `<table class="teq"><thead><tr><th class="stk1">Serial</th><th>Tipo de equipo</th><th>Marca</th><th>Modelo</th><th>Asignado a</th><th>Correo</th><th>Cliente</th><th>Proyecto</th><th>Departamento</th><th>Municipio</th><th>Último mantenimiento preventivo</th><th>Observaciones</th><th class="solo-editar"></th></tr></thead><tbody>${filas || '<tr><td colspan="13">Sin filas</td></tr>'}</tbody></table>`;
+  $('dbTable').innerHTML = `<table class="teq"><thead><tr><th class="stk1">Serial</th><th>Tipo de equipo</th><th>Marca</th><th>Modelo</th><th>Asignado a</th><th>Correo</th><th>Cliente</th><th>Proyecto</th><th>Departamento</th><th>Municipio</th><th>Último mantenimiento preventivo</th><th>Observaciones</th><th class="solo-editar"><span class="sr">Borrar</span></th></tr></thead><tbody>${filas || '<tr><td colspan="13">Sin filas</td></tr>'}</tbody></table>`;
 }
 function editarCelda(el) {
   if (soloLectura) return;
@@ -1204,7 +911,7 @@ function ponerFormato(ws, filas, cols, ancho) {
 }
 async function descargarExcel() {
   if (!DL) { toast('Descargar no está disponible en esta vista.'); return; }
-  const btn = $('btnExcel'); btn.disabled = true; btn.textContent = 'Preparando…';
+  const btn = $('btnExcel'), txt = btn.lastElementChild; btn.disabled = true; txt.textContent = 'Preparando…';
   const hoy = hoyIso();
   try {
     const { eq, rec } = filasExcel();
@@ -1222,7 +929,7 @@ async function descargarExcel() {
     toast('Archivo listo');
   } catch (e) {
     if (!(e && e.code === 'declined')) toast(e && e.code === 'rate_limited' ? 'Ya hay una descarga abierta; intenta en un momento.' : 'No se pudo preparar el archivo.');
-  } finally { btn.disabled = false; btn.textContent = 'Descargar Excel'; }
+  } finally { btn.disabled = false; txt.textContent = 'Descargar Excel'; }
 }
 
 /* ================= EVENTOS ================= */
@@ -1246,8 +953,8 @@ $('rcBackup').onchange = () => { if ($('rcBackup').value === 'hecho' && !$('rcBa
 $('rcForm').onsubmit = guardarRec;
 $('rcAcc').onclick = e => { const c = e.target.closest('[data-acc]'); if (c && !c.disabled) c.setAttribute('aria-pressed', c.getAttribute('aria-pressed') !== 'true'); };
 $('eqHist').onclick = e => { const h = e.target.closest('[data-hist]'); if (h) { const id = h.dataset.hist; cerrarEq(); ir('rec'); abrirRec(id); } };
-$('rcCancel').onclick = cerrarRec; $('rcDel').onclick = () => borrarRec(rcActual);
-$('rcSheet').onclick = e => { if (e.target === $('rcSheet')) cerrarRec(); };
+$('rcCancel').onclick = pedirCerrarRec; $('rcDel').onclick = () => borrarRec(rcActual);
+$('rcSheet').onclick = e => { if (e.target === $('rcSheet')) pedirCerrarRec(); };
 
 $('fOrden').innerHTML = ORDENES.map(o => `<option value="${o.k}">${o.n}</option>`).join('');
 if (ORDENES.some(o => o.k === ui.ordenEq)) $('fOrden').value = ui.ordenEq;
@@ -1256,14 +963,14 @@ $('fOrden').onchange = () => { ui.ordenEq = $('fOrden').value; guardarUi(); rend
 $('eqList').onclick = e => { const b = e.target.closest('[data-eq]'); if (b) abrirEq(b.dataset.eq); };
 $('btnNewEq').onclick = () => abrirEq(null);
 $('eqForm').onsubmit = guardarEq;
-$('eqCancel').onclick = cerrarEq; $('eqDel').onclick = () => borrarEq(eqActual);
+$('eqCancel').onclick = pedirCerrarEq; $('eqDel').onclick = () => borrarEq(eqActual);
 $('eqARec').onclick = () => {
   const e = Q.get(eqActual); if (!e) return;
   const pend = pendienteDe(e.serial);
   if (pend) { cerrarEq(); ir('rec'); abrirRec(pend.id); return; }
   cerrarEq(); ir('rec'); abrirRec(null, e.serial); conocerSerial(true);
 };
-$('eqSheet').onclick = e => { if (e.target === $('eqSheet')) cerrarEq(); };
+$('eqSheet').onclick = e => { if (e.target === $('eqSheet')) pedirCerrarEq(); };
 
 $('cfNo').onclick = () => { $('cfSheet').hidden = true; cfAccion = null; };
 $('cfYes').onclick = () => { $('cfSheet').hidden = true; const a = cfAccion; cfAccion = null; if (a) a(); };
@@ -1281,7 +988,20 @@ $('btnExcel').onclick = descargarExcel;
 $('btnReintentar').onclick = () => { if (!DB) { toast('Todavía no hay conexión.'); return; } reintentarPendientes(); };
 window.addEventListener('online', () => { reintentarPendientes(); });
 setInterval(() => { if (pendientes.length) reintentarPendientes(); }, 30000);
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { cerrarRec(); cerrarEq(); $('cfSheet').hidden = true; } });
+// Escape cierra solo lo de más arriba: primero la confirmación, luego la hoja.
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const top = UI.arriba(); if (!top) return;
+  e.preventDefault();
+  if (top === $('cfSheet')) $('cfNo').click();
+  else if (top === $('rcSheet')) pedirCerrarRec();
+  else if (top === $('eqSheet')) pedirCerrarEq();
+  else top.hidden = true;
+});
+$('btnCopia').onclick = () => nube.exportar();
+$('archivoCopia').onchange = e => nube.importar(e.target);
+$('btnNombre').onclick = () => nube.cambiarNombre();
+$('btnSalir').onclick = () => nube.salir();
 
 /* ================= ARRANQUE ================= */
 async function iniciar() {

@@ -117,19 +117,23 @@
 
   /* ---------- estilos de lo que agrega este archivo ---------- */
   const css = `
-  .nube-pantalla { position: fixed; inset: 0; z-index: 90; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 20px 16px; overflow-y: auto; }
+  .nube-pantalla { position: fixed; inset: 0; z-index: 90; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px 18px; overflow-y: auto; }
   .nube-caja { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 14px; }
-  .nube-logo { width: 64px; height: 64px; border-radius: 18px; }
-  .nube-caja h2 { font-family: var(--f-display); font-weight: 800; font-size: 1.5rem; margin: 0; }
-  .nube-caja p { margin: 0; color: var(--muted); font-size: .9rem; }
-  .nube-ver { display: flex; align-items: center; gap: 8px; font-size: .85rem; color: var(--muted); }
-  .nube-ver input { width: 18px; height: 18px; accent-color: var(--accent); }
-  .nube-barra { position: sticky; top: 0; z-index: 25; font-size: .8rem; font-weight: 700; text-align: center; padding: 6px 12px; }
+  .nube-logo { width: 72px; height: 72px; border-radius: 20px; box-shadow: 0 10px 24px rgba(0,0,0,.14); }
+  .nube-caja h2 { font-family: var(--f-display); font-weight: 780; font-size: 1.7rem; letter-spacing: -.02em; line-height: 1.1; margin: 4px 0 0; }
+  .nube-caja p { margin: 0; color: var(--muted); font-size: .95rem; }
+  .nube-ver { display: flex; align-items: center; gap: 10px; min-height: 40px; font-size: .9rem; color: var(--muted); cursor: pointer; }
+  .nube-ver input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+  .nube-barra { position: sticky; top: 0; z-index: 25; font-size: .82rem; font-weight: 700; text-align: center; padding: 7px 12px; }
   .nube-barra.off { background: var(--warn-bg); color: var(--warn); }
   .nube-barra.env { background: var(--listo-bg); color: var(--listo); }
-  .nube-instalar { display: flex; align-items: center; gap: 10px; justify-content: space-between; background: var(--accent-soft); color: var(--fg); border-radius: 12px; padding: 10px 12px; font-size: .85rem; }
+  .nube-instalar { display: flex; align-items: center; gap: 10px; justify-content: space-between; background: var(--accent-soft); color: var(--fg); border-radius: 14px; padding: 10px 12px; font-size: .88rem; }
   .nube-instalar .row { flex-wrap: nowrap; }
-  .nube-card { gap: 10px; }`;
+  .nube-x { width: 18px; height: 18px; display: block; }
+  .nube-card { gap: 10px; }
+  .nube-dlg .sheet { gap: 12px; }
+  .nube-dlg .nube-p { margin: 0; white-space: pre-line; }
+  .nube-dlg .nube-acc { justify-content: flex-end; }`;
   const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
 
   /* ---------- barra de estado: sin internet / enviando ---------- */
@@ -160,27 +164,69 @@
     if (!mostrar) { if (box) box.remove(); return; }
     if (!box) { box = document.createElement('div'); box.id = 'nubeInstalar'; box.className = 'nube-instalar'; main.prepend(box); }
     box.innerHTML = promptInstalar
-      ? `<span><b>Instala la app</b> en este teléfono: abre con un toque, sin navegador.</span><span class="row"><button class="btn small primary" type="button" id="nubeInstBtn">Instalar</button><button class="btn small ghost" type="button" id="nubeInstNo" aria-label="Ocultar">✕</button></span>`
-      : `<span><b>Para instalarla en iPhone:</b> toca Compartir <b>⬆︎</b> y luego <b>Agregar a inicio</b>.</span><span class="row"><button class="btn small ghost" type="button" id="nubeInstNo" aria-label="Ocultar">✕</button></span>`;
+      ? `<span><b>Instala la app</b> en este teléfono: abre con un toque, sin navegador.</span><span class="row"><button class="btn small primary" type="button" id="nubeInstBtn">Instalar</button><button class="btn small ghost" type="button" id="nubeInstNo" aria-label="Ocultar"><svg class="nube-x" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button></span>`
+      : `<span><b>Para instalarla en iPhone:</b> toca <b>Compartir</b> y luego <b>Agregar a inicio</b>.</span><span class="row"><button class="btn small ghost" type="button" id="nubeInstNo" aria-label="Ocultar"><svg class="nube-x" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button></span>`;
     const b = document.getElementById('nubeInstBtn');
     if (b) b.onclick = async () => { const p = promptInstalar; promptInstalar = null; p.prompt(); try { await p.userChoice; } catch (e) {} pintarInstalar(); };
     document.getElementById('nubeInstNo').onclick = () => { guardar('noInstalar', '1'); pintarInstalar(); };
   }
+
+  /* ---------- diálogo propio (reemplaza prompt y confirm del navegador) ---------- */
+  // pedir({ titulo, texto, etiqueta, valor, clave, boton, peligro, validar }) → texto escrito, true (sin campo) o null si se cancela.
+  // validar(v) puede ser async y devolver un mensaje de error para mostrarlo sin cerrar.
+  function pedir(o) {
+    return new Promise(resolver => {
+      const id = 'nubeP' + Math.random().toString(36).slice(2, 7), conCampo = o.etiqueta != null;
+      const b = document.createElement('div'); b.className = 'backdrop confirm nube-dlg';
+      b.setAttribute('role', 'dialog'); b.setAttribute('aria-modal', 'true'); b.setAttribute('aria-labelledby', id + 't');
+      b.innerHTML = `<form class="sheet" novalidate tabindex="-1">
+        <h2 id="${id}t">${escH(o.titulo)}</h2>${o.texto ? `<p class="nube-p">${escH(o.texto)}</p>` : ''}
+        ${conCampo ? `<div class="field"><label for="${id}i">${escH(o.etiqueta)}</label><input id="${id}i" type="${o.clave ? 'password' : 'text'}" autocomplete="${o.clave ? 'current-password' : 'off'}" autocapitalize="off" spellcheck="false" value="${escH(o.valor || '')}"></div>` : ''}
+        ${conCampo && o.clave ? '<label class="nube-ver"><input type="checkbox"> Mostrar la clave</label>' : ''}
+        <div class="err" role="alert" hidden></div>
+        <div class="row nube-acc"><button class="btn" type="button" data-no>Cancelar</button><button class="btn ${o.peligro ? 'danger' : 'primary'}" type="submit">${escH(o.boton || 'Aceptar')}</button></div>
+      </form>`;
+      document.body.appendChild(b);
+      const f = b.querySelector('form'), inp = b.querySelector('input:not([type=checkbox])'), err = b.querySelector('.err'), ok = f.querySelector('[type=submit]');
+      const antes = document.activeElement;
+      let fin = false;
+      const cerrar = v => { if (fin) return; fin = true; b.remove(); if (antes && antes.isConnected) try { antes.focus({ preventScroll: true }); } catch (e) {} resolver(v); };
+      const ver = b.querySelector('.nube-ver input'); if (ver) ver.onchange = () => { inp.type = ver.checked ? 'text' : 'password'; };
+      b.querySelector('[data-no]').onclick = () => cerrar(null);
+      b.addEventListener('click', e => { if (e.target === b) cerrar(null); });
+      f.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrar(null); } });
+      if (inp) inp.oninput = () => { err.hidden = true; inp.removeAttribute('aria-invalid'); };
+      f.onsubmit = async e => {
+        e.preventDefault();
+        const v = conCampo ? inp.value.trim() : true;
+        if (o.validar) {
+          const t0 = ok.textContent; ok.disabled = true; ok.textContent = o.revisando || t0;
+          let m = ''; try { m = await o.validar(v); } catch (x) { m = x && x.message || String(x); }
+          ok.disabled = false; ok.textContent = t0;
+          if (m) { err.textContent = m; err.hidden = false; if (inp) { inp.setAttribute('aria-invalid', 'true'); inp.focus(); } return; }
+        }
+        cerrar(v);
+      };
+      if (inp) { inp.focus(); inp.select(); } else ok.focus();
+    });
+  }
+  const preguntar = (titulo, texto, boton, peligro) => pedir({ titulo, texto, boton, peligro });
 
   /* ---------- pantalla de clave ---------- */
   function pantallaClave(msg) {
     return new Promise(resolver => {
       const div = document.createElement('div');
       div.className = 'nube-pantalla'; div.id = 'nubeClave';
+      div.setAttribute('role', 'dialog'); div.setAttribute('aria-modal', 'true'); div.setAttribute('aria-labelledby', 'nubeClaveT');
       div.innerHTML = `<form class="nube-caja" novalidate autocomplete="off">
-        <img class="nube-logo" src="${escH(APP.icono)}" alt="">
-        <h2>${escH(APP.nombre)}</h2>
+        <img class="nube-logo" src="${escH(APP.icono)}" alt="" width="72" height="72">
+        <h2 id="nubeClaveT">${escH(APP.nombre)}</h2>
         <p>Escribe la clave de acceso que te dieron y tu nombre. Solo se pide una vez en este teléfono.</p>
-        <div class="field"><label for="nubeK">Clave de acceso</label><input id="nubeK" type="password" autocomplete="current-password" required></div>
+        <div class="field"><label for="nubeK">Clave de acceso</label><input id="nubeK" type="password" autocomplete="current-password" autocapitalize="off" spellcheck="false" required></div>
         <label class="nube-ver"><input type="checkbox" id="nubeVer"> Mostrar la clave</label>
         <div class="field"><label for="nubeN">Tu nombre</label><input id="nubeN" type="text" autocomplete="name" placeholder="Así se verá quién hizo cada cambio" value="${escH(nombre)}"></div>
-        <div class="err" id="nubeErr" ${msg ? '' : 'hidden'}>${escH(msg || '')}</div>
-        <div class="note" id="nubeVacio" hidden></div>
+        <div class="err" id="nubeErr" role="alert" ${msg ? '' : 'hidden'}>${escH(msg || '')}</div>
+        <div class="note" id="nubeVacio" role="status" hidden></div>
         <button class="btn primary big" type="submit" id="nubeEntrar">Entrar</button>
         <button class="btn" type="button" id="nubeNueva" hidden>Sí, empezar con esta clave nueva</button>
       </form>`;
@@ -196,8 +242,8 @@
       f.onsubmit = async ev => {
         ev.preventDefault(); $e.hidden = true;
         const clave = $k.value.trim(); claveTmp = clave;
-        if (clave.length < 6) return fallo('La clave debe tener al menos 6 caracteres.');
-        if (!$n.value.trim()) return fallo('Escribe tu nombre.');
+        if (clave.length < 6) { $k.focus(); return fallo('La clave tiene al menos 6 caracteres. Revísala.'); }
+        if (!$n.value.trim()) { $n.focus(); return fallo('Escribe tu nombre.'); }
         $b.disabled = true; $b.textContent = 'Revisando…';
         try {
           candidato = await huella(APP.id + ':' + clave);
@@ -243,20 +289,24 @@
   const nube = {
     enlace(id) { const h = leer('enlace_' + id); return h && fs ? crearDb(h) : null; },
     async enlazar(id) {
-      const en = enlaceCfg(id); if (!en || !fs) return toast('La base de datos no está abierta.');
-      const clave = prompt(`Escribe la clave de acceso de la app de ${en.nombre}:`);
-      if (clave == null) return;
-      if (clave.trim().length < 6) return toast('La clave debe tener al menos 6 caracteres.');
-      try {
-        if (await probarEnlace(en, clave.trim())) { toast(`Conectada con ${en.nombre}`); setTimeout(() => location.reload(), 700); }
-        else toast(`Con esa clave no hay datos de ${en.nombre}. Revisa la clave.`);
-      } catch (e) { toast('No se pudo comprobar la clave: revisa tu internet.'); }
+      const en = enlaceCfg(id); if (!en || !fs) return toast('La base de datos no está abierta. Revisa tu internet y vuelve a abrir la app.');
+      const v = await pedir({
+        titulo: `Conectar con ${en.nombre}`, texto: `Escribe la clave de acceso de la app de ${en.nombre}. Es la misma que usan en esa app.`,
+        etiqueta: 'Clave de acceso', clave: true, boton: 'Conectar', revisando: 'Comprobando…',
+        validar: async c => {
+          if (c.length < 6) return 'La clave tiene al menos 6 caracteres. Revísala.';
+          try { return (await probarEnlace(en, c)) ? '' : `Con esa clave no hay datos de ${en.nombre}. Revisa la clave.`; }
+          catch (e) { return 'No se pudo comprobar la clave. Revisa tu internet e inténtalo otra vez.'; }
+        }
+      });
+      if (v == null) return;
+      toast(`Conectada con ${en.nombre}`); setTimeout(() => location.reload(), 700);
     },
     desenlazar(id) {
       const en = enlaceCfg(id); if (!en) return;
       const hacer = () => { guardar('enlace_' + id, null); location.reload(); };
       if (typeof window.confirmar === 'function') window.confirmar(`Desconectar de ${en.nombre}`, `Las hojas que guardes ya no cambiarán nada en ${en.nombre}. Lo que ya se envió no se borra.`, 'Desconectar', hacer);
-      else if (confirm('¿Desconectar?')) hacer();
+      else preguntar(`Desconectar de ${en.nombre}`, `Las hojas que guardes ya no cambiarán nada en ${en.nombre}.`, 'Desconectar', true).then(ok => { if (ok) hacer(); });
     },
     async exportar() {
       if (!fs || !espacio) return toast('La base de datos no está abierta.');
@@ -294,19 +344,18 @@
         ? `Se actualizan ${resumen} con los datos del archivo "${file.name}". Solo cambian las columnas que trae el archivo; lo demás (correo, observaciones, etc.) se conserva. Los que no existan se crean. Esto no se puede deshacer. Recomendado: descarga primero una copia de lo actual.`
         : `Se cargan ${resumen} del archivo "${file.name}". Los registros con el mismo código se reemplazan por los de la copia, para todos. Esto no se puede deshacer. Recomendado: descarga primero una copia de lo actual.`;
       if (typeof window.confirmar === 'function') window.confirmar(actualizar ? 'Actualizar datos' : 'Importar copia', texto, actualizar ? 'Actualizar' : 'Importar', hacer, 'ok');
-      else if (confirm('¿Importar la copia? Reemplaza los registros con el mismo código.')) hacer();
+      else preguntar(actualizar ? 'Actualizar datos' : 'Importar copia', texto, actualizar ? 'Actualizar' : 'Importar').then(ok => { if (ok) hacer(); });
     },
-    cambiarNombre() {
-      const n = prompt('Tu nombre (así se verá quién hizo cada cambio):', nombre);
+    async cambiarNombre() {
+      const n = await pedir({ titulo: 'Cambiar mi nombre', texto: 'Así se verá quién hizo cada cambio.', etiqueta: 'Tu nombre', valor: nombre, boton: 'Guardar',
+        validar: v => v ? '' : 'Escribe tu nombre.' });
       if (n == null) return;
-      const v = n.trim().replace(/\s+/g, ' ');
-      if (!v) return toast('El nombre no puede quedar vacío.');
-      guardar('nombre', v); location.reload();
+      guardar('nombre', n.replace(/\s+/g, ' ')); location.reload();
     },
     salir() {
       const hacer = () => { guardar('espacio', null); (APP.enlaces || []).forEach(en => guardar('enlace_' + en.id, null)); location.reload(); };
       if (typeof window.confirmar === 'function') window.confirmar('Salir de este teléfono', 'Se olvida la clave en este teléfono. Para volver a entrar tendrás que escribirla otra vez. Los datos no se borran.', 'Salir', hacer);
-      else if (confirm('¿Salir de este teléfono?')) hacer();
+      else preguntar('Salir de este teléfono', 'Se olvida la clave en este teléfono. Los datos no se borran.', 'Salir', true).then(ok => { if (ok) hacer(); });
     },
     get nombre() { return nombre; }
   };
