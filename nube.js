@@ -117,7 +117,7 @@
 
   /* ---------- estilos de lo que agrega este archivo ---------- */
   const css = `
-  .nube-pantalla { position: fixed; inset: 0; z-index: 90; background: var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px 18px; overflow-y: auto; }
+  .nube-pantalla { position: fixed; inset: 0; z-index: 90; background: var(--bg); background: radial-gradient(120% 55% at 50% 0%, var(--accent-soft), transparent 70%), var(--bg); display: flex; align-items: center; justify-content: center; padding: 24px 18px; overflow-y: auto; }
   .nube-caja { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 14px; }
   .nube-logo { width: 72px; height: 72px; border-radius: 20px; box-shadow: 0 10px 24px rgba(0,0,0,.14); }
   .nube-caja h2 { font-family: var(--f-display); font-weight: 780; font-size: 1.7rem; letter-spacing: -.02em; line-height: 1.1; margin: 4px 0 0; }

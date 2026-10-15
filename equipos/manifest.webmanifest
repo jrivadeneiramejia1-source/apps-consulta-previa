@@ -8,8 +8,8 @@
  "scope": "./",
  "display": "standalone",
  "orientation": "portrait",
- "background_color": "#F5F2EA",
- "theme_color": "#0d6b5b",
+ "background_color": "#F4F1E8",
+ "theme_color": "#0A5A4E",
  "icons": [
   {
    "src": "../iconos/equipos-192.png",

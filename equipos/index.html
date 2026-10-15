@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F5F2EA">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1412">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#0A5A4E">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0D3B37">
 <meta name="description" content="Equipos recibidos, mantenimiento y backup">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="../iconos/equipos-192.png">
@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Equipos">
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="../comun.css?v=11">
+<link rel="stylesheet" href="../comun.css?v=12">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -204,11 +204,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "v": "11"};</script>
-<script src="../iconos.js?v=11"></script>
-<script src="../comun.js?v=11"></script>
-<script src="../config.js?v=11"></script>
-<script src="../nube.js?v=11"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "v": "12"};</script>
+<script src="../iconos.js?v=12"></script>
+<script src="../comun.js?v=12"></script>
+<script src="../config.js?v=12"></script>
+<script src="../nube.js?v=12"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos';
@@ -272,8 +272,8 @@ function hace(iso) {
   return new Date(t).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 function toast(msg) {
-  const t = $('toast'); t.textContent = msg; t.hidden = false;
-  clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 2400);
+  const t = $('toast'); UI.tostada(t, msg);
+  clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, Math.min(5000, 2200 + String(msg).length * 25));
 }
 function idSerial(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
 function nuevoId(prefijo) { return prefijo + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -428,7 +428,7 @@ function pintarConexion() {
   el.querySelector('span').textContent = conexion === 'vivo' ? 'En vivo' : conexion === 'cargando' ? 'Conectando…' : 'Sin conexión';
   const pend = recibidosLista().filter(r => !r.cerrado).length;
   $('subtitulo').textContent = Q.size || R.size ? `${Q.size} equipos · ${pend} en espera` : 'Consulta Previa';
-  $('badgeRec').hidden = !pend; $('badgeRec').textContent = pend;
+  UI.insignia($('badgeRec'), pend);
 }
 function pintarAvisos() {
   document.body.classList.toggle('ro', soloLectura);
@@ -450,6 +450,7 @@ function ir(v) {
     if (k === v) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current');
   });
   render(); window.scrollTo(0, 0);
+  UI.entrar($({ rec: 'vRec', eq: 'vEq', db: 'vDb' }[v]));
 }
 function render() {
   pintarConexion();
@@ -495,18 +496,19 @@ function textoRec(r) { return sinTildes([r.serial, r.persona, r.marca, r.modelo,
 function controlTarea(r, t, nombre) {
   const v = r[t] || 'pend', f = r[t + 'Fecha'];
   const ro = soloLectura || r.cerrado ? 'disabled' : '';
+  const nuevo = recien.k === r.id + t && Date.now() - recien.t < 700 ? 'recien' : '';
   return `<div class="task"><span class="tl">${ico(t === 'mtto' ? 'mantenimiento' : 'backup')}${nombre}</span>
-    <div class="seg3" role="group" aria-label="${nombre}">${TAREAS.map(o => `<button type="button" class="v-${o.k}" data-rid="${esc(r.id)}" data-tarea="${t}" data-v="${o.k}" aria-pressed="${v === o.k}" ${ro}>${o.n}</button>`).join('')}</div>
+    <div class="seg3" role="group" aria-label="${nombre}">${TAREAS.map(o => `<button type="button" class="v-${o.k} ${v === o.k ? nuevo : ''}" data-rid="${esc(r.id)}" data-tarea="${t}" data-v="${o.k}" aria-pressed="${v === o.k}" ${ro}>${o.n}</button>`).join('')}</div>
     <span class="tfecha">${v === 'hecho' && f ? fechaBonita(f) : ''}</span></div>`;
 }
 function renderRec() {
   const todos = recibidosLista(), pend = todos.filter(r => !r.cerrado);
-  $('sumRec').innerHTML = `
-    <div class="sum"><span class="num">${pend.length}</span><span>En espera</span></div>
-    <div class="sum"><span class="num">${pend.filter(r => (r.mtto || 'pend') === 'pend').length}</span><span>Sin mantenimiento</span></div>
-    <div class="sum"><span class="num">${pend.filter(r => (r.backup || 'pend') === 'pend').length}</span><span>Sin backup</span></div>`;
-  $('sumRec').querySelector('.sum').classList.toggle('alerta', pend.some(r => (diasDesde(r.fechaIngreso) || 0) >= DIAS_ALERTA));
-  $('chipsRec').innerHTML = FILTROS_REC.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtroRec === f.k}">${f.n}</button>`).join('');
+  const nF = f => todos.filter(r => filtraRec(r, f)).length;
+  $('sumRec').innerHTML = UI.cifra({ k: 'rEsp', n: pend.length, lbl: 'En espera', icono: 'reloj', tono: 'org', filtro: 'pendientes', activo: filtroRec === 'pendientes' })
+    + UI.cifra({ k: 'rMtto', n: nF('sinmtto'), lbl: 'Sin mantenimiento', icono: 'mantenimiento', tono: 'listo', filtro: 'sinmtto', activo: filtroRec === 'sinmtto' })
+    + UI.cifra({ k: 'rBack', n: nF('sinbackup'), lbl: 'Sin backup', icono: 'backup', filtro: 'sinbackup', activo: filtroRec === 'sinbackup' });
+  UI.contar($('sumRec'));
+  $('chipsRec').innerHTML = FILTROS_REC.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtroRec === f.k}">${f.n}<span class="n">${nF(f.k)}</span></button>`).join('');
   const q = sinTildes($('qRec').value.trim());
   const lista = todos.filter(r => filtraRec(r, filtroRec) && (!q || textoRec(r).includes(q)))
     .sort((a, b) => (a.cerrado ? 1 : 0) - (b.cerrado ? 1 : 0) || (a.cerrado ? String(b.cerradoEn).localeCompare(String(a.cerradoEn)) : String(a.fechaIngreso || '').localeCompare(String(b.fechaIngreso || ''))));
@@ -539,7 +541,9 @@ function renderRec() {
     ? UI.vacio('checkCirculo', 'Todo al día', 'No hay equipos esperando mantenimiento ni backup.', 'bien')
     : UI.vacio('buscar', 'Nada coincide', 'Prueba con otro filtro o borra la búsqueda.'));
 }
+let recien = { k: '', t: 0 };   // la última tarea tocada brilla un momento
 function setTarea(rid, t, v) {
+  recien = { k: rid + t, t: Date.now() };
   const r = R.get(rid); if (!r || r.cerrado || (r[t] || 'pend') === v) return;
   const data = Object.assign({ [t]: v, [t + 'Fecha']: v === 'hecho' ? (r[t + 'Fecha'] || hoyIso()) : '' }, sello());
   escribir({ tipo: 'update', col: COL_R, id: rid, data });
@@ -731,11 +735,12 @@ function textoMtto(e) {
 function renderEq() {
   const orden = $('fOrden').value || 'tipo';
   const todos = equiposOrdenados(orden);
-  $('sumEq').innerHTML = `
-    <div class="sum"><span class="num">${todos.length}</span><span>Equipos</span></div>
-    <div class="sum"><span class="num">${todos.filter(esBodega).length}</span><span>En bodega</span></div>
-    <div class="sum"><span class="num">${todos.filter(e => { const m = mesesDesde(e.fechaMtto); return m !== null && m >= MESES_ALERTA; }).length}</span><span>Mantenimiento de hace ${MESES_ALERTA} meses o más</span></div>`;
-  const q = sinTildes($('qEq').value.trim()), tipo = $('fTipo').value || 'todos', est = $('fEqEst').value || 'todos';
+  const est = $('fEqEst').value || 'todos';
+  $('sumEq').innerHTML = UI.cifra({ k: 'eTot', n: todos.length, lbl: 'Equipos', icono: 'equipos', filtro: 'todos', activo: est === 'todos' })
+    + UI.cifra({ k: 'eBod', n: todos.filter(esBodega).length, lbl: 'En bodega', icono: 'otro', tono: 'listo', filtro: 'bodega', activo: est === 'bodega' })
+    + UI.cifra({ k: 'eVie', n: todos.filter(e => { const m = mesesDesde(e.fechaMtto); return m !== null && m >= MESES_ALERTA; }).length, lbl: `Mantenimiento de hace ${MESES_ALERTA} meses o más`, icono: 'aviso', tono: 'org', filtro: 'viejo', activo: est === 'viejo' });
+  UI.contar($('sumEq'));
+  const q = sinTildes($('qEq').value.trim()), tipo = $('fTipo').value || 'todos';
   const lista = todos.filter(e => filtraEq(e, q, tipo, est));
   $('eqCount').textContent = todos.length ? `Mostrando ${lista.length} de ${todos.length} equipos` : '';
   if (!todos.length) {
@@ -937,6 +942,9 @@ if (ui.tablaDb === 'rec') tablaDb = 'rec';
 $('tabRec').onclick = () => ir('rec'); $('tabEq').onclick = () => ir('eq'); $('tabDb').onclick = () => ir('db');
 $('qRec').oninput = renderRec;
 $('chipsRec').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { filtroRec = b.dataset.f; renderRec(); } };
+// Tocar una cifra del tablero filtra la lista; tocarla otra vez vuelve a lo normal.
+$('sumRec').onclick = e => { const b = e.target.closest('[data-filtro]'); if (!b) return; filtroRec = filtroRec === b.dataset.filtro ? 'pendientes' : b.dataset.filtro; renderRec(); $('chipsRec').querySelector('[aria-pressed="true"]')?.scrollIntoView({ block: 'nearest', inline: 'center' }); };
+$('sumEq').onclick = e => { const b = e.target.closest('[data-filtro]'); if (!b) return; const f = b.dataset.filtro; $('fEqEst').value = $('fEqEst').value === f ? 'todos' : f; renderEq(); };
 $('recList').onclick = e => {
   const t = e.target.closest('[data-tarea]'); if (t) { if (!t.disabled) setTarea(t.dataset.rid, t.dataset.tarea, t.dataset.v); return; }
   const p = e.target.closest('[data-pasar]'); if (p) return preguntarPasar(p.dataset.pasar);

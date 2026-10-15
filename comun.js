@@ -70,7 +70,58 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 
   const ico = n => (window.ico ? window.ico(n) : '');
+  const quieto = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const previos = new Map();
+  // Las cifras del tablero suben o bajan contando hasta su valor nuevo.
+  function contar(raiz) {
+    if (!raiz) return;
+    raiz.querySelectorAll('.num[data-k]').forEach(el => {
+      const k = el.dataset.k, fin = Number(el.textContent) || 0, ini = previos.has(k) ? previos.get(k) : 0;
+      previos.set(k, fin);
+      if (ini === fin || quieto() || !Number.isFinite(fin)) return;
+      const t0 = performance.now(), dur = Math.min(650, 250 + Math.abs(fin - ini) * 40);
+      el.textContent = ini;
+      const paso = t => {
+        if (!el.isConnected) return;
+        const x = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - x, 3);
+        el.textContent = Math.round(ini + (fin - ini) * e);
+        if (x < 1) requestAnimationFrame(paso);
+      };
+      requestAnimationFrame(paso);
+    });
+  }
+  const MAL = /^(no |sin conexi|la base de datos|solo lectura|ya hay|falta|ese |esa |todav[ií]a no|el escáner|hay una versi|primero|la fecha|tu cuenta|se cort|el nombre no)/i;
+  const BIEN = /(guardad|marcad|registrad|agregad|eliminad|listo|conectada|descargad|importad|recortad|escanead|archivo listo|^equipos:|actualizad)/i;
   window.UI = Object.freeze({
+    contar,
+    /** Una cifra del tablero. Con filtro, es un botón que filtra la lista al tocarlo. */
+    cifra: ({ k, n, lbl, icono, tono, filtro, activo }) => {
+      const dentro = `<span class="sum-ico" aria-hidden="true">${ico(icono)}</span><span class="num" data-k="${esH(k)}">${Number(n) || 0}</span><span class="sum-lbl">${esH(lbl)}</span>`;
+      const cls = `sum ${tono ? 't-' + tono : ''} ${Number(n) ? '' : 'cero'}`;
+      return filtro != null
+        ? `<button type="button" class="${cls}" data-filtro="${esH(filtro)}" aria-pressed="${!!activo}">${dentro}</button>`
+        : `<div class="${cls}">${dentro}</div>`;
+    },
+    /** Aviso corto con icono según sea bueno, malo o informativo. */
+    tostada: (el, msg) => {
+      const m = String(msg || ''), tipo = MAL.test(m) ? 'mal' : BIEN.test(m) ? 'bien' : 'info';
+      el.className = 'toast ' + tipo;
+      el.innerHTML = ico(tipo === 'mal' ? 'aviso' : tipo === 'bien' ? 'checkCirculo' : 'info') + `<span>${esH(m)}</span>`;
+      el.hidden = false;
+      el.style.animation = 'none'; void el.offsetWidth; el.style.animation = '';
+    },
+    /** Animación de entrada al cambiar de sección. */
+    entrar: vista => {
+      if (!vista || quieto()) return;
+      vista.classList.remove('entrando'); void vista.offsetWidth; vista.classList.add('entrando');
+      clearTimeout(vista._tEntrar); vista._tEntrar = setTimeout(() => vista.classList.remove('entrando'), 700);
+    },
+    /** Número en una insignia; salta un poco cuando cambia. */
+    insignia: (el, n) => {
+      if (!el) return;
+      const antes = el.textContent; el.hidden = !n; el.textContent = n;
+      if (n && antes !== String(n)) { el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop'); }
+    },
     /** ¿Cuál es el diálogo abierto de más arriba? */
     arriba: () => { const a = abiertos.filter(x => visible(x.el)); return a.length ? a[a.length - 1].el : null; },
     /** Estado vacío con icono, título y texto (el texto puede traer <b> ya escapado). */

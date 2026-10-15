@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" media="(prefers-color-scheme: light)" content="#F5F2EA">
-<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0E1412">
+<meta name="theme-color" media="(prefers-color-scheme: light)" content="#0A5A4E">
+<meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0D3B37">
 <meta name="description" content="Hojas de entrega y devolución escaneadas">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="../iconos/entregas-192.png">
@@ -14,7 +14,7 @@
 <meta name="apple-mobile-web-app-title" content="Entregas">
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="../comun.css?v=11">
+<link rel="stylesheet" href="../comun.css?v=12">
 <style>
 
 /* --- Entregas --- */
@@ -58,7 +58,7 @@ label.subir { cursor: pointer; }
 .sync.no { background: var(--surface-2); color: var(--muted); }
 .btn-mas { border: 1.5px dashed var(--accent); color: var(--accent-txt); background: transparent; border-radius: var(--r-control); min-height: 44px; padding: 0 14px; font-weight: 700; font-size: .88rem; align-self: flex-start; display: inline-flex; align-items: center; gap: 6px; }
 @media (hover: hover) { .btn-mas:hover { background: var(--accent-soft); } }
-.sub-acciones { position: sticky; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 10px; justify-content: flex-end; background: color-mix(in srgb, var(--bg) 94%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); padding: 12px 0; border-top: 1px solid var(--line); z-index: 5; }
+.sub-acciones { position: sticky; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); display: flex; gap: 10px; justify-content: flex-end; background: var(--bg); background: color-mix(in srgb, var(--bg) 94%, transparent); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); padding: 12px 0; border-top: 1px solid var(--line); z-index: 5; }
 .sub-acciones .btn { flex: 1; min-height: 50px; }
 .paginas { display: flex; flex-direction: column; gap: 10px; }
 .pagina { border: 1px solid var(--line); background: var(--field); border-radius: 14px; padding: 6px; display: flex; flex-direction: column; gap: 4px; cursor: zoom-in; text-align: left; }
@@ -218,12 +218,12 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "11"};</script>
-<script src="../iconos.js?v=11"></script>
-<script src="../comun.js?v=11"></script>
-<script src="escaner.js?v=11"></script>
-<script src="../config.js?v=11"></script>
-<script src="../nube.js?v=11"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "12"};</script>
+<script src="../iconos.js?v=12"></script>
+<script src="../comun.js?v=12"></script>
+<script src="escaner.js?v=12"></script>
+<script src="../config.js?v=12"></script>
+<script src="../nube.js?v=12"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -330,7 +330,7 @@ function hace(iso) {
   if (s < 86400) return `hace ${Math.round(s / 3600)} h`;
   return new Date(t).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
 }
-function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, 2600); }
+function toast(msg) { const t = $('toast'); UI.tostada(t, msg); clearTimeout(toast.t); toast.t = setTimeout(() => { t.hidden = true; }, Math.min(5000, 2200 + String(msg).length * 25)); }
 function nuevoId(p) { return p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function sello() { return { actualizado: new Date().toISOString(), por: miId || '' }; }
 const tipoNombre = k => (TIPOS.find(t => t.k === k) || TIPOS[0]).n;
@@ -424,6 +424,7 @@ function ir(v) {
   $('vEnt').hidden = v !== 'ent'; $('vSub').hidden = v !== 'sub'; $('vDb').hidden = v !== 'db';
   [['tabEnt', 'ent'], ['tabSub', 'sub'], ['tabDb', 'db']].forEach(([id, k]) => { if (k === v) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current'); });
   render(); window.scrollTo(0, 0);
+  UI.entrar($({ ent: 'vEnt', sub: 'vSub', db: 'vDb' }[v]));
 }
 function render() {
   pintarConexion(); actualizarNombres();
@@ -437,18 +438,18 @@ function actualizarNombres() {
 }
 
 /* ================= HOJAS GUARDADAS ================= */
-const FILTROS = [{ k: 'todos', n: 'Todas' }, { k: 'entrega', n: 'Entregas' }, { k: 'devolucion', n: 'Devoluciones' }, { k: 'otro', n: 'Otras' }, { k: 'sindatos', n: 'Sin nombre o fecha' }];
+const FILTROS = [{ k: 'todos', n: 'Todas' }, { k: 'mes', n: 'De este mes' }, { k: 'entrega', n: 'Entregas' }, { k: 'devolucion', n: 'Devoluciones' }, { k: 'otro', n: 'Otras' }, { k: 'sindatos', n: 'Sin nombre o fecha' }];
 const textoDe = e => sinTildes([e.nombre, e.cedula, e.seriales, e.proyecto, textoEquipos(equiposDe(e)), e.nota, e.origen].join(' '));
-function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'sindatos') return !e.nombre || !e.fecha; return (e.tipo || 'entrega') === f; }
+function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'mes') return (e.fecha || '').startsWith(hoyIso().slice(0, 7)); if (f === 'sindatos') return !e.nombre || !e.fecha; return (e.tipo || 'entrega') === f; }
 function renderEnt() {
   pintarAvisoEnlace();
   const todos = lista(), mes = hoyIso().slice(0, 7);
   const personas = new Set(todos.map(e => sinTildes(e.nombre)).filter(Boolean)).size;
-  $('sumEnt').innerHTML = `
-    <div class="sum"><span class="num">${todos.length}</span><span>Hojas guardadas</span></div>
-    <div class="sum"><span class="num">${todos.filter(e => (e.fecha || '').startsWith(mes)).length}</span><span>De este mes</span></div>
-    <div class="sum"><span class="num">${personas}</span><span>Personas</span></div>`;
-  $('chipsEnt').innerHTML = FILTROS.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtro === f.k}">${f.n}${f.k === 'sindatos' ? ` (${todos.filter(e => pasaFiltro(e, 'sindatos')).length})` : ''}</button>`).join('');
+  $('sumEnt').innerHTML = UI.cifra({ k: 'hTot', n: todos.length, lbl: 'Hojas guardadas', icono: 'hojas', filtro: 'todos', activo: filtro === 'todos' })
+    + UI.cifra({ k: 'hMes', n: todos.filter(e => (e.fecha || '').startsWith(mes)).length, lbl: 'De este mes', icono: 'reloj', tono: 'listo', filtro: 'mes', activo: filtro === 'mes' })
+    + UI.cifra({ k: 'hPer', n: personas, lbl: 'Personas', icono: 'persona', tono: 'org' });
+  UI.contar($('sumEnt'));
+  $('chipsEnt').innerHTML = FILTROS.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtro === f.k}">${f.n}<span class="n">${todos.filter(e => pasaFiltro(e, f.k)).length}</span></button>`).join('');
   const q = sinTildes($('qEnt').value.trim());
   const ver = todos.filter(e => pasaFiltro(e, filtro) && (!q || textoDe(e).includes(q)))
     .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || String(b.subido || '').localeCompare(String(a.subido || '')));
@@ -557,7 +558,7 @@ async function recortarPagina(i) {
 }
 function renderSub() {
   $('subAcciones').hidden = !lote.length;
-  $('badgeSub').hidden = !lote.length; $('badgeSub').textContent = lote.length;
+  UI.insignia($('badgeSub'), lote.length);
   const reg = gruposLote();
   $('subGuardar').textContent = reg.length === 1 ? 'Guardar 1 hoja' : `Guardar ${reg.length} hojas`;
   $('subGuardar').disabled = !reg.length;
@@ -886,6 +887,8 @@ async function descargarExcel() {
 $('tabEnt').onclick = () => ir('ent'); $('tabSub').onclick = () => { ir('sub'); renderSub(); }; $('tabDb').onclick = () => ir('db');
 $('qEnt').oninput = renderEnt;
 $('chipsEnt').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { filtro = b.dataset.f; renderEnt(); } };
+// Tocar una cifra del tablero filtra la lista; tocarla otra vez vuelve a todas.
+$('sumEnt').onclick = e => { const b = e.target.closest('[data-filtro]'); if (!b) return; filtro = filtro === b.dataset.filtro ? 'todos' : b.dataset.filtro; renderEnt(); };
 $('entList').onclick = e => { const b = e.target.closest('[data-en]'); if (b) abrirEn(b.dataset.en); };
 $('archivo').onchange = async e => {
   const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;

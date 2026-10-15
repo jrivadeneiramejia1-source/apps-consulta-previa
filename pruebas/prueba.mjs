@@ -12,6 +12,7 @@ const espera = ms => new Promise(r => setTimeout(r, ms));
 const store = page => page.evaluate(() => JSON.parse(localStorage.getItem('__fs_falso') || '{}'));
 const visible = (page, sel) => page.locator(sel).isVisible();
 async function axe(page, nombre) {
+  await espera(450);   // deja terminar las animaciones de entrada
   await page.addScriptTag({ content: AXE });
   const r = await page.evaluate(async () => (await window.axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'best-practice'] })).violations.map(v => `${v.id} (${v.nodes.length}): ${v.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' | ')}`));
   chequear(!r.length, `axe sin fallas: ${nombre}${r.length ? '\n     ' + r.join('\n     ') : ''}`);
@@ -40,6 +41,15 @@ for (const tema of ['light', 'dark']) {
   await axe(page, `equipos recibidos ${tema}`);
   await sinDesborde(page, 'equipos recibidos ' + tema);
 
+  // tablero tocable
+  await espera(900);
+  chequear(await page.locator('#sumRec [data-k="rEsp"]').textContent() === '3', 'la cifra termina de contar en su valor real');
+  await page.click('#sumRec [data-filtro="sinmtto"]'); await espera(80);
+  chequear(await page.locator('#sumRec [data-filtro="sinmtto"]').getAttribute('aria-pressed') === 'true' && await page.locator('#chipsRec [data-f="sinmtto"]').getAttribute('aria-pressed') === 'true', 'tocar una cifra filtra y marca el chip');
+  chequear(await page.locator('#recList .card.rec').count() === 2, 'cifra Sin mantenimiento muestra 2');
+  await page.click('#sumRec [data-filtro="sinmtto"]'); await espera(80);
+  chequear(await page.locator('#chipsRec [data-f="pendientes"]').getAttribute('aria-pressed') === 'true', 'tocarla otra vez vuelve a En espera');
+  chequear((await page.locator('#toast').count()) === 1, 'aviso existe');
   // filtros y búsqueda
   await page.click('#chipsRec [data-f="sinbackup"]');
   chequear(await page.locator('#recList .card.rec').count() === 3, 'filtro sin backup');
@@ -113,6 +123,10 @@ for (const tema of ['light', 'dark']) {
   // pestaña Equipos
   await page.click('#tabEq'); await page.waitForSelector('#eqList .card');
   chequear(await page.locator('#eqList .grupo').count() >= 5, 'equipos agrupados por tipo');
+  await page.click('#sumEq [data-filtro="bodega"]'); await espera(80);
+  chequear(await page.locator('#eqList .card').count() === 3 && await page.inputValue('#fEqEst') === 'bodega', 'cifra En bodega filtra');
+  await page.click('#sumEq [data-filtro="bodega"]'); await espera(80);
+  chequear(await page.inputValue('#fEqEst') === 'todos', 'tocarla otra vez quita el filtro');
   await page.fill('#qEq', 'garmin'); await espera(100);
   chequear(await page.locator('#eqList .card').count() === 1, 'búsqueda de equipos');
   await page.fill('#qEq', ''); await page.selectOption('#fEqEst', 'bodega'); await espera(100);
@@ -211,6 +225,9 @@ for (const tema of ['light', 'dark']) {
   chequear(s2[`${B}/equipos/PF2XYZ01`].asignado === 'Ana Gómez', 'Equipos: PF2XYZ01 asignado a Ana');
   chequear(Object.values(s2).some(v => v && v.origen === 'entregas' && v.serial === 'GPS778812' && !v.cerrado), 'Equipos: GPS en Recibidos');
   chequear(await pg.locator('#entList .card.hoja').count() === 2, '2 hojas en la lista');
+  await pg.click('#sumEnt [data-filtro="mes"]'); await espera(80);
+  chequear(await pg.locator('#chipsEnt [data-f="mes"]').getAttribute('aria-pressed') === 'true', 'cifra De este mes filtra');
+  await pg.click('#sumEnt [data-filtro="mes"]'); await espera(80);
   chequear(await pg.locator('#badgeSub').isHidden(), 'insignia se va al guardar');
   if (tema === 'light') await pg.screenshot({ path: `${OUT}/n3-hojas.png` }); else await pg.screenshot({ path: `${OUT}/n3-hojas-oscuro.png` });
   await axe(pg, `entregas hojas ${tema}`);

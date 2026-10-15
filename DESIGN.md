@@ -1,19 +1,21 @@
 ---
 version: 1
 name: Consulta Previa (Equipos y Entregas)
-description: Herramientas de campo para soporte técnico en La Guajira. Papel arena, verde petróleo como único acento, tarjetas grandes para el dedo y seriales en monoespaciada. Claras, rápidas y sin adornos.
+description: Herramientas de campo para soporte técnico en La Guajira. Encabezado verde petróleo, papel arena, tablero de cifras de colores que se toca para filtrar y seriales en monoespaciada. Vivas pero claras.
 
 colors:
-  arena: "#F5F2EA"            # fondo claro
+  encabezado: "#0A5A4E → #12806C"  # banda de marca con brillo en la esquina (oscuro: #0D3B37 → #14594F)
+  arena: "#F4F1E8"            # fondo claro
   papel: "#FFFFFF"            # superficies (claro)
-  arena-2: "#ECE8DD"          # superficies hundidas, notas
-  linea: "#DCD6C8"
-  tinta: "#17201C"            # texto (claro)
-  gris: "#59635D"             # texto suave (claro)
-  petroleo: "#0D6B5B"         # único acento: acción principal, pestaña activa, foco
-  noche: "#0E1412"            # fondo oscuro
-  noche-sup: "#161E1B"        # superficies (oscuro)
-  petroleo-claro: "#4CC3A7"   # acento en oscuro
+  arena-2: "#EEE9DC"          # superficies hundidas, notas
+  linea: "#DFD8C7"
+  tinta: "#14201C"            # texto (claro)
+  gris: "#56615B"             # texto suave (claro)
+  petroleo: "#0B7563"         # acento: acción principal, chip activo, pestaña activa, foco
+  sol: "#F2A93B"              # solo insignias (cuántos faltan); texto oscuro encima
+  noche: "#0A1B1C"            # fondo oscuro: petróleo profundo, nunca negro puro
+  noche-sup: "#11292A"        # superficies (oscuro)
+  petroleo-claro: "#3FD1B0"   # acento en oscuro
   estados:                    # solo para estados, nunca decorativos
     en-espera: naranja (#8F5200 / #F2B552)
     parcial: azul (#1D5BA6 / #8AB8F2)
@@ -44,11 +46,20 @@ Equipos lleva lo recibido para mantenimiento y backup; Entregas guarda las hojas
 La interfaz prioriza leer rápido el estado de cada equipo y hacer la siguiente acción con un toque.
 
 ## Signature
-El tablero de tres cifras arriba de cada lista y las tarjetas con franja de estado a la izquierda
-(naranja en espera, azul a medias, verde listo). Cada tipo de equipo tiene su placa de color con icono.
+El encabezado de color con la marca de cada app, y el tablero de tres cifras de colores arriba de cada lista:
+cada cifra tiene su franja, su icono y cuenta hasta su valor; al tocarla filtra la lista (otra vez, la quita).
+Las tarjetas llevan franja de estado a la izquierda (naranja en espera, azul a medias, verde listo)
+y cada tipo de equipo tiene su placa de color con icono.
+
+## Interacción
+- Al cambiar de sección la lista entra escalonada (0,3 s). Al marcar una tarea, el botón brilla en verde.
+- Las insignias saltan cuando cambia el número. Los avisos traen icono: verde si salió bien, sol si hay problema.
+- Con una hoja abierta, los avisos salen arriba para no tapar Guardar.
+- Todo se apaga con "reducir movimiento" del teléfono.
 
 ## Do
-- Un solo acento (petróleo). Los colores de estado solo dicen estado.
+- Un acento (petróleo) y el sol solo para insignias. Los colores de estado solo dicen estado.
+- Cada propiedad moderna (color-mix, dvh) lleva antes un valor de respaldo para teléfonos viejos.
 - Tema automático claro y oscuro; probar ambos.
 - Español, voz activa, segunda persona. Los errores dicen qué hacer.
 - Cargas con esqueletos que imitan la lista; textos de espera con "…".
