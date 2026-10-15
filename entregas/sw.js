@@ -1,16 +1,18 @@
 /* Guarda la app en el teléfono para que abra rápido y sin internet.
    Páginas propias: primero internet (para recibir actualizaciones) y si no hay, la copia guardada.
    Librerías y fuentes externas: primero la copia guardada. Firestore no pasa por aquí. */
-const VERSION = 'entregas-v7';
-const BASICOS = ['./', './index.html', './manifest.webmanifest', '../nube.js', '../config.js', '../iconos/entregas-192.png', '../iconos/entregas-512.png'];
-const EXTERNOS = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];
+const VERSION = 'entregas-v8';
+const BASICOS = ['./', './index.html', './manifest.webmanifest', './escaner.js', '../nube.js', '../config.js', '../iconos/entregas-192.png', '../iconos/entregas-512.png'];
+const EXTERNOS = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
+// Las librerías van en un cajón aparte que no se borra al actualizar la app (el detector pesa unos 10 MB).
+const LIBS = 'entregas-libs';
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(VERSION).then(c => Promise.all(BASICOS.map(u => c.add(u).catch(() => {})))));
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('entregas-') && k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('entregas-v') && k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
   const req = e.request;
@@ -25,7 +27,7 @@ self.addEventListener('fetch', e => {
   }
   if (EXTERNOS.includes(url.hostname) && !url.pathname.includes('/google.firestore')) {
     e.respondWith(caches.match(req).then(hit => hit || fetch(req).then(r => {
-      if (r.ok || r.type === 'opaque') { const copia = r.clone(); caches.open(VERSION).then(c => c.put(req, copia)); }
+      if (r.ok || r.type === 'opaque') { const copia = r.clone(); caches.open(LIBS).then(c => c.put(req, copia)); }
       return r;
     })));
   }

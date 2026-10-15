@@ -319,6 +319,10 @@ body.ro .mini { display: none; }
 
 /* --- Entregas --- */
 label.subir { text-align: center; cursor: pointer; }
+.sub-botones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+@media (max-width: 520px) { .sub-botones { grid-template-columns: 1fr; } }
+.pag-cab .btn { margin-left: auto; flex: 0 0 auto; white-space: nowrap; }
+.pag-cab b { white-space: nowrap; }
 .card.hoja { flex-direction: row; align-items: flex-start; gap: 12px; }
 .mini-hoja { width: 64px; height: 88px; object-fit: cover; object-position: top; border-radius: 6px; border: 1px solid var(--line); flex: 0 0 auto; background: #fff; }
 .mini-hoja.vacia { display: block; background: var(--surface-2); }
@@ -389,9 +393,12 @@ label.subir { text-align: center; cursor: pointer; }
 
   <!-- SECCIÓN 2: SUBIR -->
   <section class="view" id="vSub" hidden>
-    <div class="note">Sube el PDF escaneado o fotos de las hojas. Cada página sale aparte: escribe a quién pertenece y guárdala. Si una persona tiene dos páginas, marca <b>Unir con la anterior</b>. Los datos los escribes tú; la app no lee la letra.</div>
+    <div class="note">Escanea las hojas con la cámara o sube el PDF o fotos. Cada página sale aparte: escribe a quién pertenece y guárdala. Si una persona tiene dos páginas, marca <b>Unir con la anterior</b>. Los datos los escribes tú; la app no lee la letra.</div>
     <div class="aviso info" id="subEnlace" hidden><span>Esta app no está conectada con <b>Equipos</b>: las hojas se guardan, pero no actualizan la lista de equipos.</span><button class="btn small" type="button" onclick="nube.enlazar('equipos')">Conectar</button></div>
-    <label class="btn primary big solo-editar subir">Escoger PDF o fotos<input type="file" id="archivo" accept="application/pdf,image/*" multiple hidden></label>
+    <div class="sub-botones solo-editar">
+      <button class="btn primary big" type="button" id="btnEscanear">📷 Escanear con la cámara</button>
+      <label class="btn big subir">Escoger PDF o fotos<input type="file" id="archivo" accept="application/pdf,image/*" multiple hidden></label>
+    </div>
     <div class="meta" id="subEstado"></div>
     <div class="list" id="subList"></div>
     <div class="sub-acciones" id="subAcciones" hidden>
@@ -496,9 +503,10 @@ label.subir { text-align: center; cursor: pointer; }
 <div class="toast" id="toast" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "7"};</script>
-<script src="../config.js?v=7"></script>
-<script src="../nube.js?v=7"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "8"};</script>
+<script src="escaner.js?v=8"></script>
+<script src="../config.js?v=8"></script>
+<script src="../nube.js?v=8"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -794,13 +802,48 @@ async function leerArchivos(files) {
   }
   return nuevas;
 }
+/* ---------- escáner con la cámara ---------- */
+function avisoLote() { $('subEstado').textContent = lote.length ? `${lote.length} ${lote.length === 1 ? 'página lista' : 'páginas listas'}. Escribe los datos de cada una y toca Guardar.` : ''; }
+let escaneando = false;
+async function escanear() {
+  if (soloLectura) { toast('Solo lectura.'); return; }
+  if (escaneando) return;
+  if (lote.length >= MAX_PAGINAS) { toast(`Ya hay ${MAX_PAGINAS} páginas sin guardar. Guarda primero.`); return; }
+  if (!window.Escaner) { toast('El escáner no cargó. Cierra y abre la app.'); return; }
+  escaneando = true;
+  try {
+    const hojas = await window.Escaner.abrir({ max: MAX_PAGINAS - lote.length });
+    if (!hojas.length) return;
+    const ahora = new Date(), hora = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
+    for (let i = 0; i < hojas.length; i++) {
+      $('subEstado').textContent = `Preparando página escaneada ${i + 1} de ${hojas.length}…`;
+      lote.push(await prepararPagina(hojas[i], `Escaneo ${hora} · pág. ${i + 1}`));
+    }
+    avisoLote(); renderSub();
+    toast(hojas.length === 1 ? '1 página escaneada.' : `${hojas.length} páginas escaneadas.`);
+  } catch (err) { toast('No se pudo escanear: ' + (err.message || err)); avisoLote(); }
+  finally { escaneando = false; }
+}
+// Recorta y mejora una página ya cargada (foto de la galería, escaneo o PDF). Conserva los datos escritos.
+async function recortarPagina(i) {
+  const p = lote[i]; if (!p || !window.Escaner) return;
+  try {
+    const img = await createImageBitmap(p.blob), c = document.createElement('canvas');
+    c.width = img.width; c.height = img.height; c.getContext('2d').drawImage(img, 0, 0);
+    const res = await window.Escaner.recortar(c);
+    if (!res || lote[i] !== p) return;
+    const n = await prepararPagina(res, p.origen);
+    Object.assign(p, { blob: n.blob, mini: n.mini, vista: n.vista, ancho: n.ancho, alto: n.alto });
+    renderSub(); toast(`Página ${i + 1} recortada.`);
+  } catch (err) { toast('No se pudo recortar: ' + (err.message || err)); }
+}
 function renderSub() {
   $('subAcciones').hidden = !lote.length;
   const reg = gruposLote();
   $('subGuardar').textContent = reg.length === 1 ? 'Guardar 1 hoja' : `Guardar ${reg.length} hojas`;
   $('subGuardar').disabled = !reg.length;
   $('subList').innerHTML = lote.map((p, i) => `<div class="card pag ${p.incluir ? '' : 'fuera'} ${p.unir ? 'unida' : ''}" data-i="${i}">
-      <div class="pag-cab"><b>Página ${i + 1}</b><span class="meta">${esc(p.origen)}</span></div>
+      <div class="pag-cab"><b>Página ${i + 1}</b><span class="meta">${esc(p.origen)}</span><button type="button" class="btn small solo-editar" data-recortar="${i}">✂ Recortar</button></div>
       <img class="pag-img" src="${p.vista}" alt="Página ${i + 1}" data-ver="${i}">
       <div class="row">
         <label class="check"><input type="checkbox" data-k="incluir" ${p.incluir ? 'checked' : ''}> Guardar esta página</label>
@@ -1119,7 +1162,7 @@ $('chipsEnt').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { 
 $('entList').onclick = e => { const b = e.target.closest('[data-en]'); if (b) abrirEn(b.dataset.en); };
 $('archivo').onchange = async e => {
   const files = [...e.target.files]; e.target.value = ''; if (!files.length) return;
-  try { const nuevas = await leerArchivos(files); lote = lote.concat(nuevas); $('subEstado').textContent = lote.length ? `${lote.length} ${lote.length === 1 ? 'página lista' : 'páginas listas'}. Escribe los datos de cada una y toca Guardar.` : ''; }
+  try { const nuevas = await leerArchivos(files); lote = lote.concat(nuevas); avisoLote(); }
   catch (err) { $('subEstado').textContent = ''; toast('No se pudo abrir el archivo: ' + (err.message || err)); }
   renderSub();
 };
@@ -1145,7 +1188,9 @@ $('subList').onclick = e => {
     if (add) { const ins = $('subList').querySelectorAll(`[data-i="${i}"] [data-eq-k=serial]`); ins[ins.length - 1].focus(); }
     return;
   }
+  const rc = e.target.closest('[data-recortar]'); if (rc) return recortarPagina(Number(rc.dataset.recortar));
   const v = e.target.closest('[data-ver]'); if (v) { const i = Number(v.dataset.ver); verGrande(lote[i].vista, `Página ${i + 1}`); } };
+$('btnEscanear').onclick = escanear;
 $('subGuardar').onclick = guardarLote;
 $('subCancelar').onclick = () => confirmar('Descartar', 'Se quitan las páginas que no has guardado. Lo ya guardado no se toca.', 'Descartar', () => { lote = []; $('subEstado').textContent = ''; renderSub(); });
 $('enForm').onsubmit = guardarEn; $('enCancel').onclick = cerrarEn; $('enDel').onclick = () => borrarEn(enActual);
