@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=16">
+<link rel="stylesheet" href="../comun.css?v=17">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -238,6 +238,7 @@
     </div>
     <div class="field" id="mtRespOtroBox" hidden><label for="mtRespOtro">Nombre del responsable</label><input id="mtRespOtro" type="text" autocomplete="off" placeholder="Como escribió su nombre al entrar a la app"></div>
     <div class="meta" id="mtRespInfo"></div>
+    <div class="field" id="mtDiscoBox" hidden><label for="mtDisco">Disco de backup (opcional)</label><input id="mtDisco" type="text" list="dlDiscos" autocomplete="off" placeholder="Ej: Disco Backup 1"><small class="meta">El disco que se le conecta al equipo para guardar la copia.</small><datalist id="dlDiscos"></datalist></div>
     <div class="field" id="mtAnyBox" hidden><label for="mtAnydesk">Número de AnyDesk del equipo</label><input id="mtAnydesk" type="text" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="Ej: 123 456 789"></div>
     <div class="field"><label for="mtNota">Nota</label><textarea id="mtNota" placeholder="Ej: comunicarse con Ana Gómez; dijo que lo deja prendido en la tarde"></textarea></div>
     <div class="field" id="mtHistBox" hidden><span class="lbl">Lo que ha pasado</span><ol class="linea-t" id="mtHist"></ol></div>
@@ -267,11 +268,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "16"};</script>
-<script src="../iconos.js?v=16"></script>
-<script src="../comun.js?v=16"></script>
-<script src="../config.js?v=16"></script>
-<script src="../nube.js?v=16"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "17"};</script>
+<script src="../iconos.js?v=17"></script>
+<script src="../comun.js?v=17"></script>
+<script src="../config.js?v=17"></script>
+<script src="../nube.js?v=17"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas';
@@ -298,7 +299,7 @@ function textoEspera(r) {
   const t = n === 0 ? 'Hoy' : n === 1 ? 'Lleva 1 día' : `Lleva ${n} días`;
   return `<span class="espera ${n >= DIAS_ALERTA ? 'larga' : ''}">${ico('reloj')}${t}</span>`;
 }
-const CAB_EXCEL = ['SERIAL', 'TIPO DE EQUIPO', 'MARCA', 'MODELO', 'ASIGNADO A', 'MAIL', 'CLIENTE', 'PROYECTO', 'DEPARTAMENTO', 'MUNICIPIO', 'FECHA ULTIMO MTTO PREVENTIVO', 'OBSERVACIONES', 'FECHA ULTIMO BACKUP', 'FECHA ULTIMO MTTO REMOTO', 'ANYDESK'];
+const CAB_EXCEL = ['SERIAL', 'TIPO DE EQUIPO', 'MARCA', 'MODELO', 'ASIGNADO A', 'MAIL', 'CLIENTE', 'PROYECTO', 'DEPARTAMENTO', 'MUNICIPIO', 'FECHA ULTIMO MTTO PREVENTIVO', 'OBSERVACIONES', 'FECHA ULTIMO BACKUP', 'FECHA ULTIMO MTTO REMOTO', 'ANYDESK', 'DISCO DEL ULTIMO BACKUP'];
 
 /* ================= ESTADO ================= */
 let Q = new Map(), R = new Map(), T = new Map();   // equipos, recibidos y tareas: id -> datos
@@ -945,7 +946,7 @@ function abrirEq(id) {
   $('eqDel').hidden = !id; $('eqARec').hidden = !id; $('eqProg').hidden = !id;
   const nAct = id ? activasDe(id).length : 0;
   $('eqProgTxt').textContent = nAct ? `${nAct === 1 ? '1 tarea programada' : nAct + ' tareas programadas'}: ver` : 'Programar tarea';
-  $('eqFechasExtra').textContent = id ? [e.fechaRemoto ? `Último mantenimiento remoto: ${fechaBonita(e.fechaRemoto)}` : '', e.fechaBackup ? `Último backup: ${fechaBonita(e.fechaBackup)}` : 'Sin backup registrado'].filter(Boolean).join(' · ') : ''; $('eqErr').hidden = true; $('eqEditado').textContent = '';
+  $('eqFechasExtra').textContent = id ? [e.fechaRemoto ? `Último mantenimiento remoto: ${fechaBonita(e.fechaRemoto)}` : '', e.fechaBackup ? `Último backup: ${fechaBonita(e.fechaBackup)}${e.discoBackup ? ' en el disco ' + e.discoBackup : ''}` : 'Sin backup registrado'].filter(Boolean).join(' · ') : ''; $('eqErr').hidden = true; $('eqEditado').textContent = '';
   if (id && e.actualizado) {
     const base = 'Última edición ' + hace(e.actualizado);
     $('eqEditado').textContent = base + '.';
@@ -964,7 +965,7 @@ function abrirEq(id) {
       <span class="row between"><b class="mono">${fechaBonita(r.fechaIngreso)}</b><span class="pill ${s.clase}">${s.n}</span></span>
       <span class="meta">Mantenimiento: ${lab[r.mtto || 'pend']}${r.mtto === 'hecho' && r.mttoFecha ? ' (' + fechaBonita(r.mttoFecha) + ')' : ''} · Backup: ${lab[r.backup || 'pend']}${r.backup === 'hecho' && r.backupFecha ? ' (' + fechaBonita(r.backupFecha) + ')' : ''}${r.persona ? ' · ' + esc(r.persona) : ''}</span>
       ${r.obs ? `<span class="obs">${esc(r.obs)}</span>` : ''}</button>`; }).join('')
-    + mts.map(m => `<div class="hist-it"><span class="row between"><b class="mono">${fechaBonita(m.fecha)}</b><span class="pill tp-${esc(m.tipo || 'fisico')}">${ico(TIPOS_T[m.tipo || 'fisico'].ico)}${TIPOS_T[m.tipo || 'fisico'].n}</span></span>${m.nota ? `<span class="obs">${esc(m.nota)}</span>` : ''}${m.por ? `<span class="meta">Hecho por ${esc(m.por)}</span>` : ''}</div>`).join('');
+    + mts.map(m => `<div class="hist-it"><span class="row between"><b class="mono">${fechaBonita(m.fecha)}</b><span class="pill tp-${esc(m.tipo || 'fisico')}">${ico(TIPOS_T[m.tipo || 'fisico'].ico)}${TIPOS_T[m.tipo || 'fisico'].n}</span></span>${m.disco ? `<span class="meta">Quedó en el disco ${esc(m.disco)}</span>` : ''}${m.nota ? `<span class="obs">${esc(m.nota)}</span>` : ''}${m.por ? `<span class="meta">Hecho por ${esc(m.por)}</span>` : ''}</div>`).join('');
   $('eqSheet').hidden = false;
   fotoEq = UI.foto($('eqForm'));
 }
@@ -1014,10 +1015,15 @@ function confirmar(titulo, texto, boton, accion, estilo, opcHtml) {
 const TIPOS_T = {
   fisico: { n: 'Mantenimiento físico', c: 'Mant. físico', ico: 'mantenimiento', campo: 'fechaMtto', txt: 'el mantenimiento físico', ayuda: 'Puertos, teclado, limpieza: se hace con el equipo en la mano.' },
   remoto: { n: 'Mantenimiento remoto', c: 'Mant. remoto', ico: 'remoto', campo: 'fechaRemoto', txt: 'el mantenimiento remoto', ayuda: 'Drivers, actualizaciones y programas: se puede hacer por AnyDesk.' },
-  backup: { n: 'Backup', c: 'Backup', ico: 'backup', campo: 'fechaBackup', txt: 'el backup', ayuda: 'Copia de los archivos del equipo: se puede hacer por AnyDesk.' }
+  backup: { n: 'Backup', c: 'Backup', ico: 'backup', campo: 'fechaBackup', txt: 'el backup', ayuda: 'Otra persona entra por AnyDesk y copia los archivos al disco de backup que se le conecta al equipo.' }
 };
 const QUE_T = { programada: 'Programó la tarea', editada: 'Cambió la tarea', encender: 'Va a conectarse: pidió prender el equipo', encendido: 'Prendió el equipo', nopudo: 'No se pudo', hecho: 'La terminó' };
 const tipoT = t => TIPOS_T[t && t.tipo] || TIPOS_T.fisico;
+// En un backup, además de prender el equipo hay que conectarle el disco de backup (ahí queda la copia).
+const conDisco = t => t && t.tipo === 'backup';
+const queHacer = t => conDisco(t) ? `prender el equipo y conectarle el disco de backup${t.disco ? ' (' + t.disco + ')' : ''}` : 'prender el equipo';
+// Discos de backup que ya se han usado, para escogerlos rápido.
+const discosUsados = () => [...new Set([...T.values()].flatMap(t => [t.disco, t.hecho && t.hecho.disco]).concat([...Q.values()].map(e => e.discoBackup)).filter(Boolean).map(x => String(x).trim()))].sort((a, b) => a.localeCompare(b, 'es'));
 const activa = t => !!t && t.estado !== 'hecho';
 const esRemota = t => t.tipo === 'remoto' || t.tipo === 'backup';
 const tareasLista = () => [...T.entries()].map(([id, t]) => Object.assign({ id }, t));
@@ -1050,15 +1056,15 @@ const anyBonito = v => { const d = soloDigitos(v); return d.length > 6 ? d.repla
 function tarjetaTarea(t) {
   const id = idSerial(t.serial), e = Q.get(id) || { serial: t.serial, tipo: '' }, tt = tipoT(t), n = diasHasta(t.fecha), rem = esRemota(t);
   const pidio = ultimo(t, 'encender'), malo = ultimo(t, 'nopudo');
-  const estado = t.estado === 'encender' ? `<div class="estado-t org">${ico('aviso')}<span><b>${esc((pidio && pidio.quien) || 'Alguien')}</b> va a conectarse: hay que prender el equipo.</span></div>`
-    : t.estado === 'encendido' ? `<div class="estado-t ok">${ico('checkCirculo')}<span>Equipo prendido${ultimo(t, 'encendido') && ultimo(t, 'encendido').quien ? ' por <b>' + esc(ultimo(t, 'encendido').quien) + '</b>' : ''}: ya se puede entrar.</span></div>`
+  const estado = t.estado === 'encender' ? `<div class="estado-t org">${ico('aviso')}<span><b>${esc((pidio && pidio.quien) || 'Alguien')}</b> va a conectarse: hay que ${esc(queHacer(t))}.</span></div>`
+    : t.estado === 'encendido' ? `<div class="estado-t ok">${ico('checkCirculo')}<span>Equipo prendido${conDisco(t) ? ' y disco conectado' : ''}${ultimo(t, 'encendido') && ultimo(t, 'encendido').quien ? ' por <b>' + esc(ultimo(t, 'encendido').quien) + '</b>' : ''}: ya se puede entrar.</span></div>`
     : t.estado === 'nopudo' ? `<div class="estado-t rojo">${ico('aviso')}<span>No se pudo${malo && malo.nota ? ': ' + esc(malo.nota) : ''}. Sigue pendiente.</span></div>` : '';
   const any = rem ? (soloDigitos(e.anydesk)
     ? `<div class="anydesk-t"><span>${ico('remoto')}AnyDesk <b class="mono">${esc(anyBonito(e.anydesk))}</b></span><span class="row"><a class="btn small" href="anydesk:${esc(soloDigitos(e.anydesk))}">Abrir AnyDesk</a><button type="button" class="btn small ghost" data-copiar="${esc(soloDigitos(e.anydesk))}">Copiar</button></span></div>`
     : `<div class="anydesk-t sin"><span>${ico('remoto')}Este equipo no tiene número de AnyDesk.</span></div>`) : '';
   const b = [];
-  if (rem && (t.estado === 'pendiente' || t.estado === 'nopudo' || !t.estado)) b.push(`<button type="button" class="btn" data-t-acc="encender" data-t="${esc(t.id)}">${ico('campana')}Voy a conectarme: prende el equipo</button>`);
-  if (rem && t.estado === 'encender') b.push(`<button type="button" class="btn primary" data-t-acc="encendido" data-t="${esc(t.id)}">${ico('check')}Ya está prendido</button>`);
+  if (rem && (t.estado === 'pendiente' || t.estado === 'nopudo' || !t.estado)) b.push(`<button type="button" class="btn" data-t-acc="encender" data-t="${esc(t.id)}">${ico('campana')}Voy a conectarme: prende el equipo${conDisco(t) ? ' y conecta el disco' : ''}</button>`);
+  if (rem && t.estado === 'encender') b.push(`<button type="button" class="btn primary" data-t-acc="encendido" data-t="${esc(t.id)}">${ico('check')}${conDisco(t) ? 'Equipo prendido y disco conectado' : 'Ya está prendido'}</button>`);
   if (rem && (t.estado === 'encender' || t.estado === 'encendido')) b.push(`<button type="button" class="btn" data-t-acc="nopudo" data-t="${esc(t.id)}">No se pudo</button>`);
   b.push(`<button type="button" class="btn ok" data-t-acc="hecho" data-t="${esc(t.id)}">${ico('checkCirculo')}${tt.c} hecho</button>`);
   const atras = n !== null && n < 0;
@@ -1068,6 +1074,7 @@ function tarjetaTarea(t) {
         <span class="pill ${atras ? 's-rojo' : n !== null && n <= 1 ? 's-org' : 's-listo'}">${textoCuando(t.fecha)}</span></div>
       <div class="facts"><span class="pill tp-${esc(t.tipo || 'fisico')}">${ico(tt.ico)}${tt.n}</span><span class="mono">${fechaBonita(t.fecha)}</span></div>
       <div class="facts"><span>Lo tiene <b>${esc(e.asignado || 'nadie')}</b></span><span class="acc-mini">${ico('persona')}${t.resp ? 'Responsable: <b>' + esc(t.resp) + '</b>' : 'Sin responsable'}</span></div>
+      ${conDisco(t) ? `<div class="facts"><span class="acc-mini">${ico('disco')}Disco de backup: <b>${esc(t.disco || 'cualquiera')}</b></span></div>` : ''}
       ${t.nota ? `<div class="obs">${esc(t.nota)}</div>` : ''}
     </button>
     ${estado}${any}
@@ -1130,16 +1137,16 @@ function accionTarea(tid, a) {
   const url = './?agenda=1', etiqueta = 't-' + tid;
   if (a === 'encender') {
     const aQuien = [t.creadoPor, t.resp].filter(n => n && !mismoNombre(n, miId));
-    confirmar(`¿Vas a conectarte a ${e.serial}?`, `Se le avisa a ${aQuien.length ? [...new Set(aQuien)].join(' y ') : 'quien programó la tarea'} que prenda el equipo para entrar por AnyDesk.${quien}`, 'Sí, avisar', () => {
+    confirmar(`¿Vas a conectarte a ${e.serial}?`, `Se le avisa a ${aQuien.length ? [...new Set(aQuien)].join(' y ') : 'quien programó la tarea'} que ${conDisco(t) ? 'prenda el equipo y le conecte el disco de backup' + (t.disco ? ' (' + t.disco + ')' : '') : 'prenda el equipo'} para entrar por AnyDesk.${quien}`, 'Sí, avisar', () => {
       escribir({ tipo: 'update', col: COL_T, id: tid, data: Object.assign({ estado: 'encender', hist: anotar(t, 'encender') }, sello()) });
-      avisarA([t.creadoPor, t.resp], { titulo: `Prende el equipo ${e.serial}`, cuerpo: `${yo} va a conectarse por AnyDesk para hacer ${tt.txt}.${quien}${anyTxt}`, url, etiqueta });
+      avisarA([t.creadoPor, t.resp], { titulo: conDisco(t) ? `Prende ${e.serial} y conecta el disco de backup` : `Prende el equipo ${e.serial}`, cuerpo: `${yo} va a conectarse por AnyDesk para hacer ${tt.txt}. Hay que ${queHacer(t)}.${quien}${anyTxt}`, url, etiqueta });
     }, 'ok');
   }
   if (a === 'encendido') {
     const p = ultimo(t, 'encender');
     escribir({ tipo: 'update', col: COL_T, id: tid, data: Object.assign({ estado: 'encendido', hist: anotar(t, 'encendido') }, sello()) });
-    toast('Listo: se avisa que el equipo está prendido');
-    avisarA([p && p.quien, t.resp], { titulo: `Ya puedes entrar a ${e.serial}`, cuerpo: `${yo} prendió el equipo para ${tt.txt}.${anyTxt}`, url, etiqueta });
+    toast(conDisco(t) ? 'Listo: se avisa que el equipo está prendido y el disco conectado' : 'Listo: se avisa que el equipo está prendido');
+    avisarA([p && p.quien, t.resp], { titulo: `Ya puedes entrar a ${e.serial}`, cuerpo: `${yo} prendió el equipo${conDisco(t) ? ' y le conectó el disco de backup' + (t.disco ? ' (' + t.disco + ')' : '') : ''} para ${tt.txt}.${anyTxt}`, url, etiqueta });
   }
   if (a === 'nopudo') {
     confirmar(`¿No se pudo hacer ${tt.txt}?`, `${e.serial}. La tarea sigue pendiente y se le avisa a quien la programó.`, 'Avisar', () => {
@@ -1149,19 +1156,24 @@ function accionTarea(tid, a) {
     }, 'ok', '<div class="field"><label for="cfMotivo">¿Qué pasó? (opcional)</label><input id="cfMotivo" type="text" autocomplete="off" placeholder="Ej: el equipo no tenía internet"></div>');
   }
   if (a === 'hecho') {
-    confirmar(`¿${tt.n} hecho a ${e.serial}?`, `Se guarda la fecha en el equipo y la tarea sale de la agenda.${quien}`, 'Sí, hecho', () => {
-      const f = $('cfTFecha').value, nota = $('cfTNota').value.trim();
+    const pideDisco = conDisco(t);
+    confirmar(`¿${tt.n} hecho a ${e.serial}?`, `Se guarda la fecha en el equipo y la tarea sale de la agenda.${pideDisco ? ' Se avisa que ya pueden desconectar el disco.' : ''}${quien}`, 'Sí, hecho', () => {
+      const f = $('cfTFecha').value, nota = $('cfTNota').value.trim(), disco = pideDisco ? $('cfTDisco').value.trim().replace(/\s+/g, ' ') : '';
       if (!f) { $('cfTFecha').focus(); toast('Escoge la fecha.'); return false; }
-      escribir({ tipo: 'update', col: COL_T, id: tid, data: Object.assign({ estado: 'hecho', hecho: { fecha: f, por: miId || '', nota }, hist: anotar(t, 'hecho', nota) }, sello()) });
+      if (pideDisco && !disco) { $('cfTDisco').focus(); toast('Escribe en qué disco quedó el backup.'); return false; }
+      escribir({ tipo: 'update', col: COL_T, id: tid, data: Object.assign({ estado: 'hecho', hecho: Object.assign({ fecha: f, por: miId || '', nota }, pideDisco ? { disco } : {}), hist: anotar(t, 'hecho', [disco ? 'en el disco ' + disco : '', nota].filter(Boolean).join('. ')) }, sello()) });
       const e2 = Q.get(idSerial(t.serial));
       if (e2) {
-        const datos = { mttos: (e2.mttos || []).concat([{ fecha: f, tipo: t.tipo || 'fisico', nota: nota || t.nota || '', por: miId || '' }]) };
-        if (!e2[tt.campo] || f >= e2[tt.campo]) datos[tt.campo] = f;
+        const datos = { mttos: (e2.mttos || []).concat([Object.assign({ fecha: f, tipo: t.tipo || 'fisico', nota: nota || t.nota || '', por: miId || '' }, disco ? { disco } : {})]) };
+        if (!e2[tt.campo] || f >= e2[tt.campo]) { datos[tt.campo] = f; if (disco) datos.discoBackup = disco; }
         escribir({ tipo: 'update', col: COL_Q, id: e2.id || idSerial(t.serial), data: Object.assign(datos, sello()) });
       }
-      toast(`${tt.n} de ${e.serial} hecho: ${fechaBonita(f)}`);
-      avisarA([t.creadoPor, t.resp], { titulo: `${tt.c} hecho: ${e.serial}`, cuerpo: `${yo} hizo ${tt.txt} el ${fechaBonita(f)}.${nota ? ' ' + nota : ''}`, url, etiqueta });
-    }, 'ok', `<div class="field"><label for="cfTFecha">Fecha</label><input id="cfTFecha" type="date" value="${hoyIso()}" max="${hoyIso()}"></div><div class="field"><label for="cfTNota">Qué se hizo (opcional)</label><input id="cfTNota" type="text" autocomplete="off" placeholder="Ej: se actualizaron los drivers de video"></div>`);
+      toast(`${tt.n} de ${e.serial} hecho: ${fechaBonita(f)}${disco ? ', en el disco ' + disco : ''}`);
+      avisarA([t.creadoPor, t.resp], { titulo: `${tt.c} hecho: ${e.serial}`, cuerpo: `${yo} hizo ${tt.txt} el ${fechaBonita(f)}${disco ? ' en el disco ' + disco + '. Ya puedes desconectar el disco' : ''}.${nota ? ' ' + nota : ''}`, url, etiqueta });
+    }, 'ok', `<div class="field"><label for="cfTFecha">Fecha</label><input id="cfTFecha" type="date" value="${hoyIso()}" max="${hoyIso()}"></div>`
+      + (pideDisco ? `<div class="field"><label for="cfTDisco">Disco donde quedó el backup</label><input id="cfTDisco" type="text" list="dlDiscos" autocomplete="off" value="${esc(t.disco || '')}" placeholder="Ej: Disco Backup 1"></div>` : '')
+      + `<div class="field"><label for="cfTNota">${pideDisco ? 'Carpeta o detalle (opcional)' : 'Qué se hizo (opcional)'}</label><input id="cfTNota" type="text" autocomplete="off" placeholder="${pideDisco ? 'Ej: carpeta GPS778812 2026-10' : 'Ej: se actualizaron los drivers de video'}"></div>`);
+    $('dlDiscos').innerHTML = discosUsados().map(d => `<option value="${esc(d)}"></option>`).join('');
   }
 }
 
@@ -1316,6 +1328,7 @@ function ponerTipo(t) {
   $('mtTipo').querySelectorAll('[data-tipo]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tipo === mtTipo));
   $('mtTipoAyuda').textContent = TIPOS_T[mtTipo].ayuda;
   $('mtAnyBox').hidden = mtTipo === 'fisico';
+  $('mtDiscoBox').hidden = mtTipo !== 'backup';
 }
 function abrirMt(tid, serialInicial, tipoInicial) {
   const t = tid ? T.get(tid) : null;
@@ -1331,13 +1344,15 @@ function abrirMt(tid, serialInicial, tipoInicial) {
   const f = new Date(); f.setDate(f.getDate() + (tipoInicial === 'fisico' || !tipoInicial ? 7 : 1));
   $('mtFecha').value = t ? t.fecha : `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`;
   $('mtNota').value = t ? (t.nota || '') : '';
+  $('mtDisco').value = t ? (t.disco || '') : '';
+  $('dlDiscos').innerHTML = discosUsados().map(d => `<option value="${esc(d)}"></option>`).join('');
   $('mtResp').innerHTML = opcionesResp(t ? t.resp : ''); $('mtRespOtro').value = '';
   $('mtAnydesk').value = e ? anyBonito(e.anydesk) : '';
   infoResp(); infoMt();
   $('mtHistBox').hidden = !t || !(t.hist || []).length;
   $('mtHist').innerHTML = t ? (t.hist || []).slice().reverse().map(h => `<li><b>${esc(h.quien || 'Alguien')}</b> · ${esc(QUE_T[h.que] || h.que)}${h.nota ? ': ' + esc(h.nota) : ''}<span class="meta">${esc(hace(h.t))}</span></li>`).join('') : '';
   $('mtQuitar').hidden = !t; $('mtErr').hidden = true;
-  [$('mtFecha'), $('mtNota'), $('mtResp'), $('mtRespOtro'), $('mtAnydesk')].forEach(x => { x.disabled = soloLectura; });
+  [$('mtFecha'), $('mtNota'), $('mtResp'), $('mtRespOtro'), $('mtAnydesk'), $('mtDisco')].forEach(x => { x.disabled = soloLectura; });
   $('mtSheet').hidden = false;
   fotoMt = UI.foto($('mtForm'));
 }
@@ -1363,14 +1378,14 @@ function guardarMt(ev) {
   if (!$('mtFecha').value) return mostrarErr('mtErr', 'Escoge la fecha programada.');
   if ($('mtResp').value === '__otro' && !leerResp()) { $('mtRespOtro').focus(); return mostrarErr('mtErr', 'Escribe el nombre del responsable.'); }
   if (!t0 && activasDe(id).some(t => t.tipo === mtTipo)) return mostrarErr('mtErr', `Ese equipo ya tiene ${TIPOS_T[mtTipo].txt} programado. Ábrelo en la agenda para cambiarlo.`);
-  const datos = { tipo: mtTipo, fecha: $('mtFecha').value, nota: $('mtNota').value.trim(), resp: leerResp() };
+  const datos = { tipo: mtTipo, fecha: $('mtFecha').value, nota: $('mtNota').value.trim(), resp: leerResp(), disco: mtTipo === 'backup' ? $('mtDisco').value.trim().replace(/\s+/g, ' ') : '' };
   const any = soloDigitos($('mtAnydesk').value);
   if (mtTipo !== 'fisico' && any && any !== soloDigitos(e.anydesk)) escribir({ tipo: 'update', col: COL_Q, id, data: Object.assign({ anydesk: any }, sello()) });
   let tid = mtActual, nueva = !t0, cambio = nueva;
   if (t0) {
     const cambios = {}; Object.keys(datos).forEach(k => { if ((t0[k] || '') !== datos[k]) cambios[k] = datos[k]; });
     if (!Object.keys(cambios).length) { cerrarMt(); return; }
-    cambio = 'resp' in cambios || 'fecha' in cambios || 'tipo' in cambios || 'nota' in cambios;
+    cambio = 'resp' in cambios || 'fecha' in cambios || 'tipo' in cambios || 'nota' in cambios || 'disco' in cambios;
     escribir({ tipo: 'update', col: COL_T, id: tid, data: Object.assign(cambios, { hist: anotar(t0, 'editada') }, sello()) });
     toast('Tarea actualizada');
   } else {
@@ -1384,7 +1399,7 @@ function guardarMt(ev) {
     const tt = TIPOS_T[mtTipo];
     avisarA([datos.resp], {
       titulo: `${respNuevo ? 'Te asignaron' : 'Cambió'}: ${tt.n.toLowerCase()} de ${e.serial}`,
-      cuerpo: `Para el ${fechaBonita(datos.fecha)}. Lo tiene ${e.asignado || 'nadie'}${mtTipo !== 'fisico' && soloDigitos(e.anydesk || any) ? ', AnyDesk ' + anyBonito(any || e.anydesk) : ''}.${datos.nota ? ' ' + datos.nota : ''}${miId ? ' (programó ' + miId + ')' : ''}`,
+      cuerpo: `Para el ${fechaBonita(datos.fecha)}. Lo tiene ${e.asignado || 'nadie'}${mtTipo !== 'fisico' && soloDigitos(e.anydesk || any) ? ', AnyDesk ' + anyBonito(any || e.anydesk) : ''}.${datos.disco ? ' Disco de backup: ' + datos.disco + '.' : ''}${datos.nota ? ' ' + datos.nota : ''}${miId ? ' (programó ' + miId + ')' : ''}`,
       url: './?agenda=1', etiqueta: 't-' + tid
     });
   }
@@ -1476,7 +1491,7 @@ function cargarScript(src) {
 }
 function aFecha(iso) { return /^\d{4}-\d{2}-\d{2}$/.test(iso || '') ? new Date(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) : ''; }
 function filasExcel() {
-  const eq = [CAB_EXCEL].concat(equiposOrdenados().map(e => [e.serial, e.tipo || '', e.marca || '', e.modelo || '', e.asignado || '', e.mail || '', e.cliente || '', e.proyecto || '', e.departamento || '', e.municipio || '', aFecha(e.fechaMtto), e.obs || '', aFecha(e.fechaBackup), aFecha(e.fechaRemoto), e.anydesk || '']));
+  const eq = [CAB_EXCEL].concat(equiposOrdenados().map(e => [e.serial, e.tipo || '', e.marca || '', e.modelo || '', e.asignado || '', e.mail || '', e.cliente || '', e.proyecto || '', e.departamento || '', e.municipio || '', aFecha(e.fechaMtto), e.obs || '', aFecha(e.fechaBackup), aFecha(e.fechaRemoto), e.anydesk || '', e.discoBackup || '']));
   const lab = { pend: 'Pendiente', hecho: 'Hecho', na: 'No aplica' };
   const rec = [['SERIAL', 'TIPO DE EQUIPO', 'MARCA', 'MODELO', 'A NOMBRE DE', 'PROYECTO', 'FECHA QUE LO TRAJERON', 'MANTENIMIENTO', 'FECHA MANTENIMIENTO', 'BACKUP', 'FECHA BACKUP', 'ESTADO', 'ACCESORIOS', 'OBSERVACIONES']]
     .concat(recibidosLista().sort((a, b) => String(a.fechaIngreso || '').localeCompare(String(b.fechaIngreso || ''))).map(r => [r.serial, r.tipo || '', r.marca || '', r.modelo || '', r.persona || '', r.proyecto || '', aFecha(r.fechaIngreso), lab[r.mtto || 'pend'], aFecha(r.mttoFecha), lab[r.backup || 'pend'], aFecha(r.backupFecha), estadoRec(r).n, (r.acc || []).join(', '), r.obs || '']));
@@ -1499,7 +1514,7 @@ async function descargarExcel() {
     if (!window.XLSX) { try { await cargarScript(XLSX_URL); } catch (e) {} }
     if (window.XLSX) {
       const X = window.XLSX, wb = X.utils.book_new();
-      const h1 = X.utils.aoa_to_sheet(eq, { cellDates: true }); ponerFormato(h1, eq, [10, 12, 13], [16, 20, 12, 18, 32, 34, 12, 20, 14, 14, 18, 30, 16, 16, 16]);
+      const h1 = X.utils.aoa_to_sheet(eq, { cellDates: true }); ponerFormato(h1, eq, [10, 12, 13], [16, 20, 12, 18, 32, 34, 12, 20, 14, 14, 18, 30, 16, 16, 16, 22]);
       const h2 = X.utils.aoa_to_sheet(rec, { cellDates: true }); ponerFormato(h2, rec, [6, 8, 10], [16, 18, 12, 18, 30, 18, 14, 14, 14, 12, 14, 24, 26, 30]);
       X.utils.book_append_sheet(wb, h1, 'Equipos'); X.utils.book_append_sheet(wb, h2, 'Recibidos');
       data = new Blob([X.write(wb, { bookType: 'xlsx', type: 'array', compression: true, cellDates: true })]);

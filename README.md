@@ -43,6 +43,7 @@ service cloud.firestore {
 - Cada paso avisa a quien corresponde: al programar, al responsable; al pedir prender, a quien la programó; al prender, a quien pidió; al terminar, a quien la programó.
 - Al terminar: físico actualiza `fechaMtto`, remoto `fechaRemoto`, backup `fechaBackup`, y se agrega a `mttos` del equipo.
 - El equipo guarda su número de `anydesk`.
+- Backup: se le conecta al equipo el disco de backup y otra persona hace la copia por AnyDesk. La tarea puede decir qué disco usar (`disco`); al terminar se guarda en qué disco quedó (`hecho.disco` y `discoBackup` del equipo) y se avisa que ya pueden desconectarlo.
 - Colección `avisos`: un documento por teléfono que abrió Equipos `{ nombre, equipo, visto, sub }`. De ahí sale la lista de personas para escoger el responsable.
 
 ## Notificaciones (Agenda de Equipos)

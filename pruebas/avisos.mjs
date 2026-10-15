@@ -64,14 +64,14 @@ log('7. Carlos queda anotado en su propio registro', avisos(s).length === 2);
 await page.click('#tabMt'); await page.click('#btnNewMt'); await page.waitForSelector('#mtSheet:not([hidden])');
 const opc = await page.locator('#mtResp option').allTextContents();
 log('8. el responsable se escoge de las personas con sesión, con su estado de avisos', opc.some(o => o.startsWith('Jeiler · avisos activos')) && opc.some(o => o.startsWith('Carlos (tú) · sin avisos')) && opc.includes('Otra persona (escribir el nombre)'), opc.join(' | '));
-await page.click('#mtTipo [data-tipo="backup"]'); await page.fill('#mtSerial', 'GPS778812'); await page.fill('#mtFecha', '2026-10-20'); await page.fill('#mtAnydesk', '987654321');
+await page.click('#mtTipo [data-tipo="backup"]'); await page.fill('#mtSerial', 'GPS778812'); await page.fill('#mtFecha', '2026-10-20'); await page.fill('#mtAnydesk', '987654321'); await page.fill('#mtDisco', 'Disco Backup 2');
 await page.selectOption('#mtResp', 'Jeiler'); await esp(80);
 log('9. dice que a Jeiler le llegará el aviso', (await page.textContent('#mtRespInfo')).includes('le llegará el aviso'));
 await page.addScriptTag({ content: AXE }); await esp(200);
 v = await page.evaluate(async () => (await axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'best-practice'] })).violations.map(x => x.id));
 log('10. la hoja de la tarea es accesible (axe)', !v.length, v.join(', '));
 await page.click('#mtGuardar'); await esp(500);
-log('11. aviso a Jeiler: qué tarea, de qué equipo, AnyDesk y quién la programó', envios.length === 2 && ultimoEnvio().subs[0].endpoint.includes('/send/Jeiler') && ultimoEnvio().titulo === 'Te asignaron: backup de GPS778812' && ultimoEnvio().cuerpo.includes('AnyDesk 987 654 321') && ultimoEnvio().cuerpo.includes('programó Carlos'), JSON.stringify(ultimoEnvio()));
+log('11. aviso a Jeiler: qué tarea, de qué equipo, AnyDesk y quién la programó', envios.length === 2 && ultimoEnvio().subs[0].endpoint.includes('/send/Jeiler') && ultimoEnvio().titulo === 'Te asignaron: backup de GPS778812' && ultimoEnvio().cuerpo.includes('AnyDesk 987 654 321') && ultimoEnvio().cuerpo.includes('programó Carlos') && ultimoEnvio().cuerpo.includes('Disco de backup: Disco Backup 2'), JSON.stringify(ultimoEnvio()));
 s = await st(); const tid = tareas(s).find(([, x]) => x.tipo === 'backup')[0].split('/').pop();
 await page.click('#btnNewMt'); await page.fill('#mtSerial', 'PF2XYZ01'); await page.fill('#mtFecha', '2026-10-25');
 await page.selectOption('#mtResp', '__otro'); await page.fill('#mtRespOtro', 'Pedro'); await esp(80);
@@ -87,21 +87,23 @@ log('15. la pestaña Agenda cuenta lo que le toca', (await page.textContent('#ba
 await page.click('#tabMt'); await page.click('#sumMt [data-filtro="mias"]'); await esp(100);
 log('16. "Para mí" muestra su tarea', (await page.locator('#mtList .card.mt').count()) === 1);
 await page.click(`[data-t-acc="encender"][data-t="${tid}"]`); await page.waitForSelector('#cfSheet:not([hidden])');
-log('17. pregunta antes y dice a quién le avisa', (await page.textContent('#cfText')).includes('Se le avisa a Carlos'));
+log('17. pregunta antes: a quién le avisa y que conecte el disco', (await page.textContent('#cfText')).includes('Se le avisa a Carlos que prenda el equipo y le conecte el disco de backup (Disco Backup 2)'));
 await page.click('#cfYes'); await esp(500);
-log('18. Carlos recibe "Prende el equipo"', ultimoEnvio().subs[0].endpoint.includes('/send/Carlos') && ultimoEnvio().titulo === 'Prende el equipo GPS778812' && ultimoEnvio().cuerpo.includes('Jeiler va a conectarse'), JSON.stringify(ultimoEnvio()));
+log('18. Carlos recibe "Prende el equipo y conecta el disco de backup"', ultimoEnvio().subs[0].endpoint.includes('/send/Carlos') && ultimoEnvio().titulo === 'Prende GPS778812 y conecta el disco de backup' && ultimoEnvio().cuerpo.includes('Jeiler va a conectarse') && ultimoEnvio().cuerpo.includes('Disco Backup 2'), JSON.stringify(ultimoEnvio()));
 
 // Carlos prende el equipo
 await como('Carlos', { eqcp_agenda_vista: '2000-01-01' }); await esp(1200);
 const t19 = await page.textContent('#toast');
 log('19. al abrir, Carlos ve "Te pidieron prender un equipo"', t19.includes('Te pidieron prender un equipo'), t19);
 await page.click('#tabMt'); await page.click(`[data-t-acc="encendido"][data-t="${tid}"]`); await esp(500);
-log('20. Jeiler recibe "Ya puedes entrar" con el AnyDesk', ultimoEnvio().subs[0].endpoint.includes('/send/Jeiler') && ultimoEnvio().titulo === 'Ya puedes entrar a GPS778812' && ultimoEnvio().cuerpo.includes('987 654 321'));
+log('20. Jeiler recibe "Ya puedes entrar" con el AnyDesk', ultimoEnvio().subs[0].endpoint.includes('/send/Jeiler') && ultimoEnvio().titulo === 'Ya puedes entrar a GPS778812' && ultimoEnvio().cuerpo.includes('le conectó el disco de backup') && ultimoEnvio().cuerpo.includes('987 654 321'));
 
 // Jeiler termina el backup
 await como('Jeiler');
-await page.click('#tabMt'); await page.click(`[data-t-acc="hecho"][data-t="${tid}"]`); await page.waitForSelector('#cfSheet:not([hidden])'); await page.click('#cfYes'); await esp(500);
-log('21. Carlos recibe "Backup hecho"', ultimoEnvio().subs[0].endpoint.includes('/send/Carlos') && ultimoEnvio().titulo === 'Backup hecho: GPS778812');
+await page.click('#tabMt'); await page.click(`[data-t-acc="hecho"][data-t="${tid}"]`); await page.waitForSelector('#cfSheet:not([hidden])');
+log('20b. al terminar propone el disco que se programó', (await page.inputValue('#cfTDisco')) === 'Disco Backup 2');
+await page.click('#cfYes'); await esp(500);
+log('21. Carlos recibe "Backup hecho": en qué disco y que ya puede desconectarlo', ultimoEnvio().subs[0].endpoint.includes('/send/Carlos') && ultimoEnvio().titulo === 'Backup hecho: GPS778812' && ultimoEnvio().cuerpo.includes('en el disco Disco Backup 2. Ya puedes desconectar el disco'), JSON.stringify(ultimoEnvio()));
 s = await st();
 log('22. la tarea queda con todo su recorrido', s[`${B}/tareas/${tid}`].hist.map(h => h.quien + ':' + h.que).join(',') === 'Carlos:programada,Jeiler:encender,Carlos:encendido,Jeiler:hecho');
 

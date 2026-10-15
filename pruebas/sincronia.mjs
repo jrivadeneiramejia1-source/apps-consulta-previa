@@ -174,7 +174,8 @@ await eqp.click('#mtCancel'); await esp(100); if (await eqp.locator('#cfSheet').
 // Ida y vuelta: prender el equipo
 await eqp.click(`[data-t-acc="encender"][data-t="${tidB}"]`); await eqp.waitForSelector('#cfSheet:not([hidden])'); await eqp.click('#cfYes'); await esp(300);
 s = await st(eqp);
-log('G10. "Voy a conectarme" deja la tarea esperando que prendan el equipo', s[`${B}/tareas/${tidB}`].estado === 'encender' && (await eqp.locator('#mtList .estado-t.org').count()) === 1);
+log('G10. "Voy a conectarme" deja la tarea esperando que prendan el equipo y conecten el disco', s[`${B}/tareas/${tidB}`].estado === 'encender' && (await eqp.locator('#mtList .estado-t.org').innerText()).includes('conectarle el disco de backup'));
+log('G10b. el botón dice "Equipo prendido y disco conectado"', (await eqp.locator(`[data-t-acc="encendido"][data-t="${tidB}"]`).innerText()).includes('disco conectado'));
 await eqp.click(`[data-t-acc="encendido"][data-t="${tidB}"]`); await esp(300);
 s = await st(eqp);
 log('G11. "Ya está prendido" cambia el estado', s[`${B}/tareas/${tidB}`].estado === 'encendido' && (await eqp.locator('#mtList .estado-t.ok').count()) === 1);
@@ -182,11 +183,13 @@ await eqp.click(`[data-t-acc="nopudo"][data-t="${tidB}"]`); await eqp.waitForSel
 s = await st(eqp);
 log('G12. "No se pudo" guarda el motivo y la tarea sigue activa', s[`${B}/tareas/${tidB}`].estado === 'nopudo' && (await eqp.locator('#mtList .estado-t.rojo').innerText()).includes('No tenía internet'));
 await eqp.click(`[data-t-acc="hecho"][data-t="${tidB}"]`); await eqp.waitForSelector('#cfSheet:not([hidden])');
-log('G13. "Hecho" pide la fecha (hoy por defecto)', (await eqp.inputValue('#cfTFecha')) === HOY);
-await eqp.fill('#cfTNota', 'Copia en el disco D'); await eqp.click('#cfYes'); await esp(300);
+log('G13. "Hecho" pide la fecha (hoy por defecto) y el disco del backup', (await eqp.inputValue('#cfTFecha')) === HOY && await eqp.locator('#cfTDisco').isVisible());
+await eqp.fill('#cfTNota', 'Copia en el disco D'); await eqp.click('#cfYes'); await esp(200);
+log('G13b. sin el disco no deja terminar el backup', await eqp.locator('#cfSheet').isVisible());
+await eqp.fill('#cfTDisco', 'Disco Backup 1'); await eqp.click('#cfYes'); await esp(300);
 s = await st(eqp);
 const eqG = s[`${B}/equipos/GPS778812`], tB = s[`${B}/tareas/${tidB}`];
-log('G14. el backup hecho: fecha de backup en el equipo, historial y la tarea cerrada', eqG.fechaBackup === HOY && eqG.mttos.some(m => m.tipo === 'backup' && m.nota === 'Copia en el disco D') && tB.estado === 'hecho' && tB.hist.map(h => h.que).join(',') === 'programada,encender,encendido,nopudo,hecho');
+log('G14. el backup hecho: fecha y disco en el equipo, historial y la tarea cerrada', eqG.fechaBackup === HOY && eqG.discoBackup === 'Disco Backup 1' && eqG.mttos.some(m => m.tipo === 'backup' && m.disco === 'Disco Backup 1' && m.nota === 'Copia en el disco D') && tB.estado === 'hecho' && tB.hecho.disco === 'Disco Backup 1' && tB.hist.map(h => h.que).join(',') === 'programada,encender,encendido,nopudo,hecho');
 log('G15. y sale de la agenda', (await eqp.locator(`[data-t-acc][data-t="${tidB}"]`).count()) === 0);
 // Físico: se cierra solo desde Recibidos
 await eqp.click('#btnNewMt'); await eqp.fill('#mtSerial', '5CD1234ABC'); await eqp.fill('#mtFecha', HOY); await eqp.click('#mtGuardar'); await esp(300);
@@ -199,7 +202,7 @@ s = await st(eqp);
 log('G17. la tarea física queda hecha y el equipo con fecha y backup nuevos', s[`${B}/tareas/${tidF}`].estado === 'hecho' && s[`${B}/equipos/5CD1234ABC`].fechaMtto === HOY && s[`${B}/equipos/5CD1234ABC`].fechaBackup === HOY);
 // Ficha del equipo y quitar
 await eqp.click('#tabEq'); await eqp.click('[data-eq="GPS778812"]'); await eqp.waitForSelector('#eqSheet:not([hidden])');
-log('G18. la ficha muestra el último backup y el historial', (await eqp.textContent('#eqFechasExtra')).includes('Último backup') && (await eqp.textContent('#eqHist')).includes('Backup'));
+log('G18. la ficha muestra el último backup con su disco y el historial', (await eqp.textContent('#eqFechasExtra')).includes('en el disco Disco Backup 1') && (await eqp.textContent('#eqHist')).includes('Quedó en el disco Disco Backup 1'));
 log('G19. la ficha tiene el número de AnyDesk', (await eqp.inputValue('#eqAnydesk')) === '123456789');
 await eqp.click('#eqProg'); await eqp.waitForSelector('#mtSheet:not([hidden])');
 log('G20. desde el equipo se programa una tarea nueva', (await eqp.inputValue('#mtSerial')) === 'GPS778812' && (await eqp.textContent('#mtTitle')) === 'Programar tarea');
