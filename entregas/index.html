@@ -503,10 +503,10 @@ label.subir { text-align: center; cursor: pointer; }
 <div class="toast" id="toast" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "8"};</script>
-<script src="escaner.js?v=8"></script>
-<script src="../config.js?v=8"></script>
-<script src="../nube.js?v=8"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "9"};</script>
+<script src="escaner.js?v=9"></script>
+<script src="../config.js?v=9"></script>
+<script src="../nube.js?v=9"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -770,7 +770,8 @@ function escalar(fuente, w, h, maxAncho) {
   return c;
 }
 async function prepararPagina(canvas, origen) {
-  const blob = await canvasA(canvas, 'image/jpeg', CALIDAD);
+  // Las hojas del escáner traen su propia compresión según la calidad escogida.
+  const blob = await canvasA(canvas, 'image/jpeg', canvas.calidadJpeg || CALIDAD);
   const mini = escalar(canvas, canvas.width, canvas.height, 220).toDataURL('image/jpeg', 0.6);
   const vista = escalar(canvas, canvas.width, canvas.height, 700).toDataURL('image/jpeg', 0.75);
   return { blob, mini, vista, ancho: canvas.width, alto: canvas.height, origen, incluir: true, unir: false, nombre: '', cedula: '', fecha: '', tipo: 'entrega', proyecto: '', equipos: [eqVacio()], nota: '' };

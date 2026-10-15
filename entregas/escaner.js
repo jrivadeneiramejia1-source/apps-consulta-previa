@@ -4,7 +4,23 @@
 (function () {
   'use strict';
   const CV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
-  const ANCHO_MAX = 1700, DET = 480;
+  const DET = 480, OSCURO = 70;
+  // Calidad de la toma: resolución que se le pide a la cámara, tamaño final de la hoja y compresión JPEG.
+  const CALIDADES = {
+    ahorro: { nombre: 'Ahorro', detalle: 'unos 200 KB por hoja · letra grande', cam: [1920, 1080], ancho: 1100, largo: 1600, jpeg: 0.7, foto: false, max: 3000 },
+    normal: { nombre: 'Normal', detalle: 'unos 400 KB por hoja · recomendada', cam: [1920, 1080], ancho: 1700, largo: 2400, jpeg: 0.8, foto: true, max: 3000 },
+    alta: { nombre: 'Alta', detalle: 'unos 800 KB por hoja · letra pequeña', cam: [3840, 2160], ancho: 2480, largo: 3508, jpeg: 0.9, foto: true, max: 4100 }
+  };
+  const FLASH = {
+    no: 'Apagado',
+    si: 'Al tomar la foto',
+    auto: 'Automático (si hay poca luz)',
+    fijo: 'Siempre encendido'
+  };
+  const leer = (k, d, ok) => { try { const v = localStorage.getItem(k); return v && ok[v] ? v : d; } catch (e) { return d; } };
+  const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  let calidad = leer('escaner.calidad', 'normal', CALIDADES), luz = leer('escaner.flash', 'no', FLASH);
+  const perfil = () => CALIDADES[calidad];
   const $e = (tag, cls, html) => { const x = document.createElement(tag); if (cls) x.className = cls; if (html != null) x.innerHTML = html; return x; };
   // Aviso flotante propio (el de la app queda debajo del escáner).
   function avisar(m) {
@@ -109,7 +125,7 @@
   const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
   function procesar(cv, canvas, q, filtro, giro) {
     let w = Math.max(dist(q[0], q[1]), dist(q[3], q[2])), h = Math.max(dist(q[0], q[3]), dist(q[1], q[2]));
-    const k = Math.min(1, ANCHO_MAX / Math.min(w, h) * 1.0, 2400 / Math.max(w, h));
+    const pf = perfil(), k = Math.min(1, pf.ancho / Math.min(w, h), pf.largo / Math.max(w, h));
     w = Math.max(50, Math.round(w * k)); h = Math.max(50, Math.round(h * k));
     const src = cv.imread(canvas), dst = new cv.Mat();
     const a = cv.matFromArray(4, 1, cv.CV_32FC2, q.flatMap(p => [p.x, p.y]));
@@ -134,7 +150,7 @@
       } else { out = new cv.Mat(); cv.cvtColor(g, out, cv.COLOR_GRAY2RGBA); g.delete(); }
     }
     for (let i = 0; i < ((giro || 0) / 90) % 4; i++) { const t = new cv.Mat(); cv.rotate(out, t, cv.ROTATE_90_CLOCKWISE); if (out !== dst) out.delete(); out = t; }
-    const c = document.createElement('canvas'); cv.imshow(c, out);
+    const c = document.createElement('canvas'); cv.imshow(c, out); c.calidadJpeg = pf.jpeg;
     [src, a, b, M, dst].forEach(m => m.delete()); if (out !== dst) out.delete();
     return c;
   }
@@ -162,6 +178,15 @@
   .esc-mango { position: absolute; width: 34px; height: 34px; margin: -17px 0 0 -17px; border-radius: 50%; border: 3px solid #46c2a6; background: rgba(70,194,166,.25); touch-action: none; }
   .esc-filtros { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; padding: 4px 10px; }
   .esc-filtros button[aria-pressed="true"] { background: #fff; color: #000; }
+  .esc-opc { display: flex; gap: 6px; }
+  .esc-opc .esc-btn { padding: 8px 10px; font-size: .82rem; }
+  .esc-panel { background: #111; border-bottom: 1px solid rgba(255,255,255,.15); padding: 8px 12px 10px; }
+  .esc-panel .lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 6px; }
+  .esc-panel button { text-align: left; }
+  .esc-panel button[aria-pressed="true"] { background: #46c2a6; border-color: #46c2a6; color: #062019; }
+  .esc-panel button small { display: block; font-weight: 500; opacity: .8; font-size: .75rem; margin-top: 2px; }
+  .esc-panel .nota { font-size: .8rem; color: #ffd27a; margin-top: 8px; }
+  .esc-panel .meta2 { font-size: .78rem; opacity: .75; margin-top: 8px; }
   .esc [hidden] { display: none !important; }`;
   let estiloPuesto = false;
   function ponerEstilo() { if (estiloPuesto) return; const st = document.createElement('style'); st.textContent = css; document.head.appendChild(st); estiloPuesto = true; }
@@ -235,18 +260,22 @@
   // Convierte una foto (archivo o blob) en canvas, como máximo de 3000 px por lado.
   async function aCanvas(fuente) {
     const img = await createImageBitmap(fuente);
-    const k = Math.min(1, 3000 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+    const k = Math.min(1, perfil().max / Math.max(img.width, img.height)), c = document.createElement('canvas');
     c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); if (img.close) img.close();
     return c;
   }
   // Foto a resolución completa si el teléfono lo permite; si no, el cuadro del video.
-  async function fotoDe(video, stream) {
+  // Con la luz encendida se usa el cuadro del video: tomar la foto aparte puede apagar la luz en algunos teléfonos.
+  async function fotoDe(video, stream, conLuz) {
     const cuadro = () => { const c = document.createElement('canvas'); c.width = video.videoWidth; c.height = video.videoHeight; c.getContext('2d').drawImage(video, 0, 0); return c; };
     const pista = stream && stream.getVideoTracks()[0];
-    if (!pista || typeof window.ImageCapture !== 'function') return cuadro();
+    if (!pista || conLuz || !perfil().foto || typeof window.ImageCapture !== 'function') return cuadro();
     try {
-      const blob = await Promise.race([new window.ImageCapture(pista).takePhoto(), new Promise((_, mal) => setTimeout(() => mal(new Error('tiempo')), 5000))]);
+      const ic = new window.ImageCapture(pista); let ajustes;
+      // Que el flash propio de la cámara no se dispare si el usuario lo dejó apagado.
+      try { const pc = await ic.getPhotoCapabilities(); if (pc && pc.fillLightMode && pc.fillLightMode.includes('off')) ajustes = { fillLightMode: 'off' }; } catch (e) {}
+      const blob = await Promise.race([ic.takePhoto(ajustes), new Promise((_, mal) => setTimeout(() => mal(new Error('tiempo')), 5000))]);
       const c = await aCanvas(blob);
       // Si la foto sale girada respecto a lo que se ve en pantalla, se usa el cuadro del video.
       if ((c.width > c.height) !== (video.videoWidth > video.videoHeight) || Math.max(c.width, c.height) < Math.max(video.videoWidth, video.videoHeight)) return cuadro();
@@ -258,9 +287,12 @@
   // opciones.max: cuántas páginas se pueden escanear como máximo.
   async function abrir(opciones) {
     ponerEstilo();
+    calidad = leer('escaner.calidad', calidad, CALIDADES); luz = leer('escaner.flash', luz, FLASH);
     const max = Math.max(1, (opciones && opciones.max) || 40);
     const caja = $e('div', 'esc');
-    caja.innerHTML = `<div class="esc-barra"><b>Escanear hojas</b><button class="esc-btn" data-a="cerrar" type="button">Cerrar</button></div>
+    caja.innerHTML = `<div class="esc-barra"><button class="esc-btn" data-a="cerrar" type="button">Cerrar</button>
+        <div class="esc-opc"><button class="esc-btn" data-a="panelFlash" type="button" aria-expanded="false"></button><button class="esc-btn" data-a="panelCalidad" type="button" aria-expanded="false"></button></div></div>
+      <div class="esc-panel" data-x="panel" hidden></div>
       <div class="esc-escena"><video playsinline muted autoplay></video><canvas class="capa"></canvas></div>
       <div class="esc-estado">Cargando el detector de hojas (la primera vez tarda un poco)…</div>
       <div class="esc-filtros" data-x="alterna" hidden><label class="esc-btn si">Tomar foto con la cámara del teléfono<input type="file" accept="image/*" capture="environment" data-a="archivo" hidden></label></div>
@@ -269,10 +301,75 @@
     document.body.appendChild(caja);
     const video = caja.querySelector('video'), capa = caja.querySelector('canvas.capa'), estado = caja.querySelector('.esc-estado');
     const tira = caja.querySelector('.esc-tira'), disparo = caja.querySelector('[data-a=foto]'), btnListo = caja.querySelector('[data-a=listo]'), btnCerrar = caja.querySelector('[data-a=cerrar]');
+    const btnFlash = caja.querySelector('[data-a=panelFlash]'), btnCalidad = caja.querySelector('[data-a=panelCalidad]'), panel = caja.querySelector('[data-x=panel]');
     const paginas = [];
-    let stream = null, cv = null, timer = null, ultima = null, estables = 0, ocupado = false, cerrado = false, auto = false, avisoCerrar = 0;
+    let stream = null, pista = null, cv = null, timer = null, ultima = null, estables = 0, ocupado = false, cerrado = false, auto = false, avisoCerrar = 0;
+    let linternaOK = false, linternaOn = false, brillo = 255, panelAbierto = '', sinCamara = false, avisoSinFlash = false;
     const ponerEstado = (t, ok) => { estado.textContent = t; estado.className = 'esc-estado' + (ok ? ' ok' : ''); };
     const lleno = () => paginas.length >= max;
+    const espera = ms => new Promise(ok => setTimeout(ok, ms));
+
+    /* --- flash (linterna de la cámara) --- */
+    function revisarLinterna() {
+      try { const c = pista && pista.getCapabilities ? pista.getCapabilities() : {}; linternaOK = !!(c && c.torch); } catch (e) { linternaOK = false; }
+      pintarBotones();
+    }
+    async function linterna(on) {
+      if (!linternaOK || !pista) return false;
+      if (linternaOn === on) return true;
+      try { await pista.applyConstraints({ advanced: [{ torch: on }] }); linternaOn = on; return true; }
+      catch (e) { if (on) linternaOK = false; pintarBotones(); return false; }
+    }
+    function pintarBotones() {
+      btnFlash.textContent = '⚡ ' + (luz === 'no' ? 'Sin flash' : luz === 'si' ? 'Flash' : luz === 'auto' ? 'Flash auto' : 'Luz fija');
+      btnFlash.hidden = sinCamara;
+      btnCalidad.textContent = 'Calidad: ' + perfil().nombre;
+      btnFlash.setAttribute('aria-expanded', panelAbierto === 'flash'); btnCalidad.setAttribute('aria-expanded', panelAbierto === 'calidad');
+      if (panelAbierto) pintarPanel();
+    }
+    function resolucion() {
+      if (!video.videoWidth) return '';
+      return `Cámara: ${video.videoWidth}×${video.videoHeight}`;
+    }
+    function pintarPanel() {
+      panel.hidden = !panelAbierto;
+      if (panelAbierto === 'flash') {
+        const nota = !stream ? '' : linternaOK ? '' : '<div class="nota">Este teléfono o navegador no deja encender el flash desde la app. Busca más luz o apoya la hoja cerca de una lámpara.</div>';
+        panel.innerHTML = `<div class="lista">${Object.keys(FLASH).map(k => `<button class="esc-btn" type="button" data-luz="${k}" aria-pressed="${k === luz}">${FLASH[k]}</button>`).join('')}</div>${nota}`;
+      } else if (panelAbierto === 'calidad') {
+        panel.innerHTML = `<div class="lista">${Object.keys(CALIDADES).map(k => `<button class="esc-btn" type="button" data-cal="${k}" aria-pressed="${k === calidad}">${CALIDADES[k].nombre}<small>${CALIDADES[k].detalle}</small></button>`).join('')}</div><div class="meta2">${resolucion()}</div>`;
+      }
+    }
+    async function ponerLuz(k) {
+      luz = k; guardar('escaner.flash', k);
+      if (k === 'fijo') { if (!(await linterna(true)) && stream) avisar('Este teléfono no deja encender el flash desde la app.'); }
+      else await linterna(false);
+      pintarBotones();
+    }
+    async function ponerCalidad(k) {
+      const antes = perfil(); calidad = k; guardar('escaner.calidad', k); pintarBotones();
+      // Solo se reinicia la cámara si cambia la resolución que se le pide.
+      if (stream && !sinCamara && (antes.cam[0] !== perfil().cam[0] || antes.cam[1] !== perfil().cam[1])) {
+        ocupado = true; disparo.disabled = true; ponerEstado('Cambiando la calidad de la cámara…');
+        try { await iniciarCamara(); } catch (e) { avisar('No se pudo cambiar la calidad: ' + (e.message || e)); }
+        ocupado = false; disparo.disabled = lleno(); pintarBotones();
+      }
+      avisar(`Calidad ${perfil().nombre}${video.videoWidth ? ' · ' + resolucion() : ''}`);
+    }
+    async function iniciarCamara() {
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      stream = null; pista = null; linternaOn = false;
+      const [w, h] = perfil().cam;
+      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: w }, height: { ideal: h } }, audio: false });
+      if (cerrado) { s.getTracks().forEach(t => t.stop()); return; }
+      stream = s; pista = s.getVideoTracks()[0];
+      video.srcObject = s; await video.play();
+      revisarLinterna();
+      // Algunos teléfonos avisan que tienen flash un momento después de abrir la cámara.
+      if (!linternaOK) setTimeout(() => { if (!cerrado && pista && !linternaOK) { revisarLinterna(); if (luz === 'fijo') linterna(true); } }, 1200);
+      if (luz === 'fijo') await linterna(true);
+    }
+
     return new Promise(async resolver => {
       const terminar = (val, porAtras) => {
         if (cerrado) return;
@@ -286,7 +383,7 @@
       async function agregar(foto, q) {
         const cvE = cv || (await cargarCV().catch(() => ({ cv: null }))).cv;
         let res;
-        if (!cvE) res = foto;
+        if (!cvE) { res = foto; res.calidadJpeg = perfil().jpeg; }
         else res = await editar(cvE, foto, q);
         if (!res || cerrado) return;
         paginas.push(res);
@@ -296,7 +393,14 @@
         else avisar(cvE ? `Página ${paginas.length} lista. Escanea la siguiente o toca Listo.` : `Página ${paginas.length} guardada completa (sin el detector no se recorta).`);
       }
       caja.addEventListener('click', ev => {
+        const l = ev.target.closest('[data-luz]'); if (l) { ponerLuz(l.dataset.luz); return; }
+        const c = ev.target.closest('[data-cal]'); if (c) { if (c.dataset.cal !== calidad) ponerCalidad(c.dataset.cal); return; }
         const a = ev.target.closest('[data-a]'); if (!a) return;
+        if (a.dataset.a === 'panelFlash' || a.dataset.a === 'panelCalidad') {
+          const cual = a.dataset.a === 'panelFlash' ? 'flash' : 'calidad';
+          panelAbierto = panelAbierto === cual ? '' : cual; pintarBotones(); if (!panelAbierto) panel.hidden = true;
+          return;
+        }
         if (a.dataset.a === 'cerrar') {
           if (paginas.length && Date.now() - avisoCerrar > 4000) {
             avisoCerrar = Date.now(); btnCerrar.textContent = `¿Descartar ${paginas.length}?`;
@@ -307,7 +411,7 @@
           terminar([]);
         }
         if (a.dataset.a === 'listo') terminar(paginas.slice());
-        if (a.dataset.a === 'foto') capturar();
+        if (a.dataset.a === 'foto') { if (panelAbierto) { panelAbierto = ''; pintarBotones(); panel.hidden = true; } capturar(); }
       });
       caja.querySelector('[data-a=auto]').addEventListener('change', e => { auto = e.target.checked; estables = 0; });
       caja.querySelector('[data-a=archivo]').addEventListener('change', async e => {
@@ -317,15 +421,13 @@
         catch (er) { avisar('No se pudo abrir la foto.'); }
         ocupado = false;
       });
-      const alterna = msg => { ponerEstado(msg); caja.querySelector('[data-x=alterna]').hidden = false; disparo.hidden = true; caja.querySelector('.esc-auto').hidden = true; video.hidden = true; };
+      const alterna = msg => { sinCamara = true; ponerEstado(msg); caja.querySelector('[data-x=alterna]').hidden = false; disparo.hidden = true; caja.querySelector('.esc-auto').hidden = true; video.hidden = true; pintarBotones(); };
+      pintarBotones();
       try { cv = (await cargarCV()).cv; } catch (e) { ponerEstado(e.message); }
       if (cerrado) return;
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alterna('Este navegador no deja ver la cámara aquí. Usa el botón para tomar la foto.'); return; }
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
-        if (cerrado) { stream.getTracks().forEach(t => t.stop()); return; }
-        video.srcObject = stream; await video.play();
-      } catch (e) {
+      try { await iniciarCamara(); }
+      catch (e) {
         alterna(e && e.name === 'NotAllowedError' ? 'No hay permiso para usar la cámara aquí. Actívalo en los permisos del sitio (Cámara: Permitir) o usa este botón para tomar la foto.' : 'No se pudo abrir la cámara. Usa el botón para tomar la foto.');
         return;
       }
@@ -333,38 +435,56 @@
       disparo.disabled = false;
       ponerEstado(cv ? 'Apunta a la hoja. Se ve mejor sobre una mesa oscura.' : 'No se pudo descargar el detector (revisa el internet): la foto se guarda completa, sin recortar.');
       const peque = document.createElement('canvas');
+      function medirBrillo(ctx) {
+        // Promedio de luz del cuadro (0 = negro, 255 = blanco), para el flash automático.
+        const d = ctx.getImageData(0, 0, peque.width, peque.height).data; let t = 0, n = 0;
+        for (let i = 0; i < d.length; i += 64) { t += d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114; n++; }
+        return n ? t / n : 255;
+      }
       function ciclo() {
         if (cerrado) return;
         timer = setTimeout(ciclo, 300);
-        if (!cv || ocupado || !video.videoWidth || lleno()) return;
+        if (ocupado || !video.videoWidth || lleno()) return;
         const k = Math.min(1, DET / Math.max(video.videoWidth, video.videoHeight));
         peque.width = Math.round(video.videoWidth * k); peque.height = Math.round(video.videoHeight * k);
-        peque.getContext('2d').drawImage(video, 0, 0, peque.width, peque.height);
+        const pctx = peque.getContext('2d', { willReadFrequently: true }); pctx.drawImage(video, 0, 0, peque.width, peque.height);
+        if (!linternaOn) { try { brillo = medirBrillo(pctx); } catch (e) {} }
+        if (!cv) return;
         let q = null; try { q = detectarEn(cv, peque); } catch (e) {}
         // Dibuja el contorno encima del video.
         const r = video.getBoundingClientRect(), re = caja.querySelector('.esc-escena').getBoundingClientRect();
         capa.width = r.width; capa.height = r.height; capa.style.left = (r.left - re.left) + 'px'; capa.style.top = (r.top - re.top) + 'px';
         const x = capa.getContext('2d'); x.clearRect(0, 0, capa.width, capa.height);
+        const oscuro = brillo < OSCURO && !linternaOn ? (linternaOK ? ' · poca luz, usa ⚡' : ' · poca luz') : '';
         if (q) {
           const s = r.width / peque.width;
           x.beginPath(); q.forEach((p, i) => x[i ? 'lineTo' : 'moveTo'](p.x * s, p.y * s)); x.closePath();
           x.fillStyle = 'rgba(70,194,166,.18)'; x.fill(); x.strokeStyle = '#46c2a6'; x.lineWidth = 4; x.stroke();
           const mov = ultima ? Math.max(...q.map((p, i) => dist(p, ultima[i]))) / peque.width : 1;
           estables = mov < 0.03 ? estables + 1 : 0;
-          ponerEstado(auto ? (estables >= 4 ? 'Capturando…' : 'Hoja detectada: mantén el teléfono quieto') : 'Hoja detectada: toca el botón blanco', true);
+          ponerEstado((auto ? (estables >= 4 ? 'Capturando…' : 'Hoja detectada: mantén el teléfono quieto') : 'Hoja detectada: toca el botón blanco') + oscuro, true);
           if (auto && estables >= 4) { estables = 0; capturar(); }
-        } else { estables = 0; ponerEstado('Buscando la hoja… que se vean las 4 esquinas; mejor sobre fondo oscuro.'); }
+        } else { estables = 0; ponerEstado('Buscando la hoja… que se vean las 4 esquinas; mejor sobre fondo oscuro.' + oscuro); }
         ultima = q;
       }
       async function capturar() {
         if (ocupado || !video.videoWidth || lleno()) return;
         ocupado = true; disparo.disabled = true; capa.getContext('2d').clearRect(0, 0, capa.width, capa.height);
-        ponerEstado('Tomando la foto…', true);
+        let encendida = false;
         try {
-          const foto = await fotoDe(video, stream);
+          // Flash: se enciende la luz un momento antes de la foto y se apaga después (menos en "Siempre encendido").
+          const quiere = luz === 'si' || (luz === 'auto' && brillo < OSCURO);
+          if (luz === 'fijo') encendida = linternaOn;
+          else if (quiere) {
+            if (linternaOK) { ponerEstado('Flash…', true); encendida = await linterna(true); if (encendida) await espera(900); }
+            else if (!avisoSinFlash) { avisoSinFlash = true; avisar('Este teléfono no deja encender el flash desde la app: busca más luz.'); }
+          }
+          ponerEstado('Tomando la foto…', true);
+          const foto = await fotoDe(video, stream, encendida);
+          if (encendida && luz !== 'fijo') await linterna(false);
           let q = null; try { if (cv) q = detectar(cv, foto); } catch (e) {}
           await agregar(foto, q);
-        } catch (e) { avisar('No se pudo tomar la foto: ' + (e.message || e)); }
+        } catch (e) { avisar('No se pudo tomar la foto: ' + (e.message || e)); if (luz !== 'fijo') await linterna(false); }
         ultima = null; estables = 0; ocupado = false; disparo.disabled = lleno();
       }
       ciclo();
@@ -378,5 +498,5 @@
     return editar(cv, canvas, q, 'Cancelar');
   }
 
-  window.Escaner = { abrir, recortar, cargarCV, _detectar: detectar, _procesar: procesar };
+  window.Escaner = { abrir, recortar, cargarCV, CALIDADES, _detectar: detectar, _procesar: procesar, _estado: () => ({ calidad, luz }) };
 })();
