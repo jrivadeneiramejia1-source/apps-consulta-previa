@@ -5,6 +5,7 @@
   'use strict';
   const FOCO = 'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   const esH = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const ico = n => (window.ico ? window.ico(n) : '');
   const abiertos = [];   // pila de diálogos abiertos: { el, volver }
   const visible = el => !el.hidden && el.isConnected;
 
@@ -69,7 +70,40 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar); else iniciar();
 
-  const ico = n => (window.ico ? window.ico(n) : '');
+  /* ---------- tema: automático (el del teléfono), claro u oscuro ---------- */
+  // Se guarda en el teléfono y lo comparten Equipos y Entregas. En <head> hay una línea que lo aplica antes de pintar.
+  const TEMAS = [
+    { k: 'auto', n: 'automático, igual que el teléfono', ico: 'temaAuto' },
+    { k: 'light', n: 'claro', ico: 'temaSol' },
+    { k: 'dark', n: 'oscuro', ico: 'temaLuna' }
+  ];
+  const HERO = { light: '#0A5A4E', dark: '#0D3B37' };
+  const leerTema = () => { try { const t = localStorage.getItem('cp_tema'); return t === 'light' || t === 'dark' ? t : 'auto'; } catch (e) { return 'auto'; } };
+  function ponerTema(t, avisar) {
+    const raiz = document.documentElement;
+    if (t === 'auto') raiz.removeAttribute('data-theme'); else raiz.dataset.theme = t;
+    try { t === 'auto' ? localStorage.removeItem('cp_tema') : localStorage.setItem('cp_tema', t); } catch (e) {}
+    // La barra del teléfono toma el color del encabezado del tema que se ve.
+    document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+      const media = (m.getAttribute('media') || '').includes('dark') ? 'dark' : 'light';
+      m.setAttribute('content', HERO[t === 'auto' ? media : t]);
+    });
+    const b = document.getElementById('btnTema'), d = TEMAS.find(x => x.k === t);
+    if (b) {
+      const sig = TEMAS[(TEMAS.indexOf(d) + 1) % TEMAS.length];
+      b.innerHTML = ico(d.ico);
+      b.setAttribute('aria-label', `Tema ${d.n}. Toca para cambiar a ${sig.k === 'auto' ? 'automático' : sig.n}`);
+      b.title = `Tema ${d.k === 'auto' ? 'automático' : d.n}`;
+    }
+    if (avisar && typeof window.toast === 'function') window.toast(`Tema ${d.n}`);
+  }
+  function iniciarTema() {
+    ponerTema(leerTema(), false);
+    const b = document.getElementById('btnTema');
+    if (b) b.onclick = () => { const i = TEMAS.findIndex(x => x.k === leerTema()); ponerTema(TEMAS[(i + 1) % TEMAS.length].k, true); };
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciarTema); else iniciarTema();
+
   const quieto = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   const previos = new Map();
   // Las cifras del tablero suben o bajan contando hasta su valor nuevo.

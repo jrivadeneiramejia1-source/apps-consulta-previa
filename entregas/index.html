@@ -14,7 +14,8 @@
 <meta name="apple-mobile-web-app-title" content="Entregas">
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="../comun.css?v=12">
+<script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
+<link rel="stylesheet" href="../comun.css?v=13">
 <style>
 
 /* --- Entregas --- */
@@ -84,7 +85,10 @@ label.subir { cursor: pointer; }
         <p id="subtitulo">Consulta Previa</p>
       </div>
     </div>
-    <div class="conn" id="conn" data-s="cargando" role="status"><i aria-hidden="true"></i><span>Conectando…</span></div>
+    <div class="top-der">
+      <button class="tema-btn" id="btnTema" type="button" aria-label="Cambiar el tema"></button>
+      <div class="conn" id="conn" data-s="cargando" role="status"><i aria-hidden="true"></i><span>Conectando…</span></div>
+    </div>
   </div>
 </header>
 
@@ -218,12 +222,12 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "12"};</script>
-<script src="../iconos.js?v=12"></script>
-<script src="../comun.js?v=12"></script>
-<script src="escaner.js?v=12"></script>
-<script src="../config.js?v=12"></script>
-<script src="../nube.js?v=12"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "13"};</script>
+<script src="../iconos.js?v=13"></script>
+<script src="../comun.js?v=13"></script>
+<script src="escaner.js?v=13"></script>
+<script src="../config.js?v=13"></script>
+<script src="../nube.js?v=13"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';

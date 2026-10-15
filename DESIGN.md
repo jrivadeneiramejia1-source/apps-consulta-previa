@@ -60,7 +60,7 @@ y cada tipo de equipo tiene su placa de color con icono.
 ## Do
 - Un acento (petróleo) y el sol solo para insignias. Los colores de estado solo dicen estado.
 - Cada propiedad moderna (color-mix, dvh) lleva antes un valor de respaldo para teléfonos viejos.
-- Tema automático claro y oscuro; probar ambos.
+- Tema automático (el del teléfono) con botón en el encabezado para escoger claro u oscuro; se guarda en el teléfono y lo comparten Equipos y Entregas. Probar los tres.
 - Español, voz activa, segunda persona. Los errores dicen qué hacer.
 - Cargas con esqueletos que imitan la lista; textos de espera con "…".
 - Hojas y diálogos: foco adentro al abrir, Escape cierra solo lo de arriba, el foco vuelve al botón que la abrió.

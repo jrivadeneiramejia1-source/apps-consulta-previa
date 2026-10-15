@@ -41,6 +41,25 @@ for (const tema of ['light', 'dark']) {
   await axe(page, `equipos recibidos ${tema}`);
   await sinDesborde(page, 'equipos recibidos ' + tema);
 
+  // botón de tema: automático → claro → oscuro → automático
+  const fondo = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  const otro = tema === 'light' ? 'dark' : 'light', CLARO = 'rgb(244, 241, 232)', OSCURO = 'rgb(10, 27, 28)';
+  chequear(await page.locator('#btnTema svg.ph').count() === 1 && (await page.getAttribute('#btnTema', 'aria-label')).startsWith('Tema automático'), 'botón de tema en automático');
+  await page.click('#btnTema'); await espera(80);
+  chequear(await page.evaluate(() => document.documentElement.dataset.theme) === 'light' && await fondo() === CLARO, 'tema claro a mano');
+  await page.click('#btnTema'); await espera(80);
+  chequear(await page.evaluate(() => document.documentElement.dataset.theme) === 'dark' && await fondo() === OSCURO, 'tema oscuro a mano');
+  chequear(await page.getAttribute('meta[name="theme-color"]', 'content') === '#0D3B37', 'barra del teléfono del color del tema');
+  await axe(page, `tema oscuro a mano (${tema})`);
+  await page.reload(); await page.waitForSelector('#recList .card.rec');
+  chequear(await fondo() === OSCURO, 'el tema escogido se mantiene al volver a abrir');
+  await page.click('#btnTema'); await espera(80);
+  chequear(!(await page.evaluate(() => document.documentElement.hasAttribute('data-theme'))) && await fondo() === (tema === 'light' ? CLARO : OSCURO), 'vuelve a automático');
+  await page.click('#btnTema'); await espera(80);
+  await axe(page, `tema claro a mano (${tema})`);
+  await page.click('#btnTema'); await page.click('#btnTema'); await espera(80);
+  chequear(!(await page.evaluate(() => document.documentElement.hasAttribute('data-theme'))), 'deja el tema en automático');
+
   // tablero tocable
   await espera(900);
   chequear(await page.locator('#sumRec [data-k="rEsp"]').textContent() === '3', 'la cifra termina de contar en su valor real');

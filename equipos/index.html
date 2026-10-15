@@ -14,7 +14,8 @@
 <meta name="apple-mobile-web-app-title" content="Equipos">
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="../comun.css?v=12">
+<script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
+<link rel="stylesheet" href="../comun.css?v=13">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -26,7 +27,10 @@
         <p id="subtitulo">Consulta Previa</p>
       </div>
     </div>
-    <div class="conn" id="conn" data-s="cargando" role="status"><i aria-hidden="true"></i><span>Conectando…</span></div>
+    <div class="top-der">
+      <button class="tema-btn" id="btnTema" type="button" aria-label="Cambiar el tema"></button>
+      <div class="conn" id="conn" data-s="cargando" role="status"><i aria-hidden="true"></i><span>Conectando…</span></div>
+    </div>
   </div>
 </header>
 
@@ -204,11 +208,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "v": "12"};</script>
-<script src="../iconos.js?v=12"></script>
-<script src="../comun.js?v=12"></script>
-<script src="../config.js?v=12"></script>
-<script src="../nube.js?v=12"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "v": "13"};</script>
+<script src="../iconos.js?v=13"></script>
+<script src="../comun.js?v=13"></script>
+<script src="../config.js?v=13"></script>
+<script src="../nube.js?v=13"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos';
@@ -505,7 +509,7 @@ function renderRec() {
   const todos = recibidosLista(), pend = todos.filter(r => !r.cerrado);
   const nF = f => todos.filter(r => filtraRec(r, f)).length;
   $('sumRec').innerHTML = UI.cifra({ k: 'rEsp', n: pend.length, lbl: 'En espera', icono: 'reloj', tono: 'org', filtro: 'pendientes', activo: filtroRec === 'pendientes' })
-    + UI.cifra({ k: 'rMtto', n: nF('sinmtto'), lbl: 'Sin mantenimiento', icono: 'mantenimiento', tono: 'listo', filtro: 'sinmtto', activo: filtroRec === 'sinmtto' })
+    + UI.cifra({ k: 'rMtto', n: nF('sinmtto'), lbl: 'Sin manteni\u00ADmiento', icono: 'mantenimiento', tono: 'listo', filtro: 'sinmtto', activo: filtroRec === 'sinmtto' })
     + UI.cifra({ k: 'rBack', n: nF('sinbackup'), lbl: 'Sin backup', icono: 'backup', filtro: 'sinbackup', activo: filtroRec === 'sinbackup' });
   UI.contar($('sumRec'));
   $('chipsRec').innerHTML = FILTROS_REC.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtroRec === f.k}">${f.n}<span class="n">${nF(f.k)}</span></button>`).join('');
@@ -738,7 +742,7 @@ function renderEq() {
   const est = $('fEqEst').value || 'todos';
   $('sumEq').innerHTML = UI.cifra({ k: 'eTot', n: todos.length, lbl: 'Equipos', icono: 'equipos', filtro: 'todos', activo: est === 'todos' })
     + UI.cifra({ k: 'eBod', n: todos.filter(esBodega).length, lbl: 'En bodega', icono: 'otro', tono: 'listo', filtro: 'bodega', activo: est === 'bodega' })
-    + UI.cifra({ k: 'eVie', n: todos.filter(e => { const m = mesesDesde(e.fechaMtto); return m !== null && m >= MESES_ALERTA; }).length, lbl: `Mantenimiento de hace ${MESES_ALERTA} meses o más`, icono: 'aviso', tono: 'org', filtro: 'viejo', activo: est === 'viejo' });
+    + UI.cifra({ k: 'eVie', n: todos.filter(e => { const m = mesesDesde(e.fechaMtto); return m !== null && m >= MESES_ALERTA; }).length, lbl: `Manteni\u00ADmiento de hace ${MESES_ALERTA} meses o más`, icono: 'aviso', tono: 'org', filtro: 'viejo', activo: est === 'viejo' });
   UI.contar($('sumEq'));
   const q = sinTildes($('qEq').value.trim()), tipo = $('fTipo').value || 'todos';
   const lista = todos.filter(e => filtraEq(e, q, tipo, est));
