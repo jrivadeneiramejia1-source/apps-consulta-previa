@@ -22,6 +22,7 @@ export function servir(puerto = 8811) {
 export const huella = (app, clave) => crypto.createHash('sha256').update(app + ':' + clave).digest('hex').slice(0, 40);
 const LIBS = {
   'xlsx.full.min.js': '/home/claude/construir/node_modules/xlsx/dist/xlsx.full.min.js',
+  'opencv.js': '/home/claude/construir/node_modules/@techstark/opencv-js/dist/opencv.js',
 };
 export async function pagina(browser, { tema = 'light', ancho = 390, alto = 844, semilla = null, errores = [] } = {}) {
   const ctx = await browser.newContext({ viewport: { width: ancho, height: alto }, colorScheme: tema, locale: 'es-CO', deviceScaleFactor: 2 });

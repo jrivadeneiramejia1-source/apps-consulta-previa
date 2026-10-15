@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=19">
+<link rel="stylesheet" href="../comun.css?v=20">
 <style>
 
 /* --- Entregas --- */
@@ -223,12 +223,12 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "19"};</script>
-<script src="../iconos.js?v=19"></script>
-<script src="../comun.js?v=19"></script>
-<script src="escaner.js?v=19"></script>
-<script src="../config.js?v=19"></script>
-<script src="../nube.js?v=19"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "20"};</script>
+<script src="../iconos.js?v=20"></script>
+<script src="../comun.js?v=20"></script>
+<script src="escaner.js?v=20"></script>
+<script src="../config.js?v=20"></script>
+<script src="../nube.js?v=20"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -504,11 +504,15 @@ function escalar(fuente, w, h, maxAncho) {
   return c;
 }
 async function prepararPagina(canvas, origen) {
-  // Las hojas del escáner traen su propia compresión según la calidad escogida.
-  const blob = await canvasA(canvas, 'image/jpeg', canvas.calidadJpeg || CALIDAD);
-  const mini = escalar(canvas, canvas.width, canvas.height, 220).toDataURL('image/jpeg', 0.6);
-  const vista = escalar(canvas, canvas.width, canvas.height, 700).toDataURL('image/jpeg', 0.75);
-  return { blob, mini, vista, ancho: canvas.width, alto: canvas.height, origen, incluir: true, unir: false, nombre: '', cedula: '', fecha: '', tipo: 'entrega', proyecto: '', equipos: [eqVacio()], nota: '' };
+  // Las hojas del escáner llegan ya comprimidas ({ blob, width, height }) según la calidad escogida; un canvas se comprime aquí.
+  let blob = canvas.blob || null, fuente = canvas;
+  if (blob) fuente = await createImageBitmap(blob);
+  else blob = await canvasA(canvas, 'image/jpeg', canvas.calidadJpeg || CALIDAD);
+  const w = fuente.width, h = fuente.height;
+  const mini = escalar(fuente, w, h, 220).toDataURL('image/jpeg', 0.6);
+  const vista = escalar(fuente, w, h, 700).toDataURL('image/jpeg', 0.75);
+  if (fuente !== canvas && fuente.close) fuente.close();
+  return { blob, mini, vista, ancho: w, alto: h, origen, incluir: true, unir: false, nombre: '', cedula: '', fecha: '', tipo: 'entrega', proyecto: '', equipos: [eqVacio()], nota: '' };
 }
 async function leerArchivos(files) {
   const nuevas = [];
