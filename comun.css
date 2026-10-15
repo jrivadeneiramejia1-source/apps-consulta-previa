@@ -211,7 +211,7 @@ button.card:active { transform: scale(.992); }
 .obs { font-size: .86rem; color: var(--muted); border-left: 3px solid var(--line-2); padding-left: 10px; white-space: pre-wrap; }
 .month { font-family: var(--f-display); font-weight: 700; font-size: .82rem; letter-spacing: .02em; color: var(--muted); padding: 8px 2px 0; text-transform: capitalize; }
 
-.pill { display: inline-flex; align-items: center; gap: 5px; font-size: .76rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; line-height: 1.2; }
+.pill { display: inline-flex; align-items: center; gap: 5px; font-size: .76rem; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 .pill .ph { width: 1.05em; height: 1.05em; }
 .pill.s-pend { color: var(--pend); background: var(--pend-bg); }
 .pill.s-org { color: var(--org); background: var(--org-bg); }
@@ -290,7 +290,7 @@ td .cell { min-width: 150px; font-size: .82rem; }
   padding-top: 6px; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
   padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px));
 }
-.tabs-in { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.tabs-in { max-width: 760px; margin: 0 auto; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 2px; }
 .tab { border: 0; background: transparent; min-height: 60px; padding: 4px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; font-size: .78rem; font-weight: 650; color: var(--muted); transition: color .15s; }
 .tab-ico { display: grid; place-items: center; width: 56px; height: 30px; border-radius: 999px; transition: background-color .2s; position: relative; }
 .tab-ico .ph { width: 23px; height: 23px; }
@@ -301,7 +301,7 @@ td .cell { min-width: 150px; font-size: .82rem; }
 .tab-ico { transition: background-color .2s, transform .12s; }
 .tab[aria-current="page"] .ico-off { display: none; }
 .tab[aria-current="page"] .ico-on { display: block; }
-.tab-lbl { display: inline-flex; align-items: center; }
+.tab-lbl { display: inline-flex; align-items: center; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .badge { position: absolute; top: -4px; right: 6px; background: var(--sol); color: var(--sol-ink); font-family: var(--f-mono); font-size: .68rem; font-weight: 500; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; border: 2px solid var(--surface); }
 .badge.pop { animation: pop .35s cubic-bezier(.3, 1.6, .5, 1); }
 
@@ -447,3 +447,19 @@ body.con-hoja .toast { bottom: auto; top: calc(14px + env(safe-area-inset-top, 0
 .teq td input.m { min-width: 120px; }
 .tareas { display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
 .nube-card .card-title { display: flex; align-items: center; gap: 8px; }
+
+/* Opciones dentro de la confirmación (a quién se asigna, qué más borrar) */
+.cf-opc { display: flex; flex-direction: column; gap: 8px; }
+.cf-opc fieldset { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.cf-opc legend { font-weight: 700; font-size: .9rem; margin-bottom: 6px; padding: 0; }
+.cf-opc .check input[type=radio] { width: 20px; height: 20px; accent-color: var(--accent); margin: 0; flex: none; }
+.cf-opc .check .meta { margin-left: auto; font-size: .78rem; }
+.cf-opc input[type=text], .cf-opc input[type=date] { width: 100%; min-height: 46px; padding: 10px 12px; border-radius: var(--r-control); border: 1.5px solid var(--line); background: var(--field); font-size: 16px; }
+.cf-opc input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.cf-opc .nota-cf { font-size: .84rem; color: var(--muted); margin: 0; }
+.enlace { display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+/* Mantenimiento programado */
+.card.mt { box-shadow: inset 4px 0 0 var(--listo), var(--shadow-sm); padding-left: 18px; }
+.card.mt.atras { box-shadow: inset 4px 0 0 var(--danger), var(--shadow-sm); }
+.card.mt.sug { box-shadow: inset 4px 0 0 var(--org), var(--shadow-sm); }
+.pill.s-rojo { color: var(--danger); background: var(--danger-bg); }

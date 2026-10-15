@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=13">
+<link rel="stylesheet" href="../comun.css?v=14">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -65,6 +65,16 @@
     <button class="btn solo-editar" id="btnNewEq" type="button"><span data-ico="mas"></span>Agregar equipo</button>
   </section>
 
+  <!-- SECCIÓN: MANTENIMIENTO PROGRAMADO -->
+  <section class="view" id="vMt" aria-labelledby="tMt" hidden>
+    <h2 class="titulo-vista" id="tMt">Agenda de mantenimiento</h2>
+    <div class="summary" id="sumMt"></div>
+    <button class="btn primary big solo-editar" id="btnNewMt" type="button"><span data-ico="programar"></span>Programar mantenimiento</button>
+    <input class="search" id="qMt" type="search" placeholder="Buscar serial, persona o modelo" autocomplete="off" aria-label="Buscar en mantenimiento">
+    <div class="count" id="mtCount" aria-live="polite"></div>
+    <div class="list" id="mtList"></div>
+  </section>
+
   <!-- SECCIÓN 3: BASE DE DATOS -->
   <section class="view" id="vDb" aria-labelledby="tDb" hidden>
     <h2 class="titulo-vista" id="tDb">Base de datos</h2>
@@ -83,6 +93,7 @@
     <div class="card nube-card">
       <h3 class="card-title"><span data-ico="nube"></span>Copia de seguridad y acceso</h3>
       <div class="meta" id="nubeInfo"></div>
+      <div class="enlace"><b>Conexión con Entregas</b><div class="meta" id="enlaceInfo"></div><div class="row" id="enlaceBtn"></div></div>
       <div class="row">
         <button class="btn" type="button" id="btnCopia"><span data-ico="descargar"></span>Descargar copia (JSON)</button>
         <label class="btn solo-editar"><span data-ico="importar"></span>Importar copia<input type="file" id="archivoCopia" accept=".json,application/json" hidden></label>
@@ -104,6 +115,10 @@
     <button class="tab" id="tabEq" type="button">
       <span class="tab-ico"><span class="ico-off" data-ico="equipos"></span><span class="ico-on" data-ico="equiposF"></span></span>
       <span class="tab-lbl">Equipos</span>
+    </button>
+    <button class="tab" id="tabMt" type="button">
+      <span class="tab-ico"><span class="ico-off" data-ico="calendario"></span><span class="ico-on" data-ico="calendarioF"></span><span class="badge" id="badgeMt" hidden>0</span></span>
+      <span class="tab-lbl">Agenda</span>
     </button>
     <button class="tab" id="tabDb" type="button">
       <span class="tab-ico"><span class="ico-off" data-ico="base"></span><span class="ico-on" data-ico="baseF"></span></span>
@@ -161,6 +176,7 @@
     <h2 id="eqTitle" class="serial"></h2>
     <p class="sub" id="eqSub"></p>
     <button class="btn ok big solo-editar" type="button" id="eqARec"><span data-ico="recibidos"></span><span id="eqARecTxt">Lo trajeron: registrar como recibido</span></button>
+    <button class="btn solo-editar" type="button" id="eqProg"><span data-ico="programar"></span><span id="eqProgTxt">Programar mantenimiento</span></button>
     <div class="fields cols">
       <div class="field"><label for="eqSerial">Serial</label><input id="eqSerial" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
       <div class="field"><label for="eqTipo">Tipo de equipo</label><input id="eqTipo" type="text" list="dlTipos" autocomplete="off"></div>
@@ -194,11 +210,33 @@
   </form>
 </div>
 
+<!-- HOJA: PROGRAMAR MANTENIMIENTO -->
+<div class="backdrop" id="mtSheet" hidden>
+  <form class="sheet" id="mtForm" novalidate aria-labelledby="mtTitle">
+    <div class="grab" aria-hidden="true"></div>
+    <h2 id="mtTitle">Programar mantenimiento</h2>
+    <p class="sub" id="mtSub">Para cuando te piden hacerle mantenimiento a un equipo. No hace falta subir ninguna hoja.</p>
+    <div class="field"><label for="mtSerial">Serial del equipo</label><input id="mtSerial" type="text" list="dlSeriales" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe o busca el serial"></div>
+    <div class="note" id="mtInfo" hidden></div>
+    <div class="field"><label for="mtFecha">Fecha programada</label><input id="mtFecha" type="date"></div>
+    <div class="field"><label for="mtNota">Nota</label><textarea id="mtNota" placeholder="Ej: comunicarse con Ana Gómez; dijo que lo trae el jueves"></textarea></div>
+    <div class="err" id="mtErr" role="alert" hidden></div>
+    <div class="sheet-actions">
+      <button class="btn danger solo-editar" type="button" id="mtQuitar"><span data-ico="borrar"></span>Quitar</button>
+      <div class="row">
+        <button class="btn" type="button" id="mtCancel">Cerrar</button>
+        <button class="btn primary solo-editar" type="submit" id="mtGuardar"><span data-ico="check"></span>Guardar</button>
+      </div>
+    </div>
+  </form>
+</div>
+
 <!-- CONFIRMACIÓN -->
 <div class="backdrop confirm" id="cfSheet" hidden>
   <div class="sheet" role="alertdialog" aria-labelledby="cfTitle" aria-describedby="cfText">
     <h2 id="cfTitle">¿Seguro?</h2>
     <p id="cfText"></p>
+    <div class="cf-opc" id="cfOpc" hidden></div>
     <div class="row">
       <button class="btn" type="button" id="cfNo">Cancelar</button>
       <button class="btn danger" type="button" id="cfYes">Eliminar</button>
@@ -208,11 +246,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "v": "13"};</script>
-<script src="../iconos.js?v=13"></script>
-<script src="../comun.js?v=13"></script>
-<script src="../config.js?v=13"></script>
-<script src="../nube.js?v=13"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "14"};</script>
+<script src="../iconos.js?v=14"></script>
+<script src="../comun.js?v=14"></script>
+<script src="../config.js?v=14"></script>
+<script src="../nube.js?v=14"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos';
@@ -244,6 +282,8 @@ const CAB_EXCEL = ['SERIAL', 'TIPO DE EQUIPO', 'MARCA', 'MODELO', 'ASIGNADO A', 
 /* ================= ESTADO ================= */
 let Q = new Map(), R = new Map();          // equipos y recibidos: id -> datos
 let DB = null, USER = null, DL = null, miId = null, puedeEscribir = null, soloLectura = false;
+let ENTDB = null;   // conexión con la app de Entregas (para actualizar o borrar la hoja de una devolución)
+let filtroMt = 'prog', mtActual = null;
 let listoQ = false, listoR = false, conexion = 'cargando', fechaCache = null;
 let pendientes = lsGet(PEND_KEY) || [];
 let vista = 'rec', tablaDb = 'eq', filtroRec = 'pendientes', rcActual = null, eqActual = null;
@@ -449,19 +489,21 @@ function pintarAvisos() {
 /* ================= NAVEGACIÓN ================= */
 function ir(v) {
   vista = v;
-  $('vRec').hidden = v !== 'rec'; $('vEq').hidden = v !== 'eq'; $('vDb').hidden = v !== 'db';
-  [['tabRec', 'rec'], ['tabEq', 'eq'], ['tabDb', 'db']].forEach(([id, k]) => {
+  $('vRec').hidden = v !== 'rec'; $('vEq').hidden = v !== 'eq'; $('vMt').hidden = v !== 'mt'; $('vDb').hidden = v !== 'db';
+  [['tabRec', 'rec'], ['tabEq', 'eq'], ['tabMt', 'mt'], ['tabDb', 'db']].forEach(([id, k]) => {
     if (k === v) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current');
   });
   render(); window.scrollTo(0, 0);
-  UI.entrar($({ rec: 'vRec', eq: 'vEq', db: 'vDb' }[v]));
+  UI.entrar($({ rec: 'vRec', eq: 'vEq', mt: 'vMt', db: 'vDb' }[v]));
 }
 function render() {
   pintarConexion();
   actualizarListas();
   if (vista === 'rec') renderRec();
   if (vista === 'eq') renderEq();
+  if (vista === 'mt') renderMt();
   if (vista === 'db') renderDb();
+  UI.insignia($('badgeMt'), programados().filter(e => (diasHasta(e.prog.fecha) ?? 1) <= 0).length);
 }
 function actualizarListas() {
   const tipos = [...new Set([...Q.values(), ...R.values()].map(e => e.tipo).filter(Boolean))].sort();
@@ -530,7 +572,7 @@ function renderRec() {
     return `<div class="card rec st-${e.k}">
       <button type="button" class="card-top" data-rec="${esc(r.id)}">
         <div class="card-head"><div class="cab">${iconoDe(r.tipo)}<div class="cab-t"><div class="card-title serial">${esc(r.serial)}</div><div class="meta">${esc([r.tipo, r.marca, r.modelo].filter(Boolean).join(' · ') || 'Sin datos del equipo')}</div></div></div><span class="pill ${e.clase}">${e.n}</span></div>
-        <div class="facts"><span><b>${esc(r.persona || 'Sin persona')}</b></span><span class="mono">Llegó ${fechaBonita(r.fechaIngreso)}</span>${r.cerrado ? '' : textoEspera(r)}${!eq && !r.cerrado ? '<span class="tag-shared">Equipo nuevo</span>' : ''}${r.origen === 'entregas' ? '<span class="tag-shared">Devolución</span>' : ''}</div>
+        <div class="facts"><span><b>${esc(r.persona || 'Sin persona')}</b></span><span class="mono">Llegó ${fechaBonita(r.fechaIngreso)}</span>${r.cerrado ? '' : textoEspera(r)}${!eq && !r.cerrado ? '<span class="tag-shared">Equipo nuevo</span>' : ''}${r.origen === 'entregas' ? `<span class="tag-shared">Devolución${devueltoPor(r) ? ' de ' + esc(devueltoPor(r)) : ''}</span>` : ''}</div>
         ${(r.acc || []).length ? `<div class="acc-mini">${ico('bolsa')}Trajo: ${esc(r.acc.join(', '))}</div>` : ''}
         ${r.cerrado ? '' : `<div class="prog" aria-label="${hechas} de 2 tareas resueltas"><span style="width:${hechas * 50}%"></span></div>`}
       </button>
@@ -558,6 +600,24 @@ function setTarea(rid, t, v) {
 
 /* ================= PASAR A EQUIPOS ================= */
 const destinoDe = r => (r.persona || '').trim() || 'Equipos';
+const BODEGA = 'Bodega Riohacha';
+// Quién devolvió el equipo (hojas de devolución de Entregas)
+const devueltoPor = r => (r.devueltoPor || (String(r.obs || '').match(/Devuelto por (.+?) el /) || [])[1] || '').trim();
+// Opciones de a quién queda asignado al dar Listo: la persona del registro, quien lo devolvió, Bodega u otra.
+function opcionesDestino(r) {
+  const ops = [], add = (v, nota) => { v = String(v || '').trim(); if (v && !ops.some(o => sinTildes(o.v) === sinTildes(v))) ops.push({ v, nota }); };
+  add(r.persona, 'del registro'); add(devueltoPor(r), 'quien lo devolvió'); add(BODEGA, '');
+  return `<fieldset><legend>¿A quién queda asignado?</legend>${ops.map((o, i) => `<label class="check"><input type="radio" name="cfDest" value="${esc(o.v)}" ${i === 0 ? 'checked' : ''}> ${esc(o.v)}${o.nota ? `<span class="meta">${o.nota}</span>` : ''}</label>`).join('')}
+    <label class="check"><input type="radio" name="cfDest" value="__otro"> Otra persona</label>
+    <input id="cfDestOtro" type="text" list="dlPersonas" autocomplete="off" placeholder="Nombre de la persona" aria-label="Nombre de la otra persona" hidden></fieldset>`;
+}
+function leerDestino() {
+  const v = ($('cfOpc').querySelector('[name=cfDest]:checked') || {}).value;
+  if (v !== '__otro') return v || '';
+  const n = $('cfDestOtro').value.trim().replace(/\s+/g, ' ');
+  if (!n) { $('cfDestOtro').setAttribute('aria-invalid', 'true'); $('cfDestOtro').focus(); toast('Escribe el nombre de la persona.'); return null; }
+  return n;
+}
 const faltanDe = r => ['mtto', 'backup'].filter(t => (r[t] || 'pend') === 'pend').map(t => t === 'mtto' ? 'mantenimiento' : 'backup');
 // Un solo toque: marca como hecho lo que falte (con la fecha de hoy) y pasa el equipo a su destino.
 function listoTodo(rid) {
@@ -566,26 +626,32 @@ function listoTodo(rid) {
   if (!idSerial(r.serial)) { toast('Falta el serial para pasarlo a Equipos.'); return; }
   const data = {}, faltan = faltanDe(r);
   ['mtto', 'backup'].forEach(t => { if ((r[t] || 'pend') === 'pend') { data[t] = 'hecho'; data[t + 'Fecha'] = hoyIso(); } });
-  const p = planPasar(Object.assign({}, r, data));
+  const p = planPasar(Object.assign({}, r, data), '');
   const acc = (r.acc || []).length ? `\n\nEntrégalo con: ${r.acc.join(', ')}.` : '';
-  confirmar(`¿Listo y pasar a ${destinoDe(r)}?`, `${r.serial}\nSe marca ${faltan.join(' y ')} como ${faltan.length > 1 ? 'hechos' : 'hecho'} hoy (${fechaBonita(hoyIso())}).\n${p.lineas.join('\n')}${acc}`, 'Sí, listo', async () => {
-    const r2 = R.get(rid); if (!r2 || r2.cerrado) return;
-    await escribir({ tipo: 'update', col: COL_R, id: rid, data: Object.assign({}, data, sello()) });
-    await ejecutarPasar(rid);
-  }, 'ok');
+  confirmar(`¿Listo ${r.serial}?`, `Se marca ${faltan.join(' y ')} como ${faltan.length > 1 ? 'hechos' : 'hecho'} hoy (${fechaBonita(hoyIso())}).\n${p.lineas.join('\n')}${acc}`, 'Sí, listo', () => {
+    const destino = leerDestino(); if (destino === null) return false;
+    (async () => {
+      const r2 = R.get(rid); if (!r2 || r2.cerrado) return;
+      await escribir({ tipo: 'update', col: COL_R, id: rid, data: Object.assign({}, data, sello()) });
+      await ejecutarPasar(rid, destino);
+    })();
+  }, 'ok', opcionesDestino(r));
 }
-function planPasar(r) {
+// destino: a quién queda asignado ('' = todavía no se sabe, solo para mostrar el resumen)
+function planPasar(r, destino) {
   const id = idSerial(r.serial), eq = Q.get(id), lineas = [];
   const data = {};
-  if (r.mtto === 'hecho' && r.mttoFecha) data.fechaMtto = r.mttoFecha;
-  if (r.persona) data.asignado = r.persona;
+  if (r.mtto === 'hecho' && r.mttoFecha) { data.fechaMtto = r.mttoFecha; if (eq && eq.prog) data.prog = null; }
+  const dest = destino === undefined ? r.persona : destino;
+  if (dest) data.asignado = dest;
   if (r.tipo) data.tipo = r.tipo; if (r.marca) data.marca = r.marca; if (r.modelo) data.modelo = r.modelo;
   if (r.proyecto) data.proyecto = r.proyecto;
   if (eq) {
     if (data.fechaMtto && data.fechaMtto !== eq.fechaMtto) lineas.push(`Último mantenimiento: ${fechaBonita(eq.fechaMtto)} → ${fechaBonita(data.fechaMtto)}`);
+    if (data.prog === null) lineas.push(`Se quita el mantenimiento programado para el ${fechaBonita(eq.prog.fecha)}.`);
     if (data.asignado && data.asignado !== eq.asignado) lineas.push(`Asignado a: ${eq.asignado || '(vacío)'} → ${data.asignado}`);
     ['tipo', 'marca', 'modelo', 'proyecto'].forEach(k => { if (data[k] && data[k] !== eq[k]) lineas.push(`${k[0].toUpperCase() + k.slice(1)}: ${eq[k] || '(vacío)'} → ${data[k]}`); });
-    if (!lineas.length) lineas.push('El equipo ya tiene estos datos; solo se cierra este registro.');
+    if (!lineas.length) lineas.push(destino === '' ? 'Escoge abajo a quién queda asignado.' : 'El equipo ya tiene estos datos; solo se cierra este registro.');
   } else {
     lineas.push('El equipo no está en la lista principal: se agrega como equipo nuevo.');
     if (data.fechaMtto) lineas.push(`Último mantenimiento: ${fechaBonita(data.fechaMtto)}`);
@@ -596,20 +662,25 @@ function preguntarPasar(rid) {
   const r = R.get(rid); if (!r || r.cerrado || estadoRec(r).k !== 'listo') return;
   if (soloLectura) { toast('Solo lectura: tu cuenta no puede editar.'); return; }
   if (!idSerial(r.serial)) { toast('Falta el serial para pasarlo a Equipos.'); return; }
-  const p = planPasar(r);
+  const p = planPasar(r, '');
   const acc = (r.acc || []).length ? `\n\nEntrégalo con: ${r.acc.join(', ')}.` : '';
-  confirmar(`¿Pasar a ${destinoDe(r)}?`, `${r.serial}\n${p.lineas.join('\n')}${acc}`, 'Sí, pasar', () => ejecutarPasar(rid), 'ok');
+  confirmar(`¿Pasar ${r.serial} a Equipos?`, `${p.lineas.join('\n')}${acc}`, 'Sí, pasar', () => {
+    const destino = leerDestino(); if (destino === null) return false;
+    ejecutarPasar(rid, destino);
+  }, 'ok', opcionesDestino(r));
 }
-async function ejecutarPasar(rid) {
+async function ejecutarPasar(rid, destino) {
     const r2 = R.get(rid); if (!r2 || r2.cerrado) return;
-    const p2 = planPasar(r2);
+    if (destino === undefined) destino = destinoDe(r2);
+    const p2 = planPasar(r2, destino);
     if (p2.eq) await escribir({ tipo: 'update', col: COL_Q, id: p2.id, data: Object.assign({}, p2.data, sello()) });
     else {
       const n = Math.max(0, ...[...Q.values()].map(e => Number(e.n) || 0)) + 1;
       await escribir({ tipo: 'set', col: COL_Q, id: p2.id, data: Object.assign({ serial: String(r2.serial).trim().toUpperCase(), tipo: '', marca: '', modelo: '', asignado: '', mail: '', cliente: 'Petrobras', proyecto: '', departamento: 'Guajira', municipio: 'Riohacha', fechaMtto: '', obs: '', n }, p2.data, sello()) });
     }
-    await escribir({ tipo: 'update', col: COL_R, id: rid, data: Object.assign({ cerrado: true, cerradoEn: new Date().toISOString() }, sello()) });
-    toast(`Listo: ${r2.serial} quedó asignado a ${destinoDe(r2)}`);
+    await escribir({ tipo: 'update', col: COL_R, id: rid, data: Object.assign({ cerrado: true, cerradoEn: new Date().toISOString(), cerradoA: destino }, sello()) });
+    toast(`Listo: ${r2.serial} quedó asignado a ${destino}`);
+    if (r2.hoja) actualizarHojaEntregas(r2.hoja, destino);
 }
 
 /* ================= HOJA: RECIBIDO ================= */
@@ -665,7 +736,7 @@ function pedirCerrar(hoja, foto, cerrar) {
 }
 const pedirCerrarRec = () => pedirCerrar($('rcForm'), fotoRc, cerrarRec);
 const pedirCerrarEq = () => pedirCerrar($('eqForm'), fotoEq, cerrarEq);
-window.hayCambiosSinGuardar = () => (!$('rcSheet').hidden && UI.foto($('rcForm')) !== fotoRc) || (!$('eqSheet').hidden && UI.foto($('eqForm')) !== fotoEq);
+window.hayCambiosSinGuardar = () => (!$('rcSheet').hidden && UI.foto($('rcForm')) !== fotoRc) || (!$('eqSheet').hidden && UI.foto($('eqForm')) !== fotoEq) || (!$('mtSheet').hidden && UI.foto($('mtForm')) !== fotoMt);
 function guardarRec(e) {
   e.preventDefault();
   if (soloLectura) return cerrarRec();
@@ -705,9 +776,56 @@ function guardarRec(e) {
 }
 function borrarRec(id) {
   const r = R.get(id); if (!r) return;
+  let opc = '';
+  if (r.hoja && ENTDB) opc = `<label class="check"><input type="checkbox" id="cfBorrarHoja" checked> También borrar en Entregas la hoja escaneada${devueltoPor(r) ? ' de ' + esc(devueltoPor(r)) : ''}</label><p class="nota-cf">Úsalo si la hoja quedó mal: la borras aquí y subes la correcta en Entregas.</p>`;
+  else if (r.hoja || r.origen === 'entregas') opc = `<p class="nota-cf">Este registro vino de una hoja de Entregas. ${ENTDB ? 'Esa hoja todavía no está enlazada; ábrela en Entregas para borrarla.' : 'Para poder borrar también la hoja desde aquí, conecta Equipos con Entregas en Base de datos.'}</p>`;
   confirmar('Eliminar registro', `Se borra el registro del equipo ${r.serial} de la lista de recibidos, para todos. No se puede deshacer. (No borra el equipo de la lista principal.)`, 'Eliminar', () => {
-    escribir({ tipo: 'delete', col: COL_R, id }); cerrarRec(); toast('Registro eliminado');
-  });
+    const conHoja = !!(r.hoja && ENTDB && $('cfBorrarHoja') && $('cfBorrarHoja').checked);
+    escribir({ tipo: 'delete', col: COL_R, id }); cerrarRec();
+    if (conHoja) borrarHojaEntregas(r.hoja, id).then(ok => toast(ok ? 'Registro y hoja de Entregas eliminados' : 'Registro eliminado. La hoja de Entregas no se pudo borrar: revisa tu internet.'));
+    else toast('Registro eliminado');
+  }, null, opc);
+}
+
+/* ================= CONEXIÓN CON ENTREGAS ================= */
+// Cuando una devolución queda lista, su hoja en Entregas pasa a ser una entrega a nombre de quien quedó el equipo.
+function datosConversion(h, destino) {
+  const misma = sinTildes(destino) === sinTildes(h.nombre);
+  return {
+    tipo: 'entrega', nombre: destino, cedula: misma ? (h.cedula || '') : '',
+    devolucion: { nombre: h.nombre || '', cedula: h.cedula || '', fecha: h.fecha || '' },
+    equiposSync: { fecha: new Date().toISOString(), texto: `Devuelto por ${h.nombre || 'sin nombre'}; mantenimiento y backup listos; quedó asignado a ${destino}`, completo: true },
+    actualizado: new Date().toISOString(), por: miId || ''
+  };
+}
+async function actualizarHojaEntregas(hid, destino) {
+  if (!ENTDB || !hid) return;
+  try {
+    const ref = ENTDB.collection('entregas').doc(hid), h = await ref.get();
+    if (!h || h.tipo !== 'devolucion') return;
+    const rids = Object.values(h.recibidos || {});
+    if (!rids.length || rids.some(x => { const r = R.get(x); return !r || !r.cerrado; })) return;   // faltan otros equipos de la misma hoja
+    await ref.update(datosConversion(h, destino));
+  } catch (e) { console.warn('No se pudo actualizar la hoja en Entregas', e); }
+}
+async function borrarHojaEntregas(hid, ridYa) {
+  if (!ENTDB || !hid) return false;
+  try {
+    const ref = ENTDB.collection('entregas').doc(hid), h = await ref.get();
+    if (!h) return true;
+    // Los otros pendientes que creó la misma hoja también se quitan; los terminados se dejan como historial.
+    Object.values(h.recibidos || {}).forEach(x => { const r = R.get(x); if (x !== ridYa && r && !r.cerrado) escribir({ tipo: 'delete', col: COL_R, id: x }); });
+    await ref.delete();
+    (h.paginas || []).forEach((p, pi) => { for (let c = 0; c < (p.trozos || 0); c++) ENTDB.collection('archivos').doc(`${hid}_${pi}_${c}`).delete().catch(() => {}); });
+    return true;
+  } catch (e) { return false; }
+}
+function pintarEnlace() {
+  const ok = !!ENTDB;
+  $('enlaceInfo').textContent = ok
+    ? 'Conectada. Al dar Listo a una devolución, su hoja en Entregas pasa a Entrega con el nombre de quien quedó el equipo. Al borrar un registro puedes borrar también su hoja.'
+    : 'No conectada. Toca Conectar y escribe la clave de la app de Entregas.';
+  $('enlaceBtn').innerHTML = ok ? `<button class="btn danger" type="button" data-enlace="quitar">${ico('desenlace')}Desconectar</button>` : `<button class="btn primary" type="button" data-enlace="poner">${ico('enlace')}Conectar con Entregas</button>`;
 }
 
 /* ================= EQUIPOS ================= */
@@ -717,7 +835,8 @@ const FILTROS_EQ = [
   { k: 'asignados', n: 'Solo los asignados a una persona' },
   { k: 'viejo', n: `Mantenimiento de hace más de ${MESES_ALERTA} meses` },
   { k: 'sinfecha', n: 'Sin fecha de mantenimiento' },
-  { k: 'enrec', n: 'Los que están ahora en Recibidos' }
+  { k: 'enrec', n: 'Los que están ahora en Recibidos' },
+  { k: 'prog', n: 'Con mantenimiento programado' }
 ];
 $('fEqEst').innerHTML = FILTROS_EQ.map(f => `<option value="${f.k}">${f.n}</option>`).join('');
 function filtraEq(e, q, tipo, est) {
@@ -729,6 +848,7 @@ function filtraEq(e, q, tipo, est) {
   if (est === 'viejo') return m !== null && m >= MESES_ALERTA;
   if (est === 'sinfecha') return m === null;
   if (est === 'enrec') return !!pendienteDe(e.serial);
+  if (est === 'prog') return !!(e.prog && e.prog.fecha);
   return true;
 }
 function textoMtto(e) {
@@ -765,6 +885,7 @@ function renderEq() {
       <div class="facts"><span>${esc(e.asignado || 'Sin asignar')}</span>${e.proyecto ? `<span class="meta">${esc(e.proyecto)}</span>` : ''}</div>
       <div class="facts">${textoMtto(e)}</div>
       ${rec ? `<div><span class="pill s-org">${ico('recibidos')}En Recibidos · ${estadoRec(rec).n}</span></div>` : ''}
+      ${e.prog && e.prog.fecha ? `<div><span class="pill ${(diasHasta(e.prog.fecha) ?? 1) < 0 ? 's-rojo' : 's-listo'}">${ico('calendario')}Mantenimiento programado ${fechaBonita(e.prog.fecha)}</span></div>` : ''}
     </button>`;
   }).join('') : UI.vacio('buscar', 'Nada coincide', 'Prueba con otro tipo, otro filtro o borra la búsqueda.');
 }
@@ -781,7 +902,8 @@ function abrirEq(id) {
   CAMPOS_EQ.forEach(([i, k]) => { $(i).value = e[k] || ''; $(i).disabled = soloLectura; });
   const pend = id ? pendienteDe(e.serial) : null;
   $('eqARecTxt').textContent = pend ? `Está en Recibidos (${estadoRec(pend).n}): ver` : 'Lo trajeron: registrar como recibido';
-  $('eqDel').hidden = !id; $('eqARec').hidden = !id; $('eqErr').hidden = true; $('eqEditado').textContent = '';
+  $('eqDel').hidden = !id; $('eqARec').hidden = !id; $('eqProg').hidden = !id;
+  $('eqProgTxt').textContent = e.prog && e.prog.fecha ? `Mantenimiento programado ${fechaBonita(e.prog.fecha)}: ver` : 'Programar mantenimiento'; $('eqErr').hidden = true; $('eqEditado').textContent = '';
   if (id && e.actualizado) {
     const base = 'Última edición ' + hace(e.actualizado);
     $('eqEditado').textContent = base + '.';
@@ -791,13 +913,16 @@ function abrirEq(id) {
     }).catch(() => {});
   }
   const hist = id ? recibidosLista().filter(r => idSerial(r.serial) === id).sort((a, b) => cmp(b.fechaIngreso, a.fechaIngreso)) : [];
-  $('eqHistBox').hidden = !hist.length;
-  $('eqHistTit').textContent = `Historial en Recibidos · ${hist.length} ${hist.length === 1 ? 'vez' : 'veces'}`;
+  const mts = id ? (e.mttos || []).slice().sort((a, b) => cmp(b.fecha, a.fecha)) : [];
+  $('eqHistBox').hidden = !hist.length && !mts.length;
+  const nH = hist.length + mts.length;
+  $('eqHistTit').textContent = `Historial · ${nH} ${nH === 1 ? 'registro' : 'registros'}`;
   const lab = { pend: 'pendiente', hecho: 'hecho', na: 'no aplica' };
   $('eqHist').innerHTML = hist.map(r => { const s = estadoRec(r); return `<button type="button" class="hist-it" data-hist="${esc(r.id)}">
       <span class="row between"><b class="mono">${fechaBonita(r.fechaIngreso)}</b><span class="pill ${s.clase}">${s.n}</span></span>
       <span class="meta">Mantenimiento: ${lab[r.mtto || 'pend']}${r.mtto === 'hecho' && r.mttoFecha ? ' (' + fechaBonita(r.mttoFecha) + ')' : ''} · Backup: ${lab[r.backup || 'pend']}${r.backup === 'hecho' && r.backupFecha ? ' (' + fechaBonita(r.backupFecha) + ')' : ''}${r.persona ? ' · ' + esc(r.persona) : ''}</span>
-      ${r.obs ? `<span class="obs">${esc(r.obs)}</span>` : ''}</button>`; }).join('');
+      ${r.obs ? `<span class="obs">${esc(r.obs)}</span>` : ''}</button>`; }).join('')
+    + mts.map(m => `<div class="hist-it"><span class="row between"><b class="mono">${fechaBonita(m.fecha)}</b><span class="pill s-disco">${ico('calendario')}Mantenimiento programado</span></span>${m.nota ? `<span class="obs">${esc(m.nota)}</span>` : ''}${m.por ? `<span class="meta">Hecho por ${esc(m.por)}</span>` : ''}</div>`).join('');
   $('eqSheet').hidden = false;
   fotoEq = UI.foto($('eqForm'));
 }
@@ -831,11 +956,120 @@ function borrarEq(id) {
   });
 }
 function mostrarErr(id, t) { $(id).textContent = t; $(id).hidden = false; }
-let cfAccion = null;
-function confirmar(titulo, texto, boton, accion, estilo) {
+let cfAccion = null, cfGen = 0;
+// opcHtml: casillas u opciones extra dentro de la confirmación. Si la acción devuelve false, la confirmación no se cierra.
+function confirmar(titulo, texto, boton, accion, estilo, opcHtml) {
+  cfGen++;
   $('cfTitle').textContent = titulo; $('cfText').textContent = texto; $('cfYes').textContent = boton;
   $('cfYes').className = 'btn ' + (estilo === 'ok' ? 'primary' : 'danger');
+  $('cfOpc').innerHTML = opcHtml || ''; $('cfOpc').hidden = !opcHtml;
   cfAccion = accion; $('cfSheet').hidden = false; requestAnimationFrame(() => $('cfNo').focus());
+}
+
+/* ================= MANTENIMIENTO PROGRAMADO ================= */
+// Se guarda en el mismo equipo: prog = { fecha, nota, por, creado }. Al hacerlo: fechaMtto nueva y una línea en mttos.
+function diasHasta(f) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(f || '')) return null;
+  const [y, m, d] = f.split('-').map(Number), h = new Date();
+  return Math.round((new Date(y, m - 1, d) - new Date(h.getFullYear(), h.getMonth(), h.getDate())) / 86400000);
+}
+const programados = () => equiposOrdenados().filter(e => e.prog && e.prog.fecha);
+function sugeridos() {
+  return equiposOrdenados('mtto').filter(e => { if (e.prog && e.prog.fecha) return false; if (pendienteDe(e.serial)) return false; const m = mesesDesde(e.fechaMtto); return m === null || m >= MESES_ALERTA; });
+}
+function textoCuando(f) {
+  const n = diasHasta(f); if (n === null) return '';
+  return n === 0 ? 'Hoy' : n === 1 ? 'Mañana' : n > 1 ? `En ${n} días` : n === -1 ? 'Atrasado 1 día' : `Atrasado ${-n} días`;
+}
+function renderMt() {
+  const prog = programados(), atras = prog.filter(e => diasHasta(e.prog.fecha) < 0), sug = sugeridos();
+  $('sumMt').innerHTML = UI.cifra({ k: 'mProg', n: prog.length, lbl: 'Programados', icono: 'calendario', tono: 'listo', filtro: 'prog', activo: filtroMt === 'prog' })
+    + UI.cifra({ k: 'mAtr', n: atras.length, lbl: 'Atrasados', icono: 'aviso', tono: 'rojo', filtro: 'atras', activo: filtroMt === 'atras' })
+    + UI.cifra({ k: 'mSug', n: sug.length, lbl: 'Sugeridos', icono: 'mantenimiento', tono: 'org', filtro: 'sug', activo: filtroMt === 'sug' });
+  UI.contar($('sumMt'));
+  const q = sinTildes($('qMt').value.trim());
+  const base = filtroMt === 'sug' ? sug : filtroMt === 'atras' ? atras : prog.slice().sort((a, b) => cmp(a.prog.fecha, b.prog.fecha));
+  const lista = base.filter(e => !q || sinTildes([e.serial, e.asignado, e.marca, e.modelo, e.tipo, e.prog && e.prog.nota].join(' ')).includes(q));
+  $('mtCount').textContent = (filtroMt === 'sug' ? `Equipos con ${MESES_ALERTA} meses o más sin mantenimiento, o sin fecha. ` : '') + (base.length ? `Mostrando ${lista.length} de ${base.length}` : '');
+  if (!Q.size) { $('mtList').innerHTML = conexion === 'cargando' ? UI.esqueleto(3) : UI.vacio('equipos', 'Todavía no hay equipos', 'Agrega equipos en la pestaña Equipos.'); return; }
+  if (!lista.length) {
+    $('mtList').innerHTML = q ? UI.vacio('buscar', 'Nada coincide', 'Prueba con otra búsqueda.')
+      : filtroMt === 'sug' ? UI.vacio('checkCirculo', 'Todos al día', `Ningún equipo lleva ${MESES_ALERTA} meses o más sin mantenimiento.`, 'bien')
+      : filtroMt === 'atras' ? UI.vacio('checkCirculo', 'Nada atrasado', 'Ningún mantenimiento programado está vencido.', 'bien')
+      : UI.vacio('calendario', 'No hay mantenimientos programados', 'Cuando te pidan hacerle mantenimiento a un equipo, toca “Programar mantenimiento”.');
+    return;
+  }
+  $('mtList').innerHTML = lista.map(e => {
+    const p = e.prog && e.prog.fecha ? e.prog : null, n = p ? diasHasta(p.fecha) : null;
+    const clase = p ? (n < 0 ? 'atras' : '') : 'sug';
+    return `<div class="card mt ${clase}">
+      <button type="button" class="card-top" data-mt="${esc(e.id)}">
+        <div class="card-head"><div class="cab">${iconoDe(e.tipo)}<div class="cab-t"><div class="card-title serial">${esc(e.serial)}</div><div class="meta">${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · '))}</div></div></div>
+          ${p ? `<span class="pill ${n < 0 ? 's-rojo' : n <= 2 ? 's-org' : 's-listo'}">${textoCuando(p.fecha)}</span>` : '<span class="pill s-org">Sugerido</span>'}</div>
+        <div class="facts"><span><b>${esc(e.asignado || 'Sin asignar')}</b></span>${p ? `<span>Programado para <span class="mono">${fechaBonita(p.fecha)}</span></span>` : ''}</div>
+        <div class="facts">${textoMtto(e)}</div>
+        ${p && p.nota ? `<div class="obs">${esc(p.nota)}</div>` : ''}
+      </button>
+      ${p ? `<button type="button" class="btn ok solo-editar" data-mt-hecho="${esc(e.id)}">${ico('checkCirculo')}Mantenimiento hecho</button>`
+          : `<button type="button" class="btn solo-editar" data-mt-prog="${esc(e.id)}">${ico('programar')}Programar</button>`}
+    </div>`;
+  }).join('');
+}
+function abrirMt(id) {
+  const e = id ? Q.get(id) : null;
+  mtActual = e ? id : null;
+  const p = e && e.prog && e.prog.fecha ? e.prog : null;
+  $('mtTitle').textContent = p ? 'Mantenimiento programado' : 'Programar mantenimiento';
+  $('mtSerial').value = e ? e.serial : ''; $('mtSerial').disabled = soloLectura || !!e;
+  const f = new Date(); f.setDate(f.getDate() + 7);
+  $('mtFecha').value = p ? p.fecha : `${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`;
+  $('mtNota').value = p ? (p.nota || '') : '';
+  $('mtQuitar').hidden = !p; $('mtErr').hidden = true;
+  [$('mtFecha'), $('mtNota')].forEach(x => { x.disabled = soloLectura; });
+  infoMt();
+  $('mtSheet').hidden = false;
+  fotoMt = UI.foto($('mtForm'));
+}
+function infoMt() {
+  const e = Q.get(idSerial($('mtSerial').value)), box = $('mtInfo');
+  if (!idSerial($('mtSerial').value)) { box.hidden = true; return; }
+  box.hidden = false;
+  box.innerHTML = e ? `<b>${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · ') || e.serial)}</b><br>Asignado a ${esc(e.asignado || 'nadie')} · ${textoMtto(e)}`
+    : 'Ese serial no está en la lista de Equipos. Agrégalo primero en la pestaña Equipos.';
+}
+let fotoMt = '';
+function cerrarMt() { $('mtSheet').hidden = true; mtActual = null; fotoMt = ''; }
+const pedirCerrarMt = () => pedirCerrar($('mtForm'), fotoMt, cerrarMt);
+function guardarMt(ev) {
+  ev.preventDefault();
+  if (soloLectura) return cerrarMt();
+  const id = mtActual || idSerial($('mtSerial').value), e = Q.get(id);
+  if (!id) return mostrarErr('mtErr', 'Escribe el serial del equipo.');
+  if (!e) return mostrarErr('mtErr', 'Ese serial no está en la lista de Equipos. Agrégalo primero en la pestaña Equipos.');
+  if (!$('mtFecha').value) return mostrarErr('mtErr', 'Escoge la fecha programada.');
+  const antes = e.prog && e.prog.fecha;
+  escribir({ tipo: 'update', col: COL_Q, id, data: Object.assign({ prog: { fecha: $('mtFecha').value, nota: $('mtNota').value.trim(), por: miId || '', creado: (e.prog && e.prog.creado) || new Date().toISOString() } }, sello()) });
+  toast(antes ? 'Mantenimiento programado actualizado' : `Mantenimiento programado para el ${fechaBonita($('mtFecha').value)}`);
+  cerrarMt();
+}
+function quitarMt() {
+  const e = Q.get(mtActual); if (!e) return;
+  confirmar('Quitar programación', `Se quita el mantenimiento programado de ${e.serial}. La fecha del último mantenimiento no cambia.`, 'Quitar', () => {
+    escribir({ tipo: 'update', col: COL_Q, id: mtActual, data: Object.assign({ prog: null }, sello()) }); cerrarMt(); toast('Programación quitada');
+  });
+}
+function mtHecho(id) {
+  const e = Q.get(id); if (!e) return;
+  if (soloLectura) { toast('Solo lectura: tu cuenta no puede editar.'); return; }
+  const p = e.prog || {};
+  confirmar(`¿Mantenimiento hecho a ${e.serial}?`, `Asignado a ${e.asignado || 'nadie'}. Se actualiza la fecha del último mantenimiento y se quita de los programados.`, 'Sí, hecho', () => {
+    const f = $('cfMtFecha').value;
+    if (!f) { $('cfMtFecha').focus(); toast('Escoge la fecha del mantenimiento.'); return false; }
+    const e2 = Q.get(id); if (!e2) return;
+    const mttos = (e2.mttos || []).concat([{ fecha: f, nota: (e2.prog && e2.prog.nota) || '', por: miId || '' }]);
+    escribir({ tipo: 'update', col: COL_Q, id, data: Object.assign({ fechaMtto: f, prog: null, mttos }, sello()) });
+    toast(`Mantenimiento de ${e2.serial} hecho: ${fechaBonita(f)}`);
+  }, 'ok', `<div class="field"><label for="cfMtFecha">Fecha del mantenimiento</label><input id="cfMtFecha" type="date" value="${hoyIso()}" max="${hoyIso()}"></div>${p.nota ? `<p class="nota-cf">Nota: ${esc(p.nota)}</p>` : ''}`);
 }
 
 /* ================= BASE DE DATOS (TABLAS) ================= */
@@ -943,7 +1177,20 @@ async function descargarExcel() {
 
 /* ================= EVENTOS ================= */
 if (ui.tablaDb === 'rec') tablaDb = 'rec';
-$('tabRec').onclick = () => ir('rec'); $('tabEq').onclick = () => ir('eq'); $('tabDb').onclick = () => ir('db');
+$('tabRec').onclick = () => ir('rec'); $('tabEq').onclick = () => ir('eq'); $('tabMt').onclick = () => ir('mt'); $('tabDb').onclick = () => ir('db');
+$('btnNewMt').onclick = () => abrirMt(null);
+$('qMt').oninput = renderMt;
+$('sumMt').onclick = e => { const b = e.target.closest('[data-filtro]'); if (!b) return; filtroMt = filtroMt === b.dataset.filtro && b.dataset.filtro !== 'prog' ? 'prog' : b.dataset.filtro; renderMt(); };
+$('mtList').onclick = e => {
+  const h = e.target.closest('[data-mt-hecho]'); if (h) return mtHecho(h.dataset.mtHecho);
+  const pr = e.target.closest('[data-mt-prog]'); if (pr) return abrirMt(pr.dataset.mtProg);
+  const b = e.target.closest('[data-mt]'); if (b) { const x = Q.get(b.dataset.mt); if (x && x.prog && x.prog.fecha) abrirMt(b.dataset.mt); else abrirEq(b.dataset.mt); }
+};
+$('mtSerial').addEventListener('input', infoMt);
+$('mtForm').onsubmit = guardarMt; $('mtCancel').onclick = pedirCerrarMt; $('mtQuitar').onclick = quitarMt;
+$('mtSheet').onclick = e => { if (e.target === $('mtSheet')) pedirCerrarMt(); };
+$('eqProg').onclick = () => { const id = eqActual; cerrarEq(); ir('mt'); abrirMt(id); };
+$('enlaceBtn').onclick = e => { const b = e.target.closest('[data-enlace]'); if (b) b.dataset.enlace === 'poner' ? nube.enlazar('entregas') : nube.desenlazar('entregas'); };
 $('qRec').oninput = renderRec;
 $('chipsRec').onclick = e => { const b = e.target.closest('[data-f]'); if (b) { filtroRec = b.dataset.f; renderRec(); } };
 // Tocar una cifra del tablero filtra la lista; tocarla otra vez vuelve a lo normal.
@@ -985,7 +1232,13 @@ $('eqARec').onclick = () => {
 $('eqSheet').onclick = e => { if (e.target === $('eqSheet')) pedirCerrarEq(); };
 
 $('cfNo').onclick = () => { $('cfSheet').hidden = true; cfAccion = null; };
-$('cfYes').onclick = () => { $('cfSheet').hidden = true; const a = cfAccion; cfAccion = null; if (a) a(); };
+$('cfYes').onclick = () => {
+  const a = cfAccion, gen = cfGen;
+  if (a && a() === false) return;          // la acción pidió corregir algo antes de cerrar
+  if (gen === cfGen) { $('cfSheet').hidden = true; cfAccion = null; }
+};
+// "Otra persona": muestra el campo del nombre
+$('cfOpc').addEventListener('change', e => { if (e.target.name === 'cfDest') { const o = $('cfDestOtro'); o.hidden = e.target.value !== '__otro'; if (!o.hidden) o.focus(); } });
 $('segEq').onclick = () => { tablaDb = 'eq'; ui.tablaDb = 'eq'; guardarUi(); renderDb(); };
 $('segRec').onclick = () => { tablaDb = 'rec'; ui.tablaDb = 'rec'; guardarUi(); renderDb(); };
 $('qDb').oninput = renderDb;
@@ -1008,6 +1261,7 @@ document.addEventListener('keydown', e => {
   if (top === $('cfSheet')) $('cfNo').click();
   else if (top === $('rcSheet')) pedirCerrarRec();
   else if (top === $('eqSheet')) pedirCerrarEq();
+  else if (top === $('mtSheet')) pedirCerrarMt();
   else top.hidden = true;
 });
 $('btnCopia').onclick = () => nube.exportar();
@@ -1035,6 +1289,8 @@ async function iniciar() {
   }
   if (!DB) { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
   pintarAvisos(); suscribir(); reintentarPendientes();
+  ENTDB = window.nube && typeof window.nube.enlace === 'function' ? window.nube.enlace('entregas') : null;
+  pintarEnlace();
 }
 iniciar();
 </script>

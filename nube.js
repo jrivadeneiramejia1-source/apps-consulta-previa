@@ -305,8 +305,8 @@
     desenlazar(id) {
       const en = enlaceCfg(id); if (!en) return;
       const hacer = () => { guardar('enlace_' + id, null); location.reload(); };
-      if (typeof window.confirmar === 'function') window.confirmar(`Desconectar de ${en.nombre}`, `Las hojas que guardes ya no cambiarán nada en ${en.nombre}. Lo que ya se envió no se borra.`, 'Desconectar', hacer);
-      else preguntar(`Desconectar de ${en.nombre}`, `Las hojas que guardes ya no cambiarán nada en ${en.nombre}.`, 'Desconectar', true).then(ok => { if (ok) hacer(); });
+      if (typeof window.confirmar === 'function') window.confirmar(`Desconectar de ${en.nombre}`, `Esta app ya no cambiará nada en ${en.nombre}. Lo que ya se hizo no se borra.`, 'Desconectar', hacer);
+      else preguntar(`Desconectar de ${en.nombre}`, `Esta app ya no cambiará nada en ${en.nombre}. Lo que ya se hizo no se borra.`, 'Desconectar', true).then(ok => { if (ok) hacer(); });
     },
     async exportar() {
       if (!fs || !espacio) return toast('La base de datos no está abierta.');

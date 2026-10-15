@@ -14,6 +14,15 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - `sw.js`: guarda la app en el teléfono para abrir sin internet.
 - `comun.css`, `comun.js`, `iconos.js`, `fuentes/`: diseño compartido de Equipos y Entregas (ver `DESIGN.md`).
 - `pruebas/`: banco de pruebas con Firebase falso. `node pruebas/prueba.mjs` prueba Equipos y Entregas en tema claro y oscuro.
+  `node pruebas/sincronia.mjs` prueba la sincronía Entregas ↔ Equipos y la agenda de mantenimiento.
+
+## Cómo se enlazan Entregas y Equipos
+- Hoja de **devolución**: crea un pendiente en Recibidos. La hoja guarda `recibidos: { SERIAL: id }` y el pendiente guarda `hoja` y `devueltoPor`.
+- Al dar **Listo** en Equipos se escoge a quién queda asignado (Bodega Riohacha, quien lo devolvió u otra persona). La hoja pasa a **Entrega** a ese nombre y guarda `devolucion: { nombre, cedula, fecha }`.
+- Hoja de **entrega**: asigna el equipo y guarda `antes: { SERIAL: a quién estaba asignado }` para devolverlo si se borra la hoja.
+- **Borrar** en cualquiera de las dos apps ofrece borrar también en la otra.
+- Corregir una hoja solo cambia la diferencia: no repite pendientes y quita los que sobran.
+- **Agenda de mantenimiento** (Equipos): `prog: { fecha, nota }` en el equipo; al hacerlo se actualiza `fechaMtto` y se agrega a `mttos`.
 
 ## Reglas de Firestore
 ```

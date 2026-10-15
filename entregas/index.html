@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=13">
+<link rel="stylesheet" href="../comun.css?v=14">
 <style>
 
 /* --- Entregas --- */
@@ -212,6 +212,7 @@ label.subir { cursor: pointer; }
   <div class="sheet" role="alertdialog" aria-labelledby="cfTitle" aria-describedby="cfText">
     <h2 id="cfTitle">¿Seguro?</h2>
     <p id="cfText"></p>
+    <div class="cf-opc" id="cfOpc" hidden></div>
     <div class="row">
       <button class="btn" type="button" id="cfNo">Cancelar</button>
       <button class="btn danger" type="button" id="cfYes">Eliminar</button>
@@ -222,12 +223,12 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "13"};</script>
-<script src="../iconos.js?v=13"></script>
-<script src="../comun.js?v=13"></script>
-<script src="escaner.js?v=13"></script>
-<script src="../config.js?v=13"></script>
-<script src="../nube.js?v=13"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "14"};</script>
+<script src="../iconos.js?v=14"></script>
+<script src="../comun.js?v=14"></script>
+<script src="escaner.js?v=14"></script>
+<script src="../config.js?v=14"></script>
+<script src="../nube.js?v=14"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -314,6 +315,7 @@ const TIPO_A_EQ = { 'Portátil': 'PC Portátil', 'Impresora': 'Impresora Portát
 const EQ_A_TIPO = { 'PC Portátil': 'Portátil', 'Impresora Portátil': 'Impresora', 'Video Beam': 'Video beam', 'Escaner': 'Otro', 'Antena Starlink': 'Otro' };
 const idSerial = x => String(x || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
 const pendienteEq = id => [...EQR.values()].find(x => !x.cerrado && idSerial(x.serial) === id);
+const pendienteEqId = id => { for (const [k, x] of EQR) if (!x.cerrado && idSerial(x.serial) === id) return k; return null; };
 const ui = lsGet(UI_KEY) || {};
 
 /* ================= UTILIDADES ================= */
@@ -402,7 +404,7 @@ function suscribir() {
   subs.splice(0).forEach(u => { try { u(); } catch (e) {} });
   subs.push(DB.collection(COL).limit(5000).onSnapshot(s => {
     ENT = new Map(s.docs.map(d => [d.id, Object.assign({}, d.data())])); listo = true;
-    pendientes.forEach(aplicarLocal); conexion = 'vivo'; guardarCacheLuego(); pintarConexion(); pintarAvisos(); pedirRender();
+    pendientes.forEach(aplicarLocal); conexion = 'vivo'; guardarCacheLuego(); pintarConexion(); pintarAvisos(); pedirRender(); revisarLuego();
   }, e => { marcarDesconectado(); if (e && e.code === 'unavailable') setTimeout(suscribir, 5000); }));
 }
 
@@ -445,6 +447,15 @@ function actualizarNombres() {
 const FILTROS = [{ k: 'todos', n: 'Todas' }, { k: 'mes', n: 'De este mes' }, { k: 'entrega', n: 'Entregas' }, { k: 'devolucion', n: 'Devoluciones' }, { k: 'otro', n: 'Otras' }, { k: 'sindatos', n: 'Sin nombre o fecha' }];
 const textoDe = e => sinTildes([e.nombre, e.cedula, e.seriales, e.proyecto, textoEquipos(equiposDe(e)), e.nota, e.origen].join(' '));
 function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'mes') return (e.fecha || '').startsWith(hoyIso().slice(0, 7)); if (f === 'sindatos') return !e.nombre || !e.fecha; return (e.tipo || 'entrega') === f; }
+// Qué pasa con la hoja en Equipos: devolución en espera, o entrega que antes fue devolución.
+function estadoHoja(e) {
+  if (e.devolucion && e.tipo === 'entrega') return `<span class="meta">Antes: devolución de ${esc(e.devolucion.nombre || 'sin nombre')} (${fechaBonita(e.devolucion.fecha)})</span>`;
+  if (e.tipo !== 'devolucion' || !EQDB) return '';
+  const rs = Object.values(e.recibidos || {}).map(rid => EQR.get(rid)).filter(Boolean);
+  if (!rs.length) return '';
+  const pend = rs.filter(x => !x.cerrado).length;
+  return pend ? `<span><span class="pill s-org">${ico('reloj')}En Recibidos, sin terminar</span></span>` : `<span><span class="pill s-disco">${ico('checkCirculo')}Equipo ya listo en Equipos</span></span>`;
+}
 function renderEnt() {
   pintarAvisoEnlace();
   const todos = lista(), mes = hoyIso().slice(0, 7);
@@ -475,6 +486,7 @@ function renderEnt() {
         <span class="card-head"><span class="card-title">${esc(e.nombre || 'Sin nombre')}</span><span class="pill t-${esc(e.tipo || 'entrega')}">${e.tipo === 'otro' ? '' : ico(e.tipo === 'devolucion' ? 'devolucion' : 'entrega')}${tipoNombre(e.tipo)}</span></span>
         <span class="facts"><span class="mono">${fechaBonita(e.fecha)}</span>${e.cedula ? `<span>CC ${esc(e.cedula)}</span>` : ''}<span>${n} ${n === 1 ? 'página' : 'páginas'}</span></span>
         ${equiposDe(e).length ? `<span class="meta mono">${esc(textoSeriales(equiposDe(e)))}</span>` : ''}
+        ${estadoHoja(e)}
         ${!e.nombre || !e.fecha ? `<span><span class="pill rev">${ico('aviso')}Falta completar datos</span></span>` : ''}
       </span>
     </button>`;
@@ -648,7 +660,7 @@ function suscribirEquipos() {
     document.querySelectorAll('.eq-fila').forEach(f => refrescarFila(f, null, true));
   }, () => {});
   let primeroR = true;
-  EQDB.collection('recibidos').limit(1000).onSnapshot(s => { EQR = new Map(s.docs.map(d => [d.id, d.data()])); if (primeroR) { primeroR = false; if (++eqListos === 2) eqListo(); } }, () => {});
+  EQDB.collection('recibidos').limit(1000).onSnapshot(s => { EQR = new Map(s.docs.map(d => [d.id, d.data()])); if (primeroR) { primeroR = false; if (++eqListos === 2) eqListo(); } revisarLuego(); pedirRender(); }, () => {});
 }
 const cmpTxt = (a, b) => String(a || '').localeCompare(String(b || ''), 'es', { numeric: true });
 function pintarEnlace() {
@@ -659,14 +671,24 @@ function pintarEnlace() {
     : 'No conectada. Toca Conectar y escribe la clave de la app de Equipos.';
   $('enlaceBtn').innerHTML = ok ? `<button class="btn danger" type="button" data-enlace="quitar">${ico('desenlace')}Desconectar</button>` : `<button class="btn primary" type="button" data-enlace="poner">${ico('enlace')}Conectar con Equipos</button>`;
 }
-// Aplica una hoja en la app de Equipos. Devuelve un resumen, o '' si no hubo nada que hacer.
-async function enviarAEquipos(h) {
-  if (!EQDB || (h.tipo !== 'entrega' && h.tipo !== 'devolucion')) return '';
-  const eqs = limpiarEquipos(equiposDe(h)); if (!eqs.length) return '';
+// Aplica una hoja en la app de Equipos y la deja enlazada con lo que creó.
+// Devuelve { txt, recibidos, antes }: recibidos = { SERIAL: id del registro en Recibidos }, antes = { SERIAL: a quién estaba asignado }.
+// Se puede llamar las veces que sea: compara con lo que ya hizo y solo cambia la diferencia (no repite pendientes).
+async function enviarAEquipos(h, hid) {
+  const res = { txt: '', recibidos: Object.assign({}, h.recibidos || {}), antes: Object.assign({}, h.antes || {}) };
+  if (!EQDB) return res;
   await Promise.race([eqListoP, esperar(8000)]);   // espera a tener la lista de Equipos antes de decidir
-  const r = { asig: 0, nuevos: 0, pend: 0, yaPend: 0, igual: 0, sinNombre: 0, datos: 0 };
+  const eqs = limpiarEquipos(equiposDe(h)), actuales = new Set(eqs.map(q => idSerial(q.serial)));
+  const r = { asig: 0, nuevos: 0, pend: 0, yaPend: 0, igual: 0, sinNombre: 0, datos: 0, quit: 0, act: 0, listos: 0 };
   const s = { actualizado: new Date().toISOString(), por: miId || '' };
-  for (const q of eqs) {
+  // 1) Limpieza: pendientes que creó esta hoja y ya no van (se corrigió el serial o ya no es devolución).
+  for (const [k, rid] of Object.entries(res.recibidos)) {
+    if (h.tipo === 'devolucion' && actuales.has(k)) continue;
+    const r0 = EQR.get(rid);
+    if (r0 && !r0.cerrado) { await EQDB.collection('recibidos').doc(rid).delete(); EQR.delete(rid); r.quit++; delete res.recibidos[k]; }
+    else if (!actuales.has(k)) delete res.recibidos[k];   // si ya se terminó, queda en Equipos como historial
+  }
+  if (h.tipo === 'entrega' || h.tipo === 'devolucion') for (const q of eqs) {
     const id = idSerial(q.serial); if (!id) continue;
     const eq = EQ.get(id);
     if (h.tipo === 'entrega') {
@@ -681,25 +703,52 @@ async function enviarAEquipos(h) {
         if (q.modelo && actual.modelo !== q.modelo) cambios.modelo = q.modelo;
         if (q.obs && !String(actual.obs || '').includes(q.obs)) cambios.obs = [actual.obs, `${fechaBonita(h.fecha || hoyIso())} entrega: ${q.obs}`].filter(Boolean).join(' · ');
         if (!Object.keys(cambios).length) { r.igual++; continue; }
+        if (cambios.asignado && !(id in res.antes)) res.antes[id] = actual.asignado || '';   // para devolverlo si se borra la hoja
         await EQDB.collection('equipos').doc(id).update(Object.assign(cambios, s));
         EQ.set(id, Object.assign({}, actual, cambios));
         if (cambios.asignado) r.asig++; else r.datos++;
       } else {
         const n = Math.max(0, ...[...EQ.values()].map(x => Number(x.n) || 0)) + 1;
-        const nuevo = Object.assign({ serial: q.serial, tipo: TIPO_A_EQ[q.tipo] || q.tipo || '', marca: q.marca || '', modelo: q.modelo || '', asignado: persona, mail: '', cliente: 'Petrobras', proyecto: h.proyecto || 'Consulta Previa', departamento: 'Guajira', municipio: 'Riohacha', fechaMtto: '', obs: ['Agregado desde Entregas', q.obs].filter(Boolean).join(' · '), n }, s);
+        const nuevo = Object.assign({ serial: q.serial, tipo: TIPO_A_EQ[q.tipo] || q.tipo || '', marca: q.marca || '', modelo: q.modelo || '', asignado: persona, mail: '', cliente: 'Petrobras', proyecto: h.proyecto || 'Consulta Previa', departamento: 'Guajira', municipio: 'Riohacha', fechaMtto: '', obs: q.obs ? `${fechaBonita(h.fecha || hoyIso())} entrega: ${q.obs}` : '', n }, s);
         await EQDB.collection('equipos').doc(id).set(nuevo); EQ.set(id, nuevo); r.nuevos++;
       }
     } else {
-      if (pendienteEq(id)) { r.yaPend++; continue; }
+      const obsBase = `Devuelto por ${h.nombre || 'sin nombre'} el ${fechaBonita(h.fecha)} (hoja de Entregas)`;
+      const ridPrev = res.recibidos[id];
+      if (ridPrev && EQR.has(ridPrev)) {
+        // Ya está enlazado: si sigue pendiente, se actualizan sus datos; si ya se terminó, no se crea otro.
+        const r0 = EQR.get(ridPrev);
+        if (r0.cerrado) { r.listos++; continue; }
+        const cambios = {};
+        if ((h.fecha || r0.fechaIngreso) !== r0.fechaIngreso) cambios.fechaIngreso = h.fecha;
+        if ((h.nombre || '') !== (r0.devueltoPor || '')) cambios.devueltoPor = h.nombre || '';
+        const obsNueva = /^Devuelto por .+? \(hoja de Entregas\)/.test(r0.obs || '') ? String(r0.obs).replace(/^Devuelto por .+? \(hoja de Entregas\)/, obsBase) : r0.obs;
+        if (obsNueva !== r0.obs) cambios.obs = obsNueva;
+        if (q.marca && q.marca !== r0.marca) cambios.marca = q.marca;
+        if (q.modelo && q.modelo !== r0.modelo) cambios.modelo = q.modelo;
+        if (!Object.keys(cambios).length) { r.yaPend++; continue; }
+        await EQDB.collection('recibidos').doc(ridPrev).update(Object.assign(cambios, s));
+        EQR.set(ridPrev, Object.assign({}, r0, cambios)); r.act++;
+        continue;
+      }
+      const otro = pendienteEqId(id);
+      if (otro) {
+        // Ya estaba pendiente (lo registraron a mano): se enlaza con esta hoja en vez de repetirlo.
+        res.recibidos[id] = otro;
+        const x = EQR.get(otro);
+        if (!x.hoja) { await EQDB.collection('recibidos').doc(otro).update(Object.assign({ hoja: hid, devueltoPor: h.nombre || '' }, s)); EQR.set(otro, Object.assign({}, x, { hoja: hid, devueltoPor: h.nombre || '' })); }
+        r.yaPend++; continue;
+      }
       const rid = 'r-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
       const rec = Object.assign({
         serial: eq ? eq.serial : q.serial, fechaIngreso: h.fecha || hoyIso(),
         tipo: eq ? (eq.tipo || '') : (TIPO_A_EQ[q.tipo] || q.tipo || ''), marca: q.marca || (eq && eq.marca) || '', modelo: q.modelo || (eq && eq.modelo) || '',
         persona: 'Bodega Riohacha', proyecto: h.proyecto || (eq && eq.proyecto) || '',
         mtto: 'pend', mttoFecha: '', backup: 'pend', backupFecha: '',
-        obs: [`Devuelto por ${h.nombre || 'sin nombre'} el ${fechaBonita(h.fecha)} (hoja de Entregas)`, q.obs].filter(Boolean).join(' · '), acc: [], cerrado: false, cerradoEn: '', origen: 'entregas'
+        obs: [obsBase, q.obs].filter(Boolean).join(' · '), acc: [], cerrado: false, cerradoEn: '', origen: 'entregas',
+        hoja: hid || '', devueltoPor: h.nombre || ''
       }, s);
-      await EQDB.collection('recibidos').doc(rid).set(rec); EQR.set(rid, rec); r.pend++;
+      await EQDB.collection('recibidos').doc(rid).set(rec); EQR.set(rid, rec); res.recibidos[id] = rid; r.pend++;
     }
   }
   const t = [];
@@ -709,16 +758,62 @@ async function enviarAEquipos(h) {
   if (r.igual) t.push(`${r.igual} ya ${r.igual === 1 ? 'estaba asignado' : 'estaban asignados'} a esa persona`);
   if (r.pend) t.push(`${r.pend} ${r.pend === 1 ? 'quedó pendiente' : 'quedaron pendientes'} en Recibidos`);
   if (r.yaPend) t.push(`${r.yaPend} ya ${r.yaPend === 1 ? 'estaba pendiente' : 'estaban pendientes'} en Recibidos`);
+  if (r.act) t.push(`${r.act} ${r.act === 1 ? 'pendiente actualizado' : 'pendientes actualizados'} en Recibidos`);
+  if (r.listos) t.push(`${r.listos} ya ${r.listos === 1 ? 'se dio' : 'se dieron'} por ${r.listos === 1 ? 'listo' : 'listos'} en Equipos`);
+  if (r.quit) t.push(`${r.quit} ${r.quit === 1 ? 'pendiente quitado' : 'pendientes quitados'} de Recibidos`);
   if (r.sinNombre) t.push(`falta el nombre para asignar ${r.sinNombre === 1 ? 'el equipo' : r.sinNombre + ' equipos'}: no se cambió nada en Equipos`);
-  return t.join(' · ');
+  res.txt = t.join(' · ');
+  return res;
 }
 async function enviarYMarcar(id) {
   const h = ENT.get(id); if (!h) return '';
   try {
-    const txt = await enviarAEquipos(h);
-    if (txt) escribir({ tipo: 'update', col: COL, id, data: { equiposSync: { fecha: new Date().toISOString(), texto: txt, completo: !/falta el nombre/.test(txt) } } });
-    return txt;
+    const res = await enviarAEquipos(h, id), data = {};
+    if (JSON.stringify(res.recibidos) !== JSON.stringify(h.recibidos || {})) data.recibidos = res.recibidos;
+    if (JSON.stringify(res.antes) !== JSON.stringify(h.antes || {})) data.antes = res.antes;
+    if (res.txt) data.equiposSync = { fecha: new Date().toISOString(), texto: res.txt, completo: !/falta el nombre/.test(res.txt) };
+    if (Object.keys(data).length) escribir({ tipo: 'update', col: COL, id, data });
+    return res.txt;
   } catch (e) { toast('No se pudo actualizar Equipos: ' + (e.message || e.code || e)); return ''; }
+}
+// Cuando en Equipos se da Listo a todos los equipos de una devolución, la hoja pasa a Entrega a nombre de quien quedó.
+// Lo hace también Equipos si está conectada; aquí se revisa por si la hoja se abrió después.
+function datosConversion(h, destino) {
+  const misma = sinTildes(destino) === sinTildes(h.nombre);
+  return {
+    tipo: 'entrega', nombre: destino, cedula: misma ? (h.cedula || '') : '',
+    devolucion: { nombre: h.nombre || '', cedula: h.cedula || '', fecha: h.fecha || '' },
+    equiposSync: { fecha: new Date().toISOString(), texto: `Devuelto por ${h.nombre || 'sin nombre'}; mantenimiento y backup listos; quedó asignado a ${destino}`, completo: true },
+    actualizado: new Date().toISOString(), por: miId || ''
+  };
+}
+let tRevisar = null;
+function revisarLuego() { clearTimeout(tRevisar); tRevisar = setTimeout(revisarDevoluciones, 400); }
+function revisarDevoluciones() {
+  if (!EQDB || !DB || soloLectura || eqListos < 2 || !listo) return;
+  for (const e of lista()) {
+    if (e.tipo !== 'devolucion') continue;
+    let rids = Object.entries(e.recibidos || {});
+    if (!rids.length) {
+      // Hoja de antes de este cambio: se enlaza con el pendiente que creó (mismo serial y fecha, venido de Entregas).
+      const nuevo = {};
+      limpiarEquipos(equiposDe(e)).forEach(q => {
+        const k = idSerial(q.serial);
+        for (const [rid, x] of EQR) if (x.origen === 'entregas' && !x.hoja && idSerial(x.serial) === k && (x.fechaIngreso || '') === (e.fecha || '')) { nuevo[k] = rid; break; }
+      });
+      if (!Object.keys(nuevo).length) continue;
+      escribir({ tipo: 'update', col: COL, id: e.id, data: { recibidos: nuevo } });
+      Object.values(nuevo).forEach(rid => { const x = EQR.get(rid); EQR.set(rid, Object.assign({}, x, { hoja: e.id })); EQDB.collection('recibidos').doc(rid).update({ hoja: e.id, devueltoPor: x.devueltoPor || e.nombre || '' }).catch(() => {}); });
+      rids = Object.entries(nuevo);
+    }
+    const rs = rids.map(([, rid]) => EQR.get(rid));
+    if (rs.some(x => !x || !x.cerrado)) continue;
+    // Solo se convierten las que se dieron por listas con la versión nueva (que pregunta a quién queda);
+    // las de antes se quedan como Devolución para no cambiar el historial sin que nadie lo decida.
+    if (rs.some(x => !x.cerradoA)) continue;
+    const destino = (rs.find(x => x.cerradoA) || {}).cerradoA || rs[0].persona || 'Bodega Riohacha';
+    escribir({ tipo: 'update', col: COL, id: e.id, data: datosConversion(e, destino) });
+  }
 }
 // Hojas de entrega o devolución con seriales que todavía no llegaron completas a Equipos.
 const aplicaEquipos = e => (e.tipo === 'entrega' || e.tipo === 'devolucion') && limpiarEquipos(equiposDe(e)).length > 0;
@@ -815,12 +910,35 @@ function guardarEn(ev) {
 }
 function borrarEn(id) {
   const e = ENT.get(id); if (!e) return;
-  confirmar('Eliminar hoja', `Se borra la hoja de ${e.nombre || 'sin nombre'} (${fechaBonita(e.fecha)}) con ${(e.paginas || []).length === 1 ? 'su página escaneada' : 'sus ' + (e.paginas || []).length + ' páginas escaneadas'}, para todos. No se puede deshacer. Si la necesitas, descarga antes el PDF.`, 'Eliminar', async () => {
-    cerrarEn();
-    await escribir({ tipo: 'delete', col: COL, id });
-    for (const [pi, p] of (e.paginas || []).entries()) for (let c = 0; c < p.trozos; c++) DB.collection(COL_A).doc(`${id}_${pi}_${c}`).delete().catch(() => {});
-    toast('Hoja eliminada');
-  });
+  const pend = [], term = [], opc = [];
+  Object.values(e.recibidos || {}).forEach(rid => { const x = EQR.get(rid); if (x) (x.cerrado ? term : pend).push([rid, x]); });
+  const dev = Object.entries(e.antes || {}).filter(([k]) => { const q = EQ.get(k); return q && sinTildes(q.asignado) === sinTildes(e.nombre); });
+  if (EQDB) {
+    if (pend.length) opc.push(`<label class="check"><input type="checkbox" id="cfBorrarPend" checked> También quitar de Recibidos en Equipos: ${esc(pend.map(p => p[1].serial).join(', '))}</label>`);
+    if (term.length) opc.push(`<label class="check"><input type="checkbox" id="cfBorrarTerm"> Borrar también en Recibidos el registro ya terminado de ${esc(term.map(p => p[1].serial).join(', '))}</label><p class="nota-cf">La lista de Equipos no cambia: el equipo sigue asignado a quien quedó.</p>`);
+    if (dev.length) opc.push(`<label class="check"><input type="checkbox" id="cfDevolver" checked> Devolver en Equipos ${esc(dev.map(([k, a]) => `${EQ.get(k).serial} a ${a || 'nadie'}`).join(', '))} (quien lo tenía antes)</label>`);
+  } else if (aplicaEquipos(e)) opc.push('<p class="nota-cf">Esta app no está conectada con Equipos: solo se borra aquí.</p>');
+  const n = (e.paginas || []).length;
+  confirmar('Eliminar hoja', `Se borra la hoja de ${e.nombre || 'sin nombre'} (${fechaBonita(e.fecha)}) con ${n === 1 ? 'su página escaneada' : 'sus ' + n + ' páginas escaneadas'}, para todos. No se puede deshacer. Si la necesitas, descarga antes el PDF.`, 'Eliminar', () => {
+    const qPend = !!($('cfBorrarPend') && $('cfBorrarPend').checked), qTerm = !!($('cfBorrarTerm') && $('cfBorrarTerm').checked), qDev = !!($('cfDevolver') && $('cfDevolver').checked);
+    (async () => {
+      cerrarEn();
+      await escribir({ tipo: 'delete', col: COL, id });
+      for (const [pi, p] of (e.paginas || []).entries()) for (let c = 0; c < p.trozos; c++) DB.collection(COL_A).doc(`${id}_${pi}_${c}`).delete().catch(() => {});
+      const hechos = [];
+      if (EQDB) {
+        const quitar = (qPend ? pend : []).concat(qTerm ? term : []);
+        quitar.forEach(([rid]) => { EQDB.collection('recibidos').doc(rid).delete().catch(() => {}); EQR.delete(rid); });
+        if (quitar.length) hechos.push(`${quitar.length} de Recibidos`);
+        if (qDev && dev.length) {
+          const s = { actualizado: new Date().toISOString(), por: miId || '' };
+          dev.forEach(([k, a]) => { EQDB.collection('equipos').doc(k).update(Object.assign({ asignado: a || '' }, s)).catch(() => {}); });
+          hechos.push(`${dev.length} ${dev.length === 1 ? 'equipo devuelto' : 'equipos devueltos'} a quien lo tenía`);
+        }
+      }
+      toast('Hoja eliminada' + (hechos.length ? ' · ' + hechos.join(' · ') : ''));
+    })();
+  }, null, opc.join(''));
 }
 async function descargarPdf(id) {
   const e = ENT.get(id); if (!e || !DL) return;
@@ -841,8 +959,11 @@ async function descargarPdf(id) {
 function verGrande(src, txt) { $('visorImg').src = src; $('visorTxt').textContent = txt; $('visor').hidden = false; }
 function cerrarVisor() { $('visor').hidden = true; $('visorImg').src = ''; }
 
-let cfAccion = null;
-function confirmar(titulo, texto, boton, accion, estilo) {
+let cfAccion = null, cfGen = 0;
+// opcHtml: casillas extra dentro de la confirmación. Si la acción devuelve false, la confirmación no se cierra.
+function confirmar(titulo, texto, boton, accion, estilo, opcHtml) {
+  cfGen++;
+  $('cfOpc').innerHTML = opcHtml || ''; $('cfOpc').hidden = !opcHtml;
   $('cfTitle').textContent = titulo; $('cfText').textContent = texto; $('cfYes').textContent = boton;
   $('cfYes').className = 'btn ' + (estilo === 'ok' ? 'primary' : 'danger');
   cfAccion = accion; $('cfSheet').hidden = false; $('cfNo').hidden = !accion; requestAnimationFrame(() => (accion ? $('cfNo') : $('cfYes')).focus());
@@ -951,7 +1072,11 @@ $('enPaginas').onclick = e => { const b = e.target.closest('[data-pv]'); const i
 $('enSheet').onclick = e => { if (e.target === $('enSheet')) pedirCerrarEn(); };
 $('visorCerrar').onclick = cerrarVisor;
 $('cfNo').onclick = () => { $('cfSheet').hidden = true; cfAccion = null; };
-$('cfYes').onclick = () => { $('cfSheet').hidden = true; const a = cfAccion; cfAccion = null; if (a) a(); };
+$('cfYes').onclick = () => {
+  const a = cfAccion, gen = cfGen;
+  if (a && a() === false) return;
+  if (gen === cfGen) { $('cfSheet').hidden = true; cfAccion = null; }
+};
 $('qDb').oninput = renderDb;
 $('dbTable').addEventListener('change', e => { if (e.target.dataset.f) editarCelda(e.target); });
 $('dbTable').onclick = e => { const b = e.target.closest('[data-del]'); if (b) borrarEn(b.dataset.del); };

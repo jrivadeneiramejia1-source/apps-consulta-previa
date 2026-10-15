@@ -88,7 +88,7 @@ for (const tema of ['light', 'dark']) {
 
   // r-2: backup hecho → pregunta pasar → pasar
   await page.click('[data-rid="r-2"][data-tarea="backup"][data-v="hecho"]'); await page.waitForSelector('#cfSheet:not([hidden])');
-  chequear((await page.textContent('#cfTitle')).startsWith('¿Pasar a María'), 'pregunta pasar a la persona');
+  chequear((await page.textContent('#cfTitle')).includes('R58N90AB') && await page.locator('#cfOpc [value="María Epieyú"]').isChecked(), 'pregunta pasar y propone a la persona del registro');
   chequear(await enfocadoDentro(page, '#cfSheet'), 'foco dentro de la confirmación');
   if (tema === 'light') await page.screenshot({ path: `${OUT}/e2-confirmar.png` });
   await axe(page, `confirmación ${tema}`);
