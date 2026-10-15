@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=17">
+<link rel="stylesheet" href="../comun.css?v=18">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -73,6 +73,7 @@
     <div class="summary cuatro" id="sumMt"></div>
     <button class="btn primary big solo-editar" id="btnNewMt" type="button"><span data-ico="programar"></span>Programar tarea</button>
     <input class="search" id="qMt" type="search" placeholder="Buscar serial, persona o modelo" autocomplete="off" aria-label="Buscar en la agenda">
+    <div class="chips" id="chipsResp" role="group" aria-label="Ver las tareas de cada persona" hidden></div>
     <div class="count" id="mtCount" aria-live="polite"></div>
     <div class="list" id="mtList"></div>
   </section>
@@ -268,11 +269,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "17"};</script>
-<script src="../iconos.js?v=17"></script>
-<script src="../comun.js?v=17"></script>
-<script src="../config.js?v=17"></script>
-<script src="../nube.js?v=17"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "18"};</script>
+<script src="../iconos.js?v=18"></script>
+<script src="../comun.js?v=18"></script>
+<script src="../config.js?v=18"></script>
+<script src="../nube.js?v=18"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas';
@@ -306,6 +307,7 @@ let Q = new Map(), R = new Map(), T = new Map();   // equipos, recibidos y tarea
 let DB = null, USER = null, DL = null, miId = null, puedeEscribir = null, soloLectura = false;
 let ENTDB = null;   // conexión con la app de Entregas (para actualizar o borrar la hoja de una devolución)
 let filtroMt = 'prog', mtActual = null, listoT = false, tareasBloqueadas = false;
+let filtroResp = '';   // '' = todas las personas; '-' = sin responsable; o el nombre (sin tildes) del responsable
 let AV = new Map(), avisosBloqueados = false;   // teléfonos con sesión: id -> { nombre, equipo, visto, sub }
 let listoQ = false, listoR = false, conexion = 'cargando', fechaCache = null;
 let pendientes = lsGet(PEND_KEY) || [];
@@ -586,7 +588,7 @@ function renderRec() {
     + UI.cifra({ k: 'rMtto', n: nF('sinmtto'), lbl: 'Sin manteni\u00ADmiento', icono: 'mantenimiento', tono: 'listo', filtro: 'sinmtto', activo: filtroRec === 'sinmtto' })
     + UI.cifra({ k: 'rBack', n: nF('sinbackup'), lbl: 'Sin backup', icono: 'backup', filtro: 'sinbackup', activo: filtroRec === 'sinbackup' });
   UI.contar($('sumRec'));
-  $('chipsRec').innerHTML = FILTROS_REC.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtroRec === f.k}">${f.n}<span class="n">${nF(f.k)}</span></button>`).join('');
+  $('chipsRec').innerHTML = FILTROS_REC.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtroRec === f.k}">${f.n} <span class="n">${nF(f.k)}</span></button>`).join('');
   const q = sinTildes($('qRec').value.trim());
   const lista = todos.filter(r => filtraRec(r, filtroRec) && (!q || textoRec(r).includes(q)))
     .sort((a, b) => (a.cerrado ? 1 : 0) - (b.cerrado ? 1 : 0) || (a.cerrado ? String(b.cerradoEn).localeCompare(String(a.cerradoEn)) : String(a.fechaIngreso || '').localeCompare(String(b.fechaIngreso || ''))));
@@ -1072,8 +1074,8 @@ function tarjetaTarea(t) {
     <button type="button" class="card-top" data-t-abrir="${esc(t.id)}">
       <div class="card-head"><div class="cab">${iconoDe(e.tipo)}<div class="cab-t"><div class="card-title serial">${esc(e.serial || t.serial)}</div><div class="meta">${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div></div></div>
         <span class="pill ${atras ? 's-rojo' : n !== null && n <= 1 ? 's-org' : 's-listo'}">${textoCuando(t.fecha)}</span></div>
-      <div class="facts"><span class="pill tp-${esc(t.tipo || 'fisico')}">${ico(tt.ico)}${tt.n}</span><span class="mono">${fechaBonita(t.fecha)}</span></div>
-      <div class="facts"><span>Lo tiene <b>${esc(e.asignado || 'nadie')}</b></span><span class="acc-mini">${ico('persona')}${t.resp ? 'Responsable: <b>' + esc(t.resp) + '</b>' : 'Sin responsable'}</span></div>
+      <div class="para-t ${mismoNombre(t.resp, miId) ? 'mio' : ''}"><span class="pill tp-${esc(t.tipo || 'fisico')}">${ico(tt.ico)}${tt.n}</span><span>programado para <b>${!t.resp ? 'cualquiera' : mismoNombre(t.resp, miId) ? 'ti' : esc(t.resp)}</b>${t.creadoPor ? ` <span class="meta">· lo programó ${mismoNombre(t.creadoPor, miId) ? 'tú' : esc(t.creadoPor)}</span>` : ''}</span></div>
+      <div class="facts"><span>Para el <span class="mono">${fechaBonita(t.fecha)}</span></span><span>Lo tiene <b>${esc(e.asignado || 'nadie')}</b></span></div>
       ${conDisco(t) ? `<div class="facts"><span class="acc-mini">${ico('disco')}Disco de backup: <b>${esc(t.disco || 'cualquiera')}</b></span></div>` : ''}
       ${t.nota ? `<div class="obs">${esc(t.nota)}</div>` : ''}
     </button>
@@ -1106,9 +1108,20 @@ function renderMt() {
   if (filtroMt === 'sug') {
     total = sug.length; const l = sug.filter(e => coincide(null, e)); vistos = l.length; html = l.map(tarjetaSugerido).join('');
   } else {
-    const base = filtroMt === 'mias' ? mias : filtroMt === 'atras' ? atras : act;
+    const base0 = filtroMt === 'mias' ? mias : filtroMt === 'atras' ? atras : act;
+    // Botones por persona: cuántas tareas tiene cada responsable en esta vista
+    const claveResp = t => t.resp ? sinTildes(String(t.resp).trim()) : '-';
+    const grupos = new Map();
+    base0.forEach(t => { const k = claveResp(t), g = grupos.get(k) || { k, n: 0, nombre: t.resp ? String(t.resp).trim() : 'Sin responsable', yo: mismoNombre(t.resp, miId) }; g.n++; grupos.set(k, g); });
+    if (filtroResp && !grupos.has(filtroResp)) filtroResp = '';
+    const orden = [...grupos.values()].sort((a, b) => (b.yo - a.yo) || (a.k === '-') - (b.k === '-') || a.nombre.localeCompare(b.nombre, 'es'));
+    $('chipsResp').hidden = filtroMt === 'mias' || grupos.size < 2;
+    $('chipsResp').innerHTML = `<button type="button" class="chip" data-resp="" aria-pressed="${!filtroResp}">Todas <span class="n">${base0.length}</span></button>`
+      + orden.map(g => `<button type="button" class="chip" data-resp="${esc(g.k)}" aria-pressed="${filtroResp === g.k}">${esc(g.yo ? g.nombre + ' (tú)' : g.nombre)} <span class="n">${g.n}</span></button>`).join('');
+    const base = filtroResp && filtroMt !== 'mias' ? base0.filter(t => claveResp(t) === filtroResp) : base0;
     total = base.length; const l = base.filter(t => coincide(t, Q.get(idSerial(t.serial)) || { serial: t.serial })); vistos = l.length; html = l.map(tarjetaTarea).join('');
   }
+  if (filtroMt === 'sug') $('chipsResp').hidden = true;
   $('mtCount').textContent = (filtroMt === 'sug' ? `Equipos con ${MESES_ALERTA} meses o más sin mantenimiento físico, o sin fecha. ` : '') + (total ? `Mostrando ${vistos} de ${total}` : '');
   if (!Q.size) { $('mtList').innerHTML = conexion === 'cargando' ? UI.esqueleto(3) : UI.vacio('equipos', 'Todavía no hay equipos', 'Agrega equipos en la pestaña Equipos.'); return; }
   $('mtList').innerHTML = html || (q ? UI.vacio('buscar', 'Nada coincide', 'Prueba con otra búsqueda.')
@@ -1532,6 +1545,7 @@ if (ui.tablaDb === 'rec') tablaDb = 'rec';
 $('tabRec').onclick = () => ir('rec'); $('tabEq').onclick = () => ir('eq'); $('tabMt').onclick = () => ir('mt'); $('tabDb').onclick = () => ir('db');
 $('btnNewMt').onclick = () => abrirMt(null);
 $('qMt').oninput = renderMt;
+$('chipsResp').onclick = e => { const b = e.target.closest('[data-resp]'); if (!b) return; filtroResp = b.dataset.resp; renderMt(); };
 $('sumMt').onclick = e => { const b = e.target.closest('[data-filtro]'); if (!b) return; filtroMt = filtroMt === b.dataset.filtro && b.dataset.filtro !== 'prog' ? 'prog' : b.dataset.filtro; renderMt(); };
 $('mtList').onclick = e => {
   const c = e.target.closest('[data-copiar]');

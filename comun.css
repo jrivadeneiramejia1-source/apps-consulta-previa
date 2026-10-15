@@ -191,7 +191,7 @@ select.search { padding-left: 14px; background: var(--surface) var(--flecha) no-
 }
 .chip:hover { border-color: var(--line-2); }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
-.chip .n { font-family: var(--f-mono); font-size: .76rem; margin-left: 6px; opacity: .8; }
+.chip .n { font-family: var(--f-mono); font-size: .76rem; margin-left: 2px; opacity: .8; }
 .count { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* Tarjetas */
@@ -498,3 +498,6 @@ body.con-hoja .toast { bottom: auto; top: calc(14px + env(safe-area-inset-top, 0
 .persona .disp { list-style: none; margin: 8px 0 0; padding: 0 0 0 46px; display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--muted); }
 .persona .disp li { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ok-t { color: var(--disco); font-weight: 700; }
+
+.para-t { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; font-size: .9rem; }
+.para-t.mio b:last-of-type { color: var(--accent-txt); }

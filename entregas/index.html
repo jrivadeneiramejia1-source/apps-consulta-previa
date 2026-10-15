@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=17">
+<link rel="stylesheet" href="../comun.css?v=18">
 <style>
 
 /* --- Entregas --- */
@@ -223,12 +223,12 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "17"};</script>
-<script src="../iconos.js?v=17"></script>
-<script src="../comun.js?v=17"></script>
-<script src="escaner.js?v=17"></script>
-<script src="../config.js?v=17"></script>
-<script src="../nube.js?v=17"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "18"};</script>
+<script src="../iconos.js?v=18"></script>
+<script src="../comun.js?v=18"></script>
+<script src="escaner.js?v=18"></script>
+<script src="../config.js?v=18"></script>
+<script src="../nube.js?v=18"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -464,7 +464,7 @@ function renderEnt() {
     + UI.cifra({ k: 'hMes', n: todos.filter(e => (e.fecha || '').startsWith(mes)).length, lbl: 'De este mes', icono: 'reloj', tono: 'listo', filtro: 'mes', activo: filtro === 'mes' })
     + UI.cifra({ k: 'hPer', n: personas, lbl: 'Personas', icono: 'persona', tono: 'org' });
   UI.contar($('sumEnt'));
-  $('chipsEnt').innerHTML = FILTROS.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtro === f.k}">${f.n}<span class="n">${todos.filter(e => pasaFiltro(e, f.k)).length}</span></button>`).join('');
+  $('chipsEnt').innerHTML = FILTROS.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtro === f.k}">${f.n} <span class="n">${todos.filter(e => pasaFiltro(e, f.k)).length}</span></button>`).join('');
   const q = sinTildes($('qEnt').value.trim());
   const ver = todos.filter(e => pasaFiltro(e, filtro) && (!q || textoDe(e).includes(q)))
     .sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || String(b.subido || '').localeCompare(String(a.subido || '')));

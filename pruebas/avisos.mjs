@@ -78,6 +78,15 @@ await page.selectOption('#mtResp', '__otro'); await page.fill('#mtRespOtro', 'Pe
 log('12. si escribe otra persona sin avisos lo dice', (await page.textContent('#mtRespInfo')).includes('no tiene notificaciones'));
 await page.click('#mtGuardar'); await esp(400);
 log('13. y no intenta enviar (dice que lo verá al abrir la app)', envios.length === 2 && (await page.textContent('#toast')).includes('Pedro no tiene notificaciones'));
+// Cada uno ve para quién es cada tarea
+await page.click('#tabMt'); await esp(200);
+const textos = await page.locator('#mtList .para-t').allInnerTexts();
+log('13b. cada tarjeta dice "… programado para …" y quién la programó', textos.some(x => /Backup\s+programado para Jeiler/.test(x) && x.includes('lo programó tú')) && textos.some(x => /Mantenimiento físico\s+programado para Pedro/.test(x)), textos.join(' | '));
+const chips = (await page.locator('#chipsResp .chip').allInnerTexts()).map(x => x.replace(/\s+/g, ' ').trim());
+log('13c. botones por persona con su cantidad', chips.join('|') === 'Todas 2|Jeiler 1|Pedro 1', chips.join('|'));
+await page.click('#chipsResp [data-resp="pedro"]'); await esp(100);
+log('13d. tocar una persona muestra solo sus tareas', (await page.locator('#mtList .card.mt').count()) === 1 && (await page.locator('#mtList .para-t').innerText()).includes('Pedro'));
+await page.click('#chipsResp [data-resp=""]'); await esp(100);
 await page.click('#tabDb'); await page.click('#notiBtns [data-noti="activar"]'); await esp(400);
 
 // Jeiler abre la app: le dice lo que le asignaron y pide prender el equipo
@@ -86,6 +95,7 @@ log('14. al abrir, Jeiler ve "Te asignaron una tarea"', (await page.textContent(
 log('15. la pestaña Agenda cuenta lo que le toca', (await page.textContent('#badgeMt')) === '1');
 await page.click('#tabMt'); await page.click('#sumMt [data-filtro="mias"]'); await esp(100);
 log('16. "Para mí" muestra su tarea', (await page.locator('#mtList .card.mt').count()) === 1);
+log('16b. a Jeiler le dice "programado para ti"', /programado para ti/.test(await page.locator('#mtList .para-t').innerText()));
 await page.click(`[data-t-acc="encender"][data-t="${tid}"]`); await page.waitForSelector('#cfSheet:not([hidden])');
 log('17. pregunta antes: a quién le avisa y que conecte el disco', (await page.textContent('#cfText')).includes('Se le avisa a Carlos que prenda el equipo y le conecte el disco de backup (Disco Backup 2)'));
 await page.click('#cfYes'); await esp(500);
