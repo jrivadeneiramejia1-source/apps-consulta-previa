@@ -152,6 +152,18 @@ log('G1. sin tareas muestra el estado vacío', (await eqp.locator('#mtList .empt
   await eqp.click('#sumMt [data-filtro="sug"]'); await esp(100);
   const visto = (await eqp.locator('#mtList .card.mt.sug .serial').allTextContents()).sort();
   log('G2. sugeridos = equipos con 6+ meses o sin fecha que no están en Recibidos', visto.length > 0 && JSON.stringify(visto) === JSON.stringify(esperado), `visto ${visto} / esperado ${esperado}`);
+  const sug1 = visto[0];
+  const btn = eqp.locator('#mtList .card.mt.sug', { hasText: sug1 }).locator('[data-t-prog]');
+  log('G2b. el botón de un sugerido dice solo "Programar mantenimiento"', (await btn.innerText()).trim() === 'Programar mantenimiento');
+  await btn.click(); await eqp.waitForSelector('#mtSheet:not([hidden])');
+  log('G2c. la hoja abre sin tipo escogido y con el serial puesto', (await eqp.locator('#mtTipo [aria-pressed="true"]').count()) === 0 && (await eqp.inputValue('#mtSerial')) === sug1);
+  await eqp.click('#mtGuardar'); await esp(100);
+  log('G2d. sin escoger el tipo no deja guardar', (await eqp.textContent('#mtErr')).includes('Escoge el tipo de tarea'));
+  await eqp.click('#mtTipo [data-tipo="remoto"]'); await eqp.click('#mtGuardar'); await esp(300);
+  const sx = await st(eqp), tr = Object.entries(sx).find(([k, v]) => k.startsWith(B + '/tareas/') && v.serial === sug1);
+  log('G2e. al escoger Mantenimiento remoto se guarda y el equipo sale de sugeridos', tr && tr[1].tipo === 'remoto' && !(await eqp.locator('#mtList .card.mt.sug .serial').allTextContents()).includes(sug1));
+  await eqp.evaluate(([B, k]) => { const d = JSON.parse(localStorage.getItem('__fs_falso')); delete d[k]; localStorage.setItem('__fs_falso', JSON.stringify(d)); }, [B, tr[0]]);
+  await eqp.reload(); await eqp.waitForSelector('#recList .card.rec'); await eqp.click('#tabMt'); await esp(200);
   await eqp.click('#sumMt [data-filtro="prog"]'); await esp(100);
 }
 // Backup remoto

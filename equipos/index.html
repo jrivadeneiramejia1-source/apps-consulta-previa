@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=18">
+<link rel="stylesheet" href="../comun.css?v=19">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -269,11 +269,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "18"};</script>
-<script src="../iconos.js?v=18"></script>
-<script src="../comun.js?v=18"></script>
-<script src="../config.js?v=18"></script>
-<script src="../nube.js?v=18"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "19"};</script>
+<script src="../iconos.js?v=19"></script>
+<script src="../comun.js?v=19"></script>
+<script src="../config.js?v=19"></script>
+<script src="../nube.js?v=19"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas';
@@ -1045,7 +1045,7 @@ function diasHasta(f) {
 }
 function sugeridos() {
   return equiposOrdenados('mtto').filter(e => {
-    if (activasDe(e.id).some(t => t.tipo === 'fisico') || pendienteDe(e.serial)) return false;
+    if (activasDe(e.id).some(t => t.tipo === 'fisico' || t.tipo === 'remoto') || pendienteDe(e.serial)) return false;
     const m = mesesDesde(e.fechaMtto); return m === null || m >= MESES_ALERTA;
   });
 }
@@ -1090,7 +1090,7 @@ function tarjetaSugerido(e) {
       <div class="facts"><span>Lo tiene <b>${esc(e.asignado || 'nadie')}</b></span></div>
       <div class="facts">${textoMtto(e)}</div>
     </button>
-    <div class="acciones-t solo-editar"><button type="button" class="btn" data-t-prog="${esc(e.id)}">${ico('programar')}Programar mantenimiento físico</button></div>
+    <div class="acciones-t solo-editar"><button type="button" class="btn" data-t-prog="${esc(e.id)}">${ico('programar')}Programar mantenimiento</button></div>
   </div>`;
 }
 function renderMt() {
@@ -1336,11 +1336,12 @@ function avisarNuevosParaMi() {
 
 /* ---------- hoja de la tarea ---------- */
 let mtTipo = 'fisico', fotoMt = '';
+// t = '' deja la hoja sin tipo escogido (desde Sugeridos): hay que tocar uno antes de guardar.
 function ponerTipo(t) {
-  mtTipo = TIPOS_T[t] ? t : 'fisico';
+  mtTipo = TIPOS_T[t] ? t : '';
   $('mtTipo').querySelectorAll('[data-tipo]').forEach(b => b.setAttribute('aria-pressed', b.dataset.tipo === mtTipo));
-  $('mtTipoAyuda').textContent = TIPOS_T[mtTipo].ayuda;
-  $('mtAnyBox').hidden = mtTipo === 'fisico';
+  $('mtTipoAyuda').textContent = mtTipo ? TIPOS_T[mtTipo].ayuda : 'Escoge qué se le va a hacer: mantenimiento físico, mantenimiento remoto o backup.';
+  $('mtAnyBox').hidden = !mtTipo || mtTipo === 'fisico';
   $('mtDiscoBox').hidden = mtTipo !== 'backup';
 }
 function abrirMt(tid, serialInicial, tipoInicial) {
@@ -1351,7 +1352,7 @@ function abrirMt(tid, serialInicial, tipoInicial) {
   const e = Q.get(idSerial(t ? t.serial : serialInicial || ''));
   $('mtTitle').textContent = t ? tipoT(t).n : 'Programar tarea';
   $('mtSub').textContent = t ? `${ESTADO_TXT(t)} · programada por ${t.creadoPor || 'alguien'}` : 'Mantenimiento o backup de un equipo. No hace falta subir ninguna hoja.';
-  ponerTipo(t ? t.tipo : tipoInicial || 'fisico');
+  ponerTipo(t ? t.tipo : tipoInicial === '' ? '' : tipoInicial || 'fisico');
   $('mtTipo').querySelectorAll('button').forEach(b => { b.disabled = soloLectura; });
   $('mtSerial').value = t ? t.serial : e ? e.serial : (serialInicial || ''); $('mtSerial').disabled = soloLectura || !!t;
   const f = new Date(); f.setDate(f.getDate() + (tipoInicial === 'fisico' || !tipoInicial ? 7 : 1));
@@ -1390,6 +1391,7 @@ function guardarMt(ev) {
   if (!e) return mostrarErr('mtErr', 'Ese serial no está en la lista de Equipos. Agrégalo primero en la pestaña Equipos.');
   if (!$('mtFecha').value) return mostrarErr('mtErr', 'Escoge la fecha programada.');
   if ($('mtResp').value === '__otro' && !leerResp()) { $('mtRespOtro').focus(); return mostrarErr('mtErr', 'Escribe el nombre del responsable.'); }
+  if (!mtTipo) { $('mtTipo').querySelector('button').focus(); return mostrarErr('mtErr', 'Escoge el tipo de tarea: mantenimiento físico, mantenimiento remoto o backup.'); }
   if (!t0 && activasDe(id).some(t => t.tipo === mtTipo)) return mostrarErr('mtErr', `Ese equipo ya tiene ${TIPOS_T[mtTipo].txt} programado. Ábrelo en la agenda para cambiarlo.`);
   const datos = { tipo: mtTipo, fecha: $('mtFecha').value, nota: $('mtNota').value.trim(), resp: leerResp(), disco: mtTipo === 'backup' ? $('mtDisco').value.trim().replace(/\s+/g, ' ') : '' };
   const any = soloDigitos($('mtAnydesk').value);
@@ -1551,7 +1553,7 @@ $('mtList').onclick = e => {
   const c = e.target.closest('[data-copiar]');
   if (c) { (navigator.clipboard ? navigator.clipboard.writeText(c.dataset.copiar) : Promise.reject()).then(() => toast('Número de AnyDesk copiado'), () => toast('No se pudo copiar: ' + c.dataset.copiar)); return; }
   const ac = e.target.closest('[data-t-acc]'); if (ac) return accionTarea(ac.dataset.t, ac.dataset.tAcc);
-  const pr = e.target.closest('[data-t-prog]'); if (pr) return abrirMt(null, pr.dataset.tProg, 'fisico');
+  const pr = e.target.closest('[data-t-prog]'); if (pr) return abrirMt(null, pr.dataset.tProg, '');   // sin tipo: se escoge en la hoja
   const ab = e.target.closest('[data-t-abrir]'); if (ab) return abrirMt(ab.dataset.tAbrir);
   const eq = e.target.closest('[data-eq-abrir]'); if (eq) return abrirEq(eq.dataset.eqAbrir);
 };
