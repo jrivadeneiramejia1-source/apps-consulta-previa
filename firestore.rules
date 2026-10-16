@@ -2,11 +2,19 @@ rules_version = '2';
 // Reglas de Firestore (proyecto consulta-previa-apps). Se pegan en Firebase → Firestore Database → Reglas (Rules).
 // Cada clave es un "espacio": espacios/<huella de 40 letras>/<colección>/<documento>.
 // Quien no conoce la clave no conoce la huella, y no se puede listar la raíz ni buscar entre espacios.
+// Crear o cambiar: el documento no puede quedar vacío ni pasar de 300 campos (evita escrituras rotas o basura).
+// El tamaño ya lo limita Firestore (1 MiB por documento); las reglas no tienen cómo medirlo.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /espacios/{espacio}/{coleccion}/{id} {
-      allow read, write: if espacio.size() == 40
+    function permitido(espacio, coleccion) {
+      return espacio.size() == 40
         && coleccion in ['comunidades', 'evidencias', 'equipos', 'recibidos', 'entregas', 'archivos', 'avisos', 'tareas'];
+    }
+    match /espacios/{espacio}/{coleccion}/{id} {
+      allow read, delete: if permitido(espacio, coleccion);
+      allow create, update: if permitido(espacio, coleccion)
+        && request.resource.data.keys().size() > 0
+        && request.resource.data.keys().size() <= 300;
     }
   }
 }

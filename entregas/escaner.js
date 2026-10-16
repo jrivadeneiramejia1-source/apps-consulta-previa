@@ -6,10 +6,12 @@
   'use strict';
   const CV_URL = 'https://cdn.jsdelivr.net/npm/@techstark/opencv-js@4.10.0-release.1/dist/opencv.js';
   // Calidad: tamaño final de la hoja, compresión JPEG y tamaño máximo con que se abre la foto.
+  // techo y piso: en Documento y Gris, si la hoja pasa del techo se baja la compresión de a poco, sin bajar del piso
+  // (nunca se reduce la resolución, así la letra pequeña y las firmas siguen nítidas).
   const CALIDADES = {
-    ahorro: { nombre: 'Ahorro', detalle: 'unos 200 KB por hoja · letra grande', ancho: 1100, largo: 1600, jpeg: 0.7, max: 2400 },
-    normal: { nombre: 'Normal', detalle: 'unos 400 KB por hoja · recomendada', ancho: 1700, largo: 2400, jpeg: 0.8, max: 3200 },
-    alta: { nombre: 'Alta', detalle: 'unos 800 KB por hoja · letra pequeña', ancho: 2480, largo: 3508, jpeg: 0.9, max: 4200 }
+    ahorro: { nombre: 'Ahorro', detalle: 'hasta unos 90 KB por hoja · letra grande', ancho: 1100, largo: 1600, jpeg: 0.7, max: 2400, techo: 90e3, piso: 0.55 },
+    normal: { nombre: 'Normal', detalle: 'hasta unos 160 KB por hoja · recomendada', ancho: 1700, largo: 2400, jpeg: 0.8, max: 3200, techo: 160e3, piso: 0.6 },
+    alta: { nombre: 'Alta', detalle: 'hasta unos 320 KB por hoja · letra pequeña', ancho: 2480, largo: 3508, jpeg: 0.9, max: 4200, techo: 320e3, piso: 0.7 }
   };
   const FILTROS = { doc: 'Documento', mejor: 'Mejorado', gris: 'Gris', color: 'Color' };
   const leer = (k, d, ok) => { try { const v = localStorage.getItem(k); return v && ok[v] ? v : d; } catch (e) { return d; } };
@@ -396,6 +398,32 @@
     const c = document.createElement('canvas'); c.width = Math.round(foto.width * k); c.height = Math.round(foto.height * k);
     const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(foto, 0, 0, c.width, c.height); return c;
   }
+  // Gris: gris real (los tres canales iguales) y el fondo limpio, para que el JPEG guarde el papel casi sin bytes.
+  // (Documento no lo necesita: su filtro ya deja el papel en blanco puro y la tinta oscura; ahí la rampa a veces pesaba más.)
+  // Lo casi negro (≤ 35) queda negro y lo casi blanco (≥ 230) blanco puro; entre 200 y 230 se aclara poco a poco.
+  // Se midió con las fotos de prueba: un corte duro en 242 hace puntitos donde el papel ronda ese valor y pesa MÁS;
+  // la rampa suave baja el peso de Gris entre 35 y 45 % sin tocar la tinta (lo más oscuro que 200 no cambia).
+  // También se probó WebP: pesa menos, pero el iPhone no lo crea desde un canvas (sale PNG, mucho más pesado)
+  // y el PDF (pdf-lib) solo acepta JPEG; por eso se queda en JPEG.
+  const RAMPA = Uint8ClampedArray.from({ length: 256 }, (_, g) => g >= 230 ? 255 : g >= 200 ? Math.round(g + (255 - g) * (g - 200) / 30) : g <= 35 ? 0 : g);
+  function limpiarFondo(c) {
+    const x = c.getContext('2d', { willReadFrequently: true }), im = x.getImageData(0, 0, c.width, c.height), d = im.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const g = RAMPA[(d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8];
+      d[i] = d[i + 1] = d[i + 2] = g; d[i + 3] = 255;
+    }
+    x.putImageData(im, 0, 0);
+  }
+  const aBlob = (c, q) => new Promise(ok => c.toBlob(ok, 'image/jpeg', q));
+  // Comprime la hoja final. Devuelve { blob, q }.
+  async function comprimir(c, filtro, cal) {
+    const pf = CALIDADES[cal] || perfil(), gris = filtro === 'doc' || filtro === 'gris';
+    if (filtro === 'gris') limpiarFondo(c);
+    let q = pf.jpeg, blob = await aBlob(c, q);
+    if (gris) while (blob && blob.size > pf.techo && q - 0.05 >= pf.piso - 1e-9) { q = Math.round((q - 0.05) * 100) / 100; blob = await aBlob(c, q); }
+    if (!blob) throw new Error('No se pudo guardar la página.');
+    return { blob, q };
+  }
   function miniatura(c, lado) {
     const k = Math.min(1, lado / Math.max(c.width, c.height)), m = document.createElement('canvas');
     m.width = Math.max(1, Math.round(c.width * k)); m.height = Math.max(1, Math.round(c.height * k));
@@ -700,7 +728,7 @@
   function abrir(opciones) {
     opciones = opciones || {};
     calidad = leer('escaner.calidad', calidad, CALIDADES); filtroPref = leer('escaner.filtro', filtroPref, FILTROS);
-    const max = Math.max(1, opciones.max || 40), paginas = [];
+    const max = Math.max(1, opciones.max || 100), paginas = [];
     let ocupado = false, cerrado = false, avisoCerrar = 0, panelAbierto = false, resolver = null;
     const p = pantalla('Escanear hojas', `
       <div class="esc-barra"><button class="esc-btn" data-a="cerrar" type="button">${icono('x')}<span>Cerrar</span></button><h2 class="esc-titulo">Escanear hojas</h2><span class="esc-hueco"></span></div>
@@ -745,11 +773,9 @@
     // La cámara y la galería solo se pueden abrir dentro de un toque: por eso se llaman directo, sin esperas antes.
     function abrirCamara(forzar) { if ((ocupado && !forzar) || lleno() || cerrado) return; inCam.value = ''; try { inCam.click(); } catch (e) {} }
     function abrirGaleria() { if (ocupado || lleno() || cerrado) return; inGal.value = ''; try { inGal.click(); } catch (e) {} }
-    async function guardarPagina(c) {
-      const pf = perfil();
-      const blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', pf.jpeg));
-      if (!blob) throw new Error('No se pudo guardar la página.');
-      paginas.push({ blob, width: c.width, height: c.height, calidadJpeg: pf.jpeg, mini: miniatura(c, 240) });
+    async function guardarPagina(c, filtro) {
+      const { blob, q } = await comprimir(c, filtro);
+      paginas.push({ blob, width: c.width, height: c.height, calidadJpeg: q, mini: miniatura(c, 240) });
       c.width = 0;   // libera la memoria de la imagen grande
     }
     async function procesar(archivos, desdeCamara) {
@@ -771,7 +797,7 @@
           foto.width = 0;
           if (cerrado) return;
           if (r && r.accion === 'usar' && r.canvas) {
-            await guardarPagina(r.canvas);
+            await guardarPagina(r.canvas, cv ? r.filtro : 'color');
             avisar(lleno() ? `Página ${paginas.length} lista. Llegaste al máximo: toca Listo.` : `Página ${paginas.length} lista.${desdeCamara ? ' Toma la siguiente o toca Listo.' : ''}`);
           }
           if (r && r.accion === 'repetir') break;
@@ -818,9 +844,10 @@
     let cv; try { cv = (await cargarCV()).cv; } catch (e) { avisar(e.message); return null; }
     const r = await revisarFoto(cv, canvas, { titulo: 'Recortar la página', textoUsar: 'Aplicar' });
     if (!r || r.accion !== 'usar' || !r.canvas) return null;
-    r.canvas.calidadJpeg = perfil().jpeg;
-    return r.canvas;
+    const { blob, q } = await comprimir(r.canvas, r.filtro), w = r.canvas.width, h = r.canvas.height;
+    r.canvas.width = 0;
+    return { blob, width: w, height: h, calidadJpeg: q };
   }
 
-  window.Escaner = { abrir, recortar, cargarCV, CALIDADES, _detectar: detectar, _detectarEn: detectarEn, _proporcion: proporcion, _ordenar: ordenar, _enderezar: enderezar, _filtrar: filtrar, _estado: () => ({ calidad, filtro: filtroPref }) };
+  window.Escaner = { abrir, recortar, cargarCV, CALIDADES, _detectar: detectar, _detectarEn: detectarEn, _proporcion: proporcion, _ordenar: ordenar, _enderezar: enderezar, _filtrar: filtrar, _comprimir: comprimir, _limpiarFondo: limpiarFondo, _estado: () => ({ calidad, filtro: filtroPref }) };
 })();

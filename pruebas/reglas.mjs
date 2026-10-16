@@ -3,6 +3,8 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { RAIZ } from './banco.mjs';
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/firestore';
 import { initializeTestEnvironment, assertSucceeds, assertFails } from '@firebase/rules-unit-testing';
 let ok = 0, mal = 0;
 const t = async (n, p) => { try { await p; ok++; console.log('OK    ' + n); } catch (e) { mal++; console.log('FALLA ' + n + ' ' + (e && e.message || e)); } };
@@ -25,6 +27,26 @@ for (const c of COLES) {
     await assertSucceeds(d.delete());
   })());
 }
+await t('no se puede crear un documento vacío', assertFails(db.doc(`espacios/${H}/equipos/vacio`).set({})));
+await t('no se puede dejar vacío un documento con update', (async () => {
+  const d = db.doc(`espacios/${H}/equipos/v2`);
+  await assertSucceeds(d.set({ serial: 'X' }));
+  await assertFails(d.update({ serial: firebase.firestore.FieldValue.delete() }));
+  await assertSucceeds(d.update({ serial: 'Y', marca: 'HP' }));
+  await assertSucceeds(d.delete());
+})());
+await t('set con merge sobre un documento existente funciona (importar "actualizar")', (async () => {
+  const d = db.doc(`espacios/${H}/equipos/m1`);
+  await assertSucceeds(d.set({ a: 1 }));
+  await assertSucceeds(d.set({ b: 2 }, { merge: true }));
+  await assertSucceeds(d.delete());
+})());
+await t('no se permite un documento con más de 300 campos', assertFails(db.doc(`espacios/${H}/equipos/grande`).set(Object.fromEntries(Array.from({ length: 301 }, (_, i) => ['c' + i, i])))));
+await t('un trozo de archivo de 700 KB se puede guardar', (async () => {
+  const d = db.doc(`espacios/${H}/archivos/e-x_0_0`);
+  await assertSucceeds(d.set({ e: 'e-x', p: 0, c: 0, n: 1, d: 'A'.repeat(700000) }));
+  await assertSucceeds(d.delete());
+})());
 await t('otra colección no se permite', assertFails(db.doc(`espacios/${H}/usuarios/x`).set({ n: 1 })));
 await t('otra colección no se puede leer', assertFails(db.doc(`espacios/${H}/usuarios/x`).get()));
 await t('espacio de otro largo no se permite (39)', assertFails(db.doc(`espacios/${'a'.repeat(39)}/equipos/x`).set({ n: 1 })));

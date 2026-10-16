@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=23">
+<link rel="stylesheet" href="../comun.css?v=24">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -44,7 +44,7 @@
     <h2 class="titulo-vista" id="tRec">Recibidos</h2>
     <div class="summary" id="sumRec"></div>
     <button class="btn primary big solo-editar" id="btnNewRec" type="button"><span data-ico="mas"></span>Registrar equipo recibido</button>
-    <input class="search" id="qRec" type="search" placeholder="Buscar serial, persona o modelo" autocomplete="off" aria-label="Buscar equipo recibido">
+    <div class="con-scan"><input class="search" id="qRec" type="search" placeholder="Buscar serial, persona o modelo" autocomplete="off" aria-label="Buscar equipo recibido"><button class="btn-scan" type="button" data-scan="qRec" aria-label="Buscar escaneando el código del serial" title="Escanear código"><span data-ico="codigo"></span></button></div>
     <div class="chips" id="chipsRec" role="group" aria-label="Filtrar recibidos"></div>
     <div class="count" id="recCount" aria-live="polite"></div>
     <div class="list" id="recList"></div>
@@ -54,7 +54,7 @@
   <section class="view" id="vEq" aria-labelledby="tEq" hidden>
     <h2 class="titulo-vista" id="tEq">Equipos</h2>
     <div class="summary cuatro" id="sumEq"></div>
-    <input class="search" id="qEq" type="search" placeholder="Buscar serial, persona o modelo" autocomplete="off" aria-label="Buscar equipo">
+    <div class="con-scan"><input class="search" id="qEq" type="search" placeholder="Buscar serial, persona o modelo" autocomplete="off" aria-label="Buscar equipo"><button class="btn-scan" type="button" data-scan="qEq" aria-label="Buscar escaneando el código del serial" title="Escanear código"><span data-ico="codigo"></span></button></div>
     <div class="filters">
       <div class="field"><label for="fTipo">Tipo de equipo</label><select id="fTipo"></select></div>
       <div class="field"><label for="fEqEst">Ubicación y mantenimiento</label><select id="fEqEst"></select></div>
@@ -140,7 +140,7 @@
     <p class="sub" id="rcSub"></p>
     <div class="note" id="rcConocido" hidden></div>
     <div class="fields cols">
-      <div class="field"><label for="rcSerial">Serial</label><input id="rcSerial" type="text" list="dlSeriales" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe o busca el serial"></div>
+      <div class="field"><label for="rcSerial">Serial</label><div class="con-scan"><input id="rcSerial" type="text" list="dlSeriales" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe o escanea"><button class="btn-scan solo-editar" type="button" data-scan="rcSerial" aria-label="Escanear el código del serial" title="Escanear código"><span data-ico="codigo"></span></button></div></div>
       <div class="field"><label for="rcIngreso">Fecha en que lo trajeron</label><input id="rcIngreso" type="date"></div>
     </div>
     <datalist id="dlSeriales"></datalist>
@@ -162,6 +162,7 @@
 
     <div class="field"><span class="lbl" id="rcAccT">Accesorios que trajo</span><div class="acc" id="rcAcc" role="group" aria-labelledby="rcAccT"></div></div>
     <div class="field"><label for="rcObs">Observaciones</label><textarea id="rcObs" placeholder="Ej: viene con falla de batería, pide backup antes de formatear"></textarea></div>
+    <div class="compartir-t" id="rcCompartir" hidden><button class="btn small" type="button" data-wa="rc"><span data-ico="whatsapp"></span>Avisar por WhatsApp</button><button class="btn small" type="button" data-copiar-txt="rc"><span data-ico="copiar"></span>Copiar resumen</button></div>
     <div class="meta" id="rcEditado"></div>
     <div class="err" id="rcErr" role="alert" hidden></div>
     <div class="sheet-actions">
@@ -183,7 +184,7 @@
     <button class="btn ok big solo-editar" type="button" id="eqARec"><span data-ico="recibidos"></span><span id="eqARecTxt">Lo trajeron: registrar como recibido</span></button>
     <button class="btn solo-editar" type="button" id="eqProg"><span data-ico="programar"></span><span id="eqProgTxt">Programar tarea</span></button>
     <div class="fields cols">
-      <div class="field"><label for="eqSerial">Serial</label><input id="eqSerial" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false"></div>
+      <div class="field"><label for="eqSerial">Serial</label><div class="con-scan"><input id="eqSerial" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false"><button class="btn-scan solo-editar" type="button" data-scan="eqSerial" id="eqScan" aria-label="Escanear el código del serial" title="Escanear código"><span data-ico="codigo"></span></button></div></div>
       <div class="field"><label for="eqTipo">Tipo de equipo</label><input id="eqTipo" type="text" list="dlTipos" autocomplete="off"></div>
     </div>
     <div class="fields cols">
@@ -205,6 +206,8 @@
     </div>
     <div class="field"><label for="eqMtto">Fecha del último mantenimiento preventivo</label><input id="eqMtto" type="date"><small class="meta" id="eqFechasExtra"></small></div>
     <div class="field"><label for="eqObs">Observaciones</label><textarea id="eqObs"></textarea></div>
+    <div class="field" id="eqHojasBox" hidden><span class="lbl" id="eqHojasTit">Hojas en Entregas</span><div class="hojas-ent" id="eqHojas"></div></div>
+    <div class="compartir-t" id="eqCompartir" hidden><button class="btn small" type="button" data-wa="eq"><span data-ico="whatsapp"></span>Compartir por WhatsApp</button><button class="btn small" type="button" data-copiar-txt="eq"><span data-ico="copiar"></span>Copiar resumen</button></div>
     <div class="field" id="eqHistBox" hidden><span class="lbl" id="eqHistTit">Historial de mantenimientos</span><div class="hist" id="eqHist"></div></div>
     <div class="meta" id="eqEditado"></div>
     <div class="err" id="eqErr" role="alert" hidden></div>
@@ -231,11 +234,14 @@
         <button type="button" data-tipo="backup" aria-pressed="false">Backup</button>
       </div>
       <small class="meta" id="mtTipoAyuda"></small></div>
-    <div class="field"><label for="mtSerial">Serial del equipo</label><input id="mtSerial" type="text" list="dlSeriales" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe o busca el serial"></div>
+    <div class="field"><label for="mtSerial">Serial del equipo</label><div class="con-scan"><input id="mtSerial" type="text" list="dlSeriales" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Escribe o escanea"><button class="btn-scan" type="button" data-scan="mtSerial" id="mtScan" aria-label="Escanear el código del serial" title="Escanear código"><span data-ico="codigo"></span></button></div></div>
     <div class="note" id="mtInfo" hidden></div>
     <div class="fields cols">
       <div class="field"><label for="mtFecha">Fecha programada</label><input id="mtFecha" type="date"></div>
       <div class="field"><label for="mtResp">Responsable</label><select id="mtResp" aria-describedby="mtRespInfo"></select></div>
+    </div>
+    <div class="chips fecha-rap" id="mtFechaRap" role="group" aria-label="Fecha rápida">
+      <button type="button" class="chip" data-dias="0">Hoy</button><button type="button" class="chip" data-dias="1">Mañana</button><button type="button" class="chip" data-dias="3">+3 días</button><button type="button" class="chip" data-dias="7">+1 semana</button><button type="button" class="chip" data-meses="1">+1 mes</button>
     </div>
     <div class="field" id="mtRespOtroBox" hidden><label for="mtRespOtro">Nombre del responsable</label><input id="mtRespOtro" type="text" autocomplete="off" placeholder="Como escribió su nombre al entrar a la app"></div>
     <div class="meta" id="mtRespInfo"></div>
@@ -269,11 +275,12 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "23"};</script>
-<script src="../iconos.js?v=23"></script>
-<script src="../comun.js?v=23"></script>
-<script src="../config.js?v=23"></script>
-<script src="../nube.js?v=23"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "24"};</script>
+<script src="../iconos.js?v=24"></script>
+<script src="../comun.js?v=24"></script>
+<script src="../codigos.js?v=24"></script>
+<script src="../config.js?v=24"></script>
+<script src="../nube.js?v=24"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas';
@@ -755,6 +762,7 @@ function abrirRec(id, serialInicial) {
     }).catch(() => {});
   }
   conocerSerial(false);
+  $('rcCompartir').hidden = !id;
   $('rcForm').querySelectorAll('input, select, textarea').forEach(el => { el.disabled = soloLectura || !!r.cerrado; });
   $('rcSerial').disabled = soloLectura || !!id;
   $('rcSheet').hidden = false;
@@ -972,6 +980,8 @@ function abrirEq(id) {
       <span class="meta">Mantenimiento: ${lab[r.mtto || 'pend']}${r.mtto === 'hecho' && r.mttoFecha ? ' (' + fechaBonita(r.mttoFecha) + ')' : ''} · Backup: ${lab[r.backup || 'pend']}${r.backup === 'hecho' && r.backupFecha ? ' (' + fechaBonita(r.backupFecha) + ')' : ''}${r.persona ? ' · ' + esc(r.persona) : ''}</span>
       ${r.obs ? `<span class="obs">${esc(r.obs)}</span>` : ''}</button>`; }).join('')
     + mts.map(m => `<div class="hist-it"><span class="row between"><b class="mono">${fechaBonita(m.fecha)}</b><span class="pill tp-${esc(m.tipo || 'fisico')}">${ico(TIPOS_T[m.tipo || 'fisico'].ico)}${TIPOS_T[m.tipo || 'fisico'].n}</span></span>${m.disco ? `<span class="meta">Quedó en el disco ${esc(m.disco)}</span>` : ''}${m.nota ? `<span class="obs">${esc(m.nota)}</span>` : ''}${m.por ? `<span class="meta">Hecho por ${esc(m.por)}</span>` : ''}</div>`).join('');
+  $('eqCompartir').hidden = !id; $('eqScan').hidden = !!id;
+  if (id) { cargarHojas(); pintarHojasEq(id); } else $('eqHojasBox').hidden = true;
   $('eqSheet').hidden = false;
   fotoEq = UI.foto($('eqForm'));
 }
@@ -1073,6 +1083,7 @@ function tarjetaTarea(t) {
   if (rem && t.estado === 'encender') b.push(`<button type="button" class="btn primary" data-t-acc="encendido" data-t="${esc(t.id)}">${ico('check')}${conDisco(t) ? 'Equipo prendido y disco conectado' : 'Ya está prendido'}</button>`);
   if (rem && (t.estado === 'encender' || t.estado === 'encendido')) b.push(`<button type="button" class="btn" data-t-acc="nopudo" data-t="${esc(t.id)}">No se pudo</button>`);
   b.push(`<button type="button" class="btn ok" data-t-acc="hecho" data-t="${esc(t.id)}">${ico('checkCirculo')}${tt.c} hecho</button>`);
+  const wa = `<button type="button" class="btn small ghost" data-t-wa="${esc(t.id)}">${ico('whatsapp')}Avisar a ${esc((e.asignado && !esBodega(e) ? e.asignado.split(' ')[0] : '') || 'quien lo tiene')} por WhatsApp</button>`;
   const atras = n !== null && n < 0;
   return `<div class="card mt t-${esc(t.tipo || 'fisico')} ${atras ? 'atras' : ''} ${paraMi(t) ? 'mia' : ''}">
     <button type="button" class="card-top" data-t-abrir="${esc(t.id)}">
@@ -1085,6 +1096,7 @@ function tarjetaTarea(t) {
     </button>
     ${estado}${any}
     <div class="acciones-t solo-editar">${b.join('')}</div>
+    <div class="compartir-t">${wa}</div>
   </div>`;
 }
 function tarjetaSugerido(e) {
@@ -1094,7 +1106,8 @@ function tarjetaSugerido(e) {
       <div class="facts"><span>Lo tiene <b>${esc(e.asignado || 'nadie')}</b></span></div>
       <div class="facts">${textoMtto(e)}</div>
     </button>
-    <div class="acciones-t solo-editar"><button type="button" class="btn" data-t-prog="${esc(e.id)}">${ico('programar')}Programar mantenimiento</button></div>
+    ${soloDigitos(e.anydesk) ? `<div class="anydesk-t"><span>${ico('remoto')}AnyDesk <b class="mono">${esc(anyBonito(e.anydesk))}</b></span><span class="row"><a class="btn small" href="anydesk:${esc(soloDigitos(e.anydesk))}">Abrir AnyDesk</a><button type="button" class="btn small ghost" data-copiar="${esc(soloDigitos(e.anydesk))}">Copiar</button></span></div>` : ''}
+    <div class="acciones-t solo-editar"><button type="button" class="btn" data-t-prog="${esc(e.id)}">${ico('programar')}Programar mantenimiento</button>${soloDigitos(e.anydesk) ? `<button type="button" class="btn" data-t-prog="${esc(e.id)}" data-tipo="remoto">${ico('remoto')}Programar remoto</button>` : ''}</div>
   </div>`;
 }
 function renderMt() {
@@ -1373,6 +1386,8 @@ function abrirMt(tid, serialInicial, tipoInicial) {
   $('mtHist').innerHTML = t ? (t.hist || []).slice().reverse().map(h => `<li><b>${esc(h.quien || 'Alguien')}</b> · ${esc(QUE_T[h.que] || h.que)}${h.nota ? ': ' + esc(h.nota) : ''}<span class="meta">${esc(hace(h.t))}</span></li>`).join('') : '';
   $('mtQuitar').hidden = !t; $('mtErr').hidden = true;
   [$('mtFecha'), $('mtNota'), $('mtResp'), $('mtRespOtro'), $('mtAnydesk'), $('mtDisco')].forEach(x => { x.disabled = soloLectura; });
+  $('mtScan').hidden = soloLectura || !!t;
+  pintarFechaRap();
   $('mtSheet').hidden = false;
   fotoMt = UI.foto($('mtForm'));
 }
@@ -1383,7 +1398,14 @@ function infoMt() {
   box.hidden = false;
   if (!e) { box.textContent = 'Ese serial no está en la lista de Equipos. Agrégalo primero en la pestaña Equipos.'; return; }
   const otras = activasDe(e.id).filter(t => t.id !== mtActual);
-  box.innerHTML = `<b>${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · ') || e.serial)}</b><br>Lo tiene ${esc(e.asignado || 'nadie')} · ${textoMtto(e)}${e.fechaBackup ? ` · último backup <span class="mono">${fechaBonita(e.fechaBackup)}</span>` : ''}${otras.length ? `<br><b>Ya tiene programado:</b> ${otras.map(t => esc(tipoT(t).n.toLowerCase()) + ' ' + fechaBonita(t.fecha)).join(', ')}` : ''}`;
+  // Acciones rápidas: escoger como responsable a quien tiene el equipo (si usa la app), pasar a remoto si tiene AnyDesk, conectarse o avisarle.
+  const acc = [], quien = (e.asignado || '').trim(), any = soloDigitos(e.anydesk || $('mtAnydesk').value);
+  const usaApp = quien && !esBodega(e) && personas().find(p => mismoNombre(p.nombre, quien));
+  if (!soloLectura && usaApp && !mismoNombre(leerResp(), quien)) acc.push(`<button type="button" class="btn small" data-mt-resp="${esc(usaApp.nombre)}">${ico('persona')}Responsable: ${esc(usaApp.nombre)}</button>`);
+  if (!soloLectura && any && mtTipo === 'fisico') acc.push(`<button type="button" class="btn small" data-mt-tipo="remoto">${ico('remoto')}Hacerlo remoto (tiene AnyDesk)</button>`);
+  if (any) acc.push(`<a class="btn small" href="anydesk:${esc(any)}">${ico('remoto')}Abrir AnyDesk ${esc(anyBonito(any))}</a><button type="button" class="btn small ghost" data-copiar="${esc(any)}">${ico('copiar')}Copiar AnyDesk</button>`);
+  if (quien && !esBodega(e)) acc.push(`<button type="button" class="btn small ghost" data-mt-wa="1">${ico('whatsapp')}Avisar a ${esc(quien.split(' ')[0])}</button>`);
+  box.innerHTML = `<b>${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · ') || e.serial)}</b><br>Lo tiene ${esc(e.asignado || 'nadie')} · ${textoMtto(e)}${e.fechaBackup ? ` · último backup <span class="mono">${fechaBonita(e.fechaBackup)}</span>` : ''}${otras.length ? `<br><b>Ya tiene programado:</b> ${otras.map(t => esc(tipoT(t).n.toLowerCase()) + ' ' + fechaBonita(t.fecha)).join(', ')}` : ''}${acc.length ? `<div class="acc-rap">${acc.join('')}</div>` : ''}`;
   if (!mtActual && !$('mtAnydesk').value) $('mtAnydesk').value = anyBonito(e.anydesk);
 }
 function cerrarMt() { $('mtSheet').hidden = true; mtActual = null; fotoMt = ''; }
@@ -1548,6 +1570,82 @@ async function descargarExcel() {
   } finally { btn.disabled = false; txt.textContent = 'Descargar Excel'; }
 }
 
+/* ================= COMPARTIR Y ESCANEAR ================= */
+// WhatsApp abre el chat con el texto listo: solo se escoge a quién se le manda.
+function abrirWhatsApp(texto) { window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener'); }
+function copiarTexto(texto, que) {
+  (navigator.clipboard ? navigator.clipboard.writeText(texto) : Promise.reject()).then(() => toast((que || 'Texto') + ' copiado: pégalo donde quieras.'), () => toast('No se pudo copiar. Mantén presionado el texto para copiarlo.'));
+}
+const descEq = e => [e.tipo, e.marca, e.modelo].filter(Boolean).join(' ') || 'equipo';
+const accTxt = r => (r.acc || []).length ? ` Se entrega con: ${r.acc.join(', ')}.` : '';
+function textoRecibido(r) {
+  const nombre = (r.persona || devueltoPor(r) || '').trim(), hola = nombre && !/bodega/i.test(nombre) ? `Hola ${nombre.split(' ')[0]}, ` : 'Hola, ';
+  const e = estadoRec(r);
+  if (r.cerrado || e.k === 'listo') return `${hola}tu ${descEq(r)} (serial ${r.serial}) ya está listo${r.mtto === 'hecho' ? ': se le hizo mantenimiento' : ''}${r.backup === 'hecho' ? (r.mtto === 'hecho' ? ' y backup' : ': se le hizo backup') : ''}.${accTxt(r)} Puedes pasar a recogerlo.`;
+  return `${hola}recibimos tu ${descEq(r)} (serial ${r.serial}) el ${fechaBonita(r.fechaIngreso)}. Falta: ${faltanDe(r).join(' y ') || 'nada'}. Te avisamos cuando esté listo.${(r.acc || []).length ? ` Trajo: ${r.acc.join(', ')}.` : ''}`;
+}
+function textoEquipo(e) {
+  const m = mesesDesde(e.fechaMtto);
+  return [`Equipo ${e.serial}: ${descEq(e)}`, `Asignado a: ${e.asignado || 'nadie'}`, e.proyecto ? `Proyecto: ${e.proyecto}` : '', `Último mantenimiento: ${e.fechaMtto ? fechaBonita(e.fechaMtto) + ' (' + haceMeses(m) + ')' : 'sin fecha'}`, e.fechaBackup ? `Último backup: ${fechaBonita(e.fechaBackup)}` : '', soloDigitos(e.anydesk) ? `AnyDesk: ${anyBonito(e.anydesk)}` : ''].filter(Boolean).join('\n');
+}
+function textoTarea(t) {
+  const e = Q.get(idSerial(t.serial)) || { serial: t.serial }, tt = tipoT(t), nombre = (e.asignado || '').trim();
+  const hola = nombre && !/bodega/i.test(nombre) ? `Hola ${nombre.split(' ')[0]}, ` : 'Hola, ';
+  const cuando = textoCuando(t.fecha).toLowerCase(), dia = /^(hoy|mañana)$/.test(cuando) ? cuando + ' (' + fechaBonita(t.fecha) + ')' : 'el ' + fechaBonita(t.fecha);
+  if (esRemota(t)) return `${hola}${dia} vamos a hacerle ${tt.txt} a tu ${descEq(e)} (serial ${e.serial}) por AnyDesk. Por favor déjalo prendido y conectado a internet${conDisco(t) ? ', con el disco de backup conectado' + (t.disco ? ' (' + t.disco + ')' : '') : ''}.${soloDigitos(e.anydesk) ? ' AnyDesk: ' + anyBonito(e.anydesk) + '.' : ''}`;
+  return `${hola}${dia} vamos a hacerle ${tt.txt} a tu ${descEq(e)} (serial ${e.serial}). Por favor tráelo${(t.nota || '').trim() ? '. ' + t.nota.trim() : ''}.`;
+}
+// Fecha de hoy más n días o meses, en formato del calendario (AAAA-MM-DD).
+function fechaMas(dias, meses) {
+  const d = new Date(); d.setHours(12, 0, 0, 0);
+  if (meses) { const dia = d.getDate(); d.setDate(1); d.setMonth(d.getMonth() + meses); d.setDate(Math.min(dia, new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate())); }
+  if (dias) d.setDate(d.getDate() + dias);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function pintarFechaRap() {
+  $('mtFechaRap').querySelectorAll('.chip').forEach(b => { b.setAttribute('aria-pressed', fechaMas(Number(b.dataset.dias || 0), Number(b.dataset.meses || 0)) === $('mtFecha').value); b.disabled = soloLectura; });
+}
+// Escanea el código del serial y lo pone en el campo (o busca con él).
+async function escanearEn(campoId) {
+  if (!window.Codigos) { toast('El lector de códigos no cargó. Cierra y abre la app.'); return; }
+  const v = await window.Codigos.leer({ titulo: 'Escanear el serial', conocidos: [...Q.values()].map(e => e.serial).concat(recibidosLista().map(r => r.serial)) });
+  if (!v) return;
+  const campo = $(campoId); if (!campo || campo.disabled) return;
+  campo.value = v;
+  campo.dispatchEvent(new Event('input', { bubbles: true })); campo.dispatchEvent(new Event('change', { bubbles: true }));
+  if (campoId === 'qEq' || campoId === 'qRec') {
+    const eq = Q.get(idSerial(v));
+    if (campoId === 'qEq' && eq) { abrirEq(idSerial(v)); return; }
+    if (campoId === 'qRec') { const r = pendienteDe(v); if (r) { abrirRec(r.id); return; } if (!soloLectura) { toast(eq ? `${eq.serial} no está en espera: regístralo como recibido.` : 'Ese serial no está en la lista: regístralo como recibido.'); abrirRec(null, v); conocerSerial(true); return; } }
+    toast(eq ? `Equipo ${eq.serial}` : `No hay ningún equipo con el serial ${v}.`);
+    return;
+  }
+  toast(`Serial ${v} escaneado.`);
+}
+/* ---------- hojas de Entregas de un equipo ---------- */
+let HOJAS = null, hojasSub = null;
+function cargarHojas() {
+  if (!ENTDB || hojasSub) return;
+  hojasSub = ENTDB.collection('entregas').limit(5000).onSnapshot(s => {
+    HOJAS = new Map(s.docs.map(d => [d.id, d.data()]));
+    if (eqActual && !$('eqSheet').hidden) pintarHojasEq(eqActual);
+  }, () => { HOJAS = HOJAS || new Map(); if (eqActual) pintarHojasEq(eqActual); });
+}
+const serialesHoja = h => (Array.isArray(h.equipos) ? h.equipos.map(q => q.serial) : String(h.seriales || '').split(/[,;\n]+/)).map(idSerial).filter(Boolean);
+function pintarHojasEq(id) {
+  const box = $('eqHojasBox');
+  if (!id || !ENTDB) { box.hidden = !id; if (id) { $('eqHojasTit').textContent = 'Hojas en Entregas'; $('eqHojas').innerHTML = '<p class="meta">Conecta Equipos con Entregas (en Base de datos) para ver aquí las hojas de entrega y devolución de este equipo.</p>'; } return; }
+  box.hidden = false;
+  if (!HOJAS) { $('eqHojasTit').textContent = 'Hojas en Entregas'; $('eqHojas').innerHTML = '<p class="meta">Buscando las hojas de este equipo…</p>'; return; }
+  const l = [...HOJAS.entries()].filter(([, h]) => serialesHoja(h).includes(id)).sort((a, b) => cmp(b[1].fecha, a[1].fecha));
+  $('eqHojasTit').textContent = `Hojas en Entregas · ${l.length}`;
+  $('eqHojas').innerHTML = l.length ? l.map(([hid, h]) => `<a class="hoja-ent" href="../entregas/?hoja=${encodeURIComponent(hid)}" target="_blank" rel="noopener">
+      ${h.miniatura ? `<img src="${esc(h.miniatura)}" alt="" loading="lazy">` : `<span class="mini-vacia">${ico('hojaVacia')}</span>`}
+      <span class="t"><b>${esc(h.tipo === 'devolucion' ? 'Devolución' : h.tipo === 'otro' ? 'Otra hoja' : 'Entrega')} · ${esc(h.nombre || 'Sin nombre')}</b><span class="meta mono">${fechaBonita(h.fecha)} · ${(h.paginas || []).length} ${(h.paginas || []).length === 1 ? 'página' : 'páginas'}</span></span>
+      <span class="flecha">${ico('flecha')}</span><span class="sr">(se abre en Entregas)</span></a>`).join('')
+    : '<p class="meta">Este equipo no aparece en ninguna hoja de Entregas.</p>';
+}
+
 /* ================= EVENTOS ================= */
 if (ui.tablaDb === 'rec') tablaDb = 'rec';
 $('tabRec').onclick = () => ir('rec'); $('tabEq').onclick = () => ir('eq'); $('tabMt').onclick = () => ir('mt'); $('tabDb').onclick = () => ir('db');
@@ -1559,7 +1657,8 @@ $('mtList').onclick = e => {
   const c = e.target.closest('[data-copiar]');
   if (c) { (navigator.clipboard ? navigator.clipboard.writeText(c.dataset.copiar) : Promise.reject()).then(() => toast('Número de AnyDesk copiado'), () => toast('No se pudo copiar: ' + c.dataset.copiar)); return; }
   const ac = e.target.closest('[data-t-acc]'); if (ac) return accionTarea(ac.dataset.t, ac.dataset.tAcc);
-  const pr = e.target.closest('[data-t-prog]'); if (pr) return abrirMt(null, pr.dataset.tProg, '');   // sin tipo: se escoge en la hoja
+  const pr = e.target.closest('[data-t-prog]'); if (pr) return abrirMt(null, pr.dataset.tProg, pr.dataset.tipo || '');   // sin tipo: se escoge en la hoja
+  const wa = e.target.closest('[data-t-wa]'); if (wa) { const t = T.get(wa.dataset.tWa); if (t) abrirWhatsApp(textoTarea(Object.assign({ id: wa.dataset.tWa }, t))); return; }
   const ab = e.target.closest('[data-t-abrir]'); if (ab) return abrirMt(ab.dataset.tAbrir);
   const eq = e.target.closest('[data-eq-abrir]'); if (eq) return abrirEq(eq.dataset.eqAbrir);
 };
@@ -1574,6 +1673,30 @@ $('personasLista').onclick = e => {
   });
 };
 $('mtSerial').addEventListener('input', infoMt);
+$('mtFecha').addEventListener('input', pintarFechaRap); $('mtFecha').addEventListener('change', pintarFechaRap);
+$('mtFechaRap').onclick = e => {
+  const b = e.target.closest('.chip'); if (!b || b.disabled) return;
+  $('mtFecha').value = fechaMas(Number(b.dataset.dias || 0), Number(b.dataset.meses || 0)); pintarFechaRap();
+};
+$('mtInfo').onclick = e => {
+  const c = e.target.closest('[data-copiar]'); if (c) return copiarTexto(c.dataset.copiar, 'Número de AnyDesk');
+  const r = e.target.closest('[data-mt-resp]'); if (r) { $('mtResp').innerHTML = opcionesResp(r.dataset.mtResp); infoResp(); infoMt(); toast(`Responsable: ${r.dataset.mtResp}`); return; }
+  const t = e.target.closest('[data-mt-tipo]'); if (t) { ponerTipo(t.dataset.mtTipo); infoMt(); return; }
+  if (e.target.closest('[data-mt-wa]')) {
+    const eq = Q.get(idSerial($('mtSerial').value)); if (!eq) return;
+    abrirWhatsApp(textoTarea({ serial: eq.serial, tipo: mtTipo || 'fisico', fecha: $('mtFecha').value, disco: $('mtDisco').value.trim(), nota: '' }));
+  }
+};
+$('mtResp').addEventListener('change', infoMt);
+document.addEventListener('click', e => { const b = e.target.closest('[data-scan]'); if (b && !b.disabled) escanearEn(b.dataset.scan); });
+$('rcCompartir').onclick = e => {
+  const r = R.get(rcActual); if (!r) return;
+  if (e.target.closest('[data-wa]')) abrirWhatsApp(textoRecibido(r)); else if (e.target.closest('[data-copiar-txt]')) copiarTexto(textoRecibido(r), 'Resumen');
+};
+$('eqCompartir').onclick = e => {
+  const q = Q.get(eqActual); if (!q) return;
+  if (e.target.closest('[data-wa]')) abrirWhatsApp(textoEquipo(q)); else if (e.target.closest('[data-copiar-txt]')) copiarTexto(textoEquipo(q), 'Resumen');
+};
 $('notiBtns').onclick = clicNoti;
 $('notiAviso').onclick = clicNoti;
 $('mtForm').onsubmit = guardarMt; $('mtCancel').onclick = pedirCerrarMt; $('mtQuitar').onclick = quitarMt;

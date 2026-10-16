@@ -399,6 +399,7 @@
     guardar('enlace_' + en.id, h); return true;
   }
   const enlaceCfg = id => (APP.enlaces || []).find(e => e.id === id);
+  const LOTE_MAX = 400, LOTE_BYTES = 7e6;   // límites de cada lote al importar una copia
   const nube = {
     enlace(id) { const h = leer('enlace_' + id); return h && fs ? crearDb(h) : null; },
     async enlazar(id) {
@@ -444,11 +445,22 @@
       const resumen = APP.colecciones.filter(c => !actualizar || Object.keys(datos.colecciones[c] || {}).length).map(c => `${Object.keys(datos.colecciones[c] || {}).length} ${c}`).join(' y ');
       const hacer = async () => {
         try {
-          for (let i = 0; i < ops.length; i += 400) {
+          // Firestore rechaza un lote de más de 10 MB o 500 escrituras. En Entregas cada trozo de "archivos"
+          // pesa hasta 700 KB, así que los lotes se arman por tamaño: máximo unos 7 MB (unos 10 trozos) o 400 registros.
+          const lotes = [], te = new TextEncoder(); let actual = [], peso = 0;
+          for (const op of ops) {
+            const p = te.encode(JSON.stringify(op[2])).length + 200;   // bytes reales (una tilde o una ñ pesan 2)
+            if (actual.length && (actual.length >= LOTE_MAX || peso + p > LOTE_BYTES)) { lotes.push(actual); actual = []; peso = 0; }
+            actual.push(op); peso += p;
+          }
+          if (actual.length) lotes.push(actual);
+          let hechos = 0;
+          for (const lote of lotes) {
             const b = F.writeBatch(fs);
-            ops.slice(i, i + 400).forEach(([col, id, d]) => { if (actualizar) b.set(F.doc(fs, ...ruta(col), id), d, { merge: true }); else b.set(F.doc(fs, ...ruta(col), id), d); });
-            await Promise.race([b.commit(), new Promise(r => setTimeout(r, 4000))]);
-            toast(`Importando… ${Math.min(i + 400, ops.length)} de ${ops.length}`);
+            lote.forEach(([col, id, d]) => { if (actualizar) b.set(F.doc(fs, ...ruta(col), id), d, { merge: true }); else b.set(F.doc(fs, ...ruta(col), id), d); });
+            await Promise.race([b.commit(), new Promise(r => setTimeout(r, 8000))]);
+            hechos += lote.length;
+            toast(`Importando… ${hechos} de ${ops.length}`);
           }
           toast(`Copia importada: ${ops.length} registros`);
         } catch (e) { toast('No se pudo importar: ' + (mapError(e).code === 'permission_denied' ? 'la base de datos lo rechazó.' : e.message)); }

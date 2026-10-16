@@ -1,13 +1,13 @@
 {
   "name": "apps-consulta-previa",
-  "version": "21.0.0",
+  "version": "24.0.0",
   "private": true,
   "description": "Apps Equipos, Entregas y Evidencias de Consulta Previa. Este archivo solo sirve para las pruebas automáticas; las apps no necesitan compilarse.",
   "type": "module",
   "scripts": {
     "lint": "eslint .",
     "enlaces": "node pruebas/enlaces.mjs",
-    "pruebas": "node pruebas/prueba.mjs && node pruebas/sincronia.mjs && node pruebas/avisos.mjs && node pruebas/worker.mjs && node pruebas/errores.mjs && node pruebas/movimiento.mjs && node pruebas/lote.mjs && node pruebas/instalar.mjs && node pruebas/escaner.mjs && node pruebas/lector.mjs",
+    "pruebas": "node pruebas/prueba.mjs && node pruebas/sincronia.mjs && node pruebas/avisos.mjs && node pruebas/worker.mjs && node pruebas/errores.mjs && node pruebas/movimiento.mjs && node pruebas/lote.mjs && node pruebas/instalar.mjs && node pruebas/escaner.mjs && node pruebas/lector.mjs && node pruebas/funciones.mjs",
     "reglas": "npx -y firebase-tools@15.34.0 emulators:exec --only firestore --project demo-consulta-previa \"node pruebas/reglas.mjs\"",
     "lighthouse": "lhci autorun"
   },
@@ -18,6 +18,8 @@
     "@techstark/opencv-js": "4.10.0-release.1",
     "@tesseract.js-data/spa": "1.0.0",
     "axe-core": "4.14.0",
+    "barcode-detector": "3.2.2",
+    "bwip-js": "4.11.4",
     "eslint": "10.12.0",
     "eslint-plugin-html": "8.2.1",
     "firebase": "13.0.0",

@@ -50,7 +50,7 @@ export async function pagina(browser, { tema = 'light', ancho = 390, alto = 844,
     const lib = Object.keys(LIBS).find(k => u.endsWith(k) && fs.existsSync(LIBS[k]));
     if (lib) return r.fulfill({ path: LIBS[lib], contentType: 'text/javascript' });
     const npm = deJsdelivr(u);
-    if (npm) return r.fulfill({ path: npm, contentType: npm.endsWith('.js') ? 'text/javascript' : 'application/octet-stream', headers: { 'access-control-allow-origin': '*' } });
+    if (npm) return r.fulfill({ path: npm, contentType: npm.endsWith('.js') ? 'text/javascript' : npm.endsWith('.wasm') ? 'application/wasm' : 'application/octet-stream', headers: { 'access-control-allow-origin': '*' } });
     errores.push('externo: ' + u); return r.abort();
   });
   if (semilla) await ctx.addInitScript(s => { if (!localStorage.getItem('__sembrado')) { Object.entries(s).forEach(([k, v]) => localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v))); localStorage.setItem('__sembrado', '1'); } }, semilla);
