@@ -1,21 +1,32 @@
 /* Guarda la app en el teléfono para que abra rápido y sin internet.
    Páginas propias: primero internet (para recibir actualizaciones) y si no hay, la copia guardada.
    Librerías y fuentes externas: primero la copia guardada. Firestore no pasa por aquí. */
-const VERSION = 'equipos-v26';
+const VERSION = 'equipos-v27';
 const BASICOS = ['./', './index.html', './manifest.webmanifest', '../comun.css', '../comun.js', '../iconos.js', '../codigos.js', '../lib/confetti.js', '../fuentes/bricolage.woff2', '../fuentes/jetbrains-mono-500.woff2', '../nube.js', '../config.js', '../iconos/equipos-192.png', '../iconos/equipos-512.png'];
 const EXTERNOS = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];   // jsdelivr: el lector de códigos
 
+// Lector de códigos (1,1 MB): cajón propio que no se borra con cada versión de la app; cambia solo si cambia la librería.
+const CODIGOS = 'codigos-3.2.2';
+const CODIGOS_ARCH = ['../lib/codigos/ponyfill.js', '../lib/codigos/zxing_reader.wasm'];
+
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(VERSION).then(c => Promise.all(BASICOS.map(u => c.add(u).catch(() => {})))));
+  e.waitUntil(Promise.all([
+    caches.open(VERSION).then(c => Promise.all(BASICOS.map(u => c.add(u).catch(() => {})))),
+    caches.open(CODIGOS).then(c => Promise.all(CODIGOS_ARCH.map(u => c.match(u).then(h => h || c.add(u)).catch(() => {}))))
+  ]));
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('equipos-') && k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => (k.startsWith('codigos-') && k !== CODIGOS) || k.startsWith('equipos-') && k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
   const req = e.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
+  if (url.origin === self.location.origin && url.pathname.includes('/lib/codigos/')) {
+    e.respondWith(caches.open(CODIGOS).then(c => c.match(req, { ignoreSearch: true }).then(hit => hit || fetch(req).then(r => { if (r.ok) c.put(req, r.clone()); return r; }))));
+    return;
+  }
   if (url.origin === self.location.origin) {
     e.respondWith(fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' }).then(r => {
       if (r.ok) { const copia = r.clone(); caches.open(VERSION).then(c => c.put(req, copia)); }

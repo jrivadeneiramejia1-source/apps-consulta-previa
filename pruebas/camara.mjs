@@ -37,7 +37,7 @@ const codigo = (text, extra = {}) => bwipjs.toBuffer(Object.assign({ bcid: 'code
 const VID_PEQ = await video('pequeno', await codigo('PF2XYZ01'), 230);
 const VID_VACIO = await video('vacio', null, 0);
 
-async function abrir(videoArchivo, { simular = false, guardada = null } = {}) {
+async function abrir(videoArchivo, { simular = false, guardada = null, antes = null } = {}) {
   const br = await lanzar(['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream', `--use-file-for-fake-video-capture=${videoArchivo}`]);
   const err = [], { ctx, page } = await pagina(br, { semilla: semillaEquipos(), errores: err });
   await ctx.grantPermissions(['camera'], { origin: URL });
@@ -54,6 +54,7 @@ async function abrir(videoArchivo, { simular = false, guardada = null } = {}) {
     const enu = MediaDevices.prototype.enumerateDevices;
     MediaDevices.prototype.enumerateDevices = async function () { const l = await enu.call(this); const v = l.filter(d => d.kind === 'videoinput'); return v.length ? [{ kind: 'videoinput', deviceId: 'gran-angular', label: 'camera2 2, facing back', groupId: '' }, ...v.map(d => ({ kind: d.kind, deviceId: d.deviceId, label: 'camera2 0, facing back', groupId: d.groupId }))] : l; };
   }, [simular, guardada]);
+  if (antes) await antes(ctx, page);
   await page.goto(URL + '/equipos/'); await page.waitForSelector('#recList .card'); await esp(300);
   return { br, page, err };
 }
@@ -136,6 +137,83 @@ const ajustes = p => p.evaluate(() => (window.__ajustes || []).map(c => c.advanc
     return Codigos.leerImagen(blob);
   }, 'data:image/png;base64,' + png.toString('base64'));
   log('F1. una foto de 4000×3000 con un código diminuto en el centro se lee', JSON.stringify(n) === '["GPS778812"]', JSON.stringify(n));
+  log('sin errores', !err.length, err.join(' | '));
+  await br.close();
+}
+
+// 5. Casos de teléfonos reales: lector lento o sin internet, pedidos que la cámara rechaza, permiso negado,
+//    cámara pegada y la app abierta dentro de WhatsApp.
+const abrirLector = async page => { await page.click('#btnNewRec'); await page.waitForSelector('#rcSheet:not([hidden])'); await page.locator('[data-scan="rcSerial"]').click(); await page.waitForSelector('.cod'); };
+const leyo = page => page.waitForFunction(() => !document.querySelector('.cod'), null, { timeout: 25000 }).then(() => page.inputValue('#rcSerial'), () => '(no leyó)');
+{
+  console.log('\n— Lector lento o sin internet: la cámara abre igual');
+  const externos = [];
+  const { br, page, err } = await abrir(VID_PEQ, { antes: async ctx => {
+    ctx.on('request', r => { if (/jsdelivr|zxing|barcode-detector/.test(r.url()) && !r.url().startsWith(URL)) externos.push(r.url()); });
+    await ctx.route('**/lib/codigos/ponyfill.js', async r => { await esp(2500); r.continue(); });
+  } });
+  await abrirLector(page); await esp(1200);
+  const antes = await page.evaluate(() => { const v = document.querySelector('.cod video'); return { imagen: !!v && !v.hidden && v.readyState >= 2, estado: document.querySelector('.cod-estado').textContent }; });
+  log('L1. la imagen de la cámara sale antes de que el lector esté listo', antes.imagen && /Preparando el lector/.test(antes.estado), JSON.stringify(antes));
+  log('L2. después lee el código', (await leyo(page)) === 'PF2XYZ01');
+  log('L3. el lector viene con la app (no se pide nada a internet)', !externos.length, externos.join(', '));
+  log('sin errores', !err.length, err.join(' | '));
+  await br.close();
+}
+{
+  console.log('\n— La cámara rechaza la resolución pedida');
+  const { br, page, err } = await abrir(VID_PEQ, { antes: async ctx => ctx.addInitScript(() => {
+    const gum = MediaDevices.prototype.getUserMedia; window.__pedidos = [];
+    MediaDevices.prototype.getUserMedia = function (c) { window.__pedidos.push(JSON.stringify(c.video)); return window.__pedidos.length < 3 ? Promise.reject(new DOMException('no', 'OverconstrainedError')) : gum.call(this, c); };
+  }) });
+  await abrirLector(page);
+  log('R1. prueba pedidos más simples hasta que abre, y lee', (await leyo(page)) === 'PF2XYZ01', JSON.stringify(await page.evaluate(() => window.__pedidos)));
+  log('R2. nunca pide «zoom: true» (en Android abre un segundo permiso que puede bloquear la cámara)', !(await page.evaluate(() => window.__pedidos)).some(p => /zoom/.test(p)));
+  log('sin errores', !err.length, err.join(' | '));
+  await br.close();
+}
+{
+  console.log('\n— Permiso de cámara negado');
+  const { br, page, err } = await abrir(VID_PEQ, { antes: async ctx => ctx.addInitScript(() => {
+    const gum = MediaDevices.prototype.getUserMedia; window.__negar = true;
+    Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (Linux; Android 14; SM-A546E) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Mobile Safari/537.36' });
+    MediaDevices.prototype.getUserMedia = function (c) { return window.__negar ? Promise.reject(new DOMException('no', 'NotAllowedError')) : gum.call(this, c); };
+  }) });
+  await abrirLector(page);
+  await page.waitForSelector('.cod-sin:not([hidden])', { timeout: 8000 }).catch(() => {});
+  const txt = await page.textContent('.cod-sin').catch(() => '');
+  log('P1. dice que la cámara está bloqueada y cómo permitirla en Android', /bloqueada/.test(txt) && /Permisos/.test(txt) && /Información de la app/.test(txt), txt);
+  log('P2. ofrece Reintentar y resalta Tomar foto', await page.isVisible('[data-a="reintentar"]') && await page.getAttribute('[data-a="foto"]', 'class').then(c => /\bsi\b/.test(c)));
+  await page.addScriptTag({ content: AXE_JS });
+  const v = await page.evaluate(async () => (await window.axe.run(document.querySelector('.cod'), { runOnly: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] })).violations.map(x => x.id));
+  log('P3. axe sin fallas en el aviso', !v.length, v.join(', '));
+  await page.evaluate(() => { window.__negar = false; }); await page.click('[data-a="reintentar"]');
+  log('P4. al dar permiso, Reintentar abre la cámara y lee', (await leyo(page)) === 'PF2XYZ01');
+  log('sin errores', !err.length, err.join(' | '));
+  await br.close();
+}
+{
+  console.log('\n— Cámara pegada (no responde)');
+  const { br, page, err } = await abrir(VID_PEQ, { antes: async ctx => ctx.addInitScript(() => {
+    window.__codigosEspera = 1500; MediaDevices.prototype.getUserMedia = () => new Promise(() => {});
+  }) });
+  await abrirLector(page);
+  await page.waitForSelector('.cod-sin:not([hidden])', { timeout: 6000 }).catch(() => {});
+  const txt = await page.textContent('.cod-sin').catch(() => '');
+  log('T1. no se queda en «Abriendo la cámara…»: avisa que no respondió y ofrece Reintentar', /no respondió/.test(txt) && await page.isVisible('[data-a="reintentar"]'), txt);
+  log('sin errores', !err.length, err.join(' | '));
+  await br.close();
+}
+{
+  console.log('\n— App abierta dentro de WhatsApp');
+  const { br, page, err } = await abrir(VID_PEQ, { antes: async ctx => ctx.addInitScript(() => {
+    Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (Linux; Android 14; wv) AppleWebKit/537.36 Chrome/130.0 Mobile Safari/537.36 WhatsApp/2.24' });
+    MediaDevices.prototype.getUserMedia = () => Promise.reject(new DOMException('no', 'NotAllowedError'));
+  }) });
+  await abrirLector(page);
+  await page.waitForSelector('.cod-sin:not([hidden])', { timeout: 8000 }).catch(() => {});
+  const txt = await page.textContent('.cod-sin').catch(() => '');
+  log('W1. explica que hay que abrirla en Chrome', /otra aplicación/.test(txt) && /Abrir en Chrome/.test(txt), txt);
   log('sin errores', !err.length, err.join(' | '));
   await br.close();
 }

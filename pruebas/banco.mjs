@@ -17,7 +17,7 @@ export const AXE_JS = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'u
 export const FOTOS = path.join(RAIZ, 'pruebas', 'fotos');
 export const SALIDA = process.env.CAPTURAS || path.join(os.tmpdir(), 'capturas-apps');
 fs.mkdirSync(SALIDA, { recursive: true });
-const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
+const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm' };
 export function servir(puerto = 8811) {
   const srv = http.createServer((req, res) => {
     const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
