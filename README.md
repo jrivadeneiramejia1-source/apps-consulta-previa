@@ -27,6 +27,7 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - `entregas/lector.js`: botón **Leer** en cada página de Subir. Lee el texto impreso (Tesseract.js en español, unos 6 MB la primera vez) y llena lo que esté vacío: nombre, cédula, fecha, tipo (entrega o devolución) y seriales.
   Los seriales se comparan con los de Equipos aunque el OCR lea mal 1 de cada 5 letras. Nunca cambia lo que ya escribiste. La letra a mano casi nunca se lee.
 - Subir: hasta 100 páginas a la vez; las páginas suben de a 6 al mismo tiempo. Cada página se puede mover antes o después. Al escribir el nombre, la app sugiere los equipos que esa persona tiene asignados en Equipos (un toque los agrega).
+- **Compartir → Entregas** (Android, con la app instalada): desde WhatsApp, el escáner del teléfono o Archivos, al tocar Compartir aparece Entregas. Las fotos o PDF llegan a Subir como páginas. Lo declara `manifest.webmanifest` (`share_target`) y los recibe `sw.js` (GitHub Pages no puede recibir archivos), que los guarda en el teléfono y abre la app. En iPhone no existe esta función. Prueba: `node pruebas/compartir.mjs`.
 - Una hoja ya guardada puede recibir más páginas: **Escanear otra página** o **Agregar foto o PDF**.
 - Pruebas: `node pruebas/escaner.mjs` y `node pruebas/lector.mjs` (el OCR corre de verdad con las librerías de `node_modules`).
 
