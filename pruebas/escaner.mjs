@@ -225,6 +225,55 @@ for (const tema of ['light', 'dark']) {
   await ctx.close();
 }
 
+// 10. Compresión: Gris queda con el fondo limpio (pesa casi la mitad); en Documento y Gris, si una hoja pesa más del techo
+// de su calidad se comprime un poco más (sin bajar del piso ni cambiar la resolución).
+{
+  console.log('\n=== COMPRESIÓN ===');
+  const { ctx, pg, err } = await abrirEntregas();
+  const r = await pg.evaluate(async () => {
+    const { cv } = await Escaner.cargarCV(), out = {}, C = Escaner.CALIDADES;
+    const ajustar = (src, pf) => { const k = Math.min(pf.ancho / Math.min(src.width, src.height), pf.largo / Math.max(src.width, src.height)), c = document.createElement('canvas'); c.width = Math.round(src.width * k); c.height = Math.round(src.height * k); const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, c.width, c.height); return c; };
+    const blobDe = (c, q) => new Promise(ok => c.toBlob(ok, 'image/jpeg', q));
+    for (const foto of ['hoja-3.jpg', 'a4-mano.jpg', 'hoja-4.jpg']) {
+      const bm = await createImageBitmap(await (await fetch('/pruebas/fotos/' + foto)).blob());
+      const c = document.createElement('canvas'); c.width = bm.width; c.height = bm.height; c.getContext('2d').drawImage(bm, 0, 0);
+      const recta = Escaner._enderezar(cv, c, Escaner._detectar(cv, c));
+      const fila = {};
+      for (const cal of ['ahorro', 'normal', 'alta']) {
+        const pf = C[cal], base = ajustar(recta, pf), doc = Escaner._filtrar(cv, base, 'doc'), w = doc.width, h = doc.height;
+        const antes = await blobDe(doc, pf.jpeg);
+        const { blob, q } = await Escaner._comprimir(doc, 'doc', cal);
+        const d = doc.getContext('2d').getImageData(0, 0, w, h).data; let gris = true, blancos = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4 * 97) { n++; if (d[i] !== d[i + 1] || d[i] !== d[i + 2]) gris = false; if (d[i] === 255) blancos++; }
+        fila[cal] = { antes: antes.size, ahora: blob.size, q, techo: pf.techo, piso: pf.piso, jpeg: pf.jpeg, igual: doc.width === w && doc.height === h, gris, blancos: blancos / n };
+      }
+      // Gris: limpiar el fondo sí baja el peso. Color: no se toca.
+      const g1 = Escaner._filtrar(cv, ajustar(recta, C.normal), 'gris'), gAntes = (await blobDe(g1, C.normal.jpeg)).size;
+      Escaner._limpiarFondo(g1); fila.gris = { antes: gAntes, ahora: (await blobDe(g1, C.normal.jpeg)).size };
+      const col = ajustar(recta, C.normal), px0 = [...col.getContext('2d').getImageData(10, 10, 1, 1).data].join();
+      await Escaner._comprimir(col, 'color', 'normal');
+      fila.colorIntacto = [...col.getContext('2d').getImageData(10, 10, 1, 1).data].join() === px0;
+      out[foto] = fila;
+    }
+    return out;
+  });
+  const kb = n => Math.round(n / 1024);
+  for (const [foto, f] of Object.entries(r)) {
+    console.log(`  ${foto}: ` + ['ahorro', 'normal', 'alta'].map(c => `${c} ${kb(f[c].antes)} → ${kb(f[c].ahora)} KB (q ${f[c].q})`).join(' · ') + ` · gris sin limpiar ${kb(f.gris.antes)} → limpio ${kb(f.gris.ahora)} KB`);
+    for (const c of ['ahorro', 'normal', 'alta']) {
+      const x = f[c];
+      chequear(x.ahora <= x.techo || Math.abs(x.q - x.piso) < 1e-9, `${foto} ${c}: queda bajo ${kb(x.techo)} KB o en la compresión mínima permitida (${kb(x.ahora)} KB, q ${x.q})`);
+      chequear(x.q >= x.piso - 1e-9 && x.q <= x.jpeg, `${foto} ${c}: la compresión queda entre el piso y la calidad escogida`);
+      chequear(x.ahora <= x.antes * 1.03, `${foto} ${c}: no pesa más que antes (${kb(x.antes)} → ${kb(x.ahora)} KB)`);
+      chequear(x.igual && x.gris && x.blancos > 0.5, `${foto} ${c}: misma resolución, gris real y fondo blanco puro (${Math.round(x.blancos * 100)} %)`);
+    }
+    chequear(f.gris.ahora < f.gris.antes, `${foto}: en Gris, limpiar el fondo baja el peso (${kb(f.gris.antes)} → ${kb(f.gris.ahora)} KB)`);
+    chequear(f.colorIntacto, `${foto}: Color no se toca`);
+  }
+  chequear(!err.length, 'sin errores' + (err.length ? ': ' + err.join(' | ') : ''));
+  await ctx.close();
+}
+
 console.log(`\nResultado: ${ok} bien, ${mal} mal`);
 await br.close(); srv.close();
 process.exit(mal ? 1 : 0);

@@ -502,3 +502,23 @@ canvas.confeti { position: fixed; inset: 0; width: 100%; height: 100%; pointer-e
 
 .para-t { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; font-size: .9rem; }
 .para-t.mio b:last-of-type { color: var(--accent-txt); }
+
+/* --- v24: escanear seriales, atajos de fecha, compartir, hojas de Entregas --- */
+.con-scan { display: flex; gap: 8px; align-items: stretch; min-width: 0; }
+.con-scan > input, .con-scan > .search { flex: 1; min-width: 0; }
+.btn-scan { flex: none; width: 48px; min-height: 48px; border-radius: var(--r-control); border: 1.5px solid var(--line); background: var(--field); color: var(--accent-txt, var(--accent)); display: grid; place-items: center; cursor: pointer; }
+.btn-scan .ph { width: 22px; height: 22px; }
+@media (hover: hover) { .btn-scan:hover { border-color: var(--accent); } }
+.fecha-rap { flex-wrap: wrap; overflow: visible; }
+.fecha-rap .chip { min-height: 40px; }
+.acc-rap { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.acc-rap .btn .ph, .compartir-t .btn .ph { width: 18px; height: 18px; }
+.compartir-t { display: flex; flex-wrap: wrap; gap: 8px; }
+.compartir-t .btn { flex: 1 1 auto; }
+.hojas-ent { display: flex; flex-direction: column; gap: 8px; }
+.hoja-ent { display: flex; gap: 12px; align-items: center; text-decoration: none; color: inherit; border: 1px solid var(--line); background: var(--field); border-radius: 14px; padding: 8px 12px 8px 8px; }
+.hoja-ent img, .hoja-ent .mini-vacia { width: 44px; height: 60px; object-fit: cover; object-position: top; border-radius: 6px; border: 1px solid var(--line); background: #fff; flex: none; }
+.hoja-ent .mini-vacia { display: grid; place-items: center; background: var(--surface-2); color: var(--muted); }
+.hoja-ent .t { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.hoja-ent .flecha .ph { width: 18px; height: 18px; color: var(--muted); }
+@media (hover: hover) { .hoja-ent:hover { border-color: var(--accent); } }

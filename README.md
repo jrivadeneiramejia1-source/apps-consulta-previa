@@ -13,6 +13,7 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - `nube.js`: conexión con Firebase, pantalla de clave, copia de seguridad e instalación.
 - `sw.js`: guarda la app en el teléfono para abrir sin internet.
 - `comun.css`, `comun.js`, `iconos.js`, `fuentes/`: diseño compartido de Equipos y Entregas (ver `DESIGN.md`).
+- `codigos.js`: lector de códigos de barras y QR de los seriales (Equipos y Entregas).
 - `firestore.rules`: reglas de la base de datos (las mismas que hay que pegar en Firebase).
 - `pruebas/`: banco de pruebas con Firebase falso. `node pruebas/prueba.mjs` prueba Equipos y Entregas en tema claro y oscuro.
   `node pruebas/sincronia.mjs` prueba la sincronía Entregas ↔ Equipos y la agenda de mantenimiento.
@@ -21,9 +22,24 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 ## Escáner y lector de Entregas
 - `entregas/escaner.js`: la cámara del teléfono saca la foto; la app busca la hoja, la recorta y la endereza (OpenCV.js, unos 10 MB la primera vez).
   Filtros: **Documento** (blanco y negro, sin sombras, con nitidez), **Mejorado** (sin sombras ni tono de la luz, pero conserva la firma en azul y los sellos), **Gris** y **Color**.
+  Peso: en Documento y Gris, si una hoja pasa del techo de su calidad (Ahorro 90 KB, Normal 160 KB, Alta 320 KB) se comprime un poco más, sin bajar del piso y sin bajar la resolución.
+  En Gris el papel se limpia con una rampa suave (de 200 a 230 se aclara, desde 230 queda blanco puro): pesa casi la mitad. Se probó un corte duro en 242 y pesaba más; se probó WebP y el iPhone no lo crea y el PDF no lo acepta.
 - `entregas/lector.js`: botón **Leer** en cada página de Subir. Lee el texto impreso (Tesseract.js en español, unos 6 MB la primera vez) y llena lo que esté vacío: nombre, cédula, fecha, tipo (entrega o devolución) y seriales.
   Los seriales se comparan con los de Equipos aunque el OCR lea mal 1 de cada 5 letras. Nunca cambia lo que ya escribiste. La letra a mano casi nunca se lee.
+- Subir: hasta 100 páginas a la vez; las páginas suben de a 6 al mismo tiempo. Cada página se puede mover antes o después. Al escribir el nombre, la app sugiere los equipos que esa persona tiene asignados en Equipos (un toque los agrega).
+- Una hoja ya guardada puede recibir más páginas: **Escanear otra página** o **Agregar foto o PDF**.
 - Pruebas: `node pruebas/escaner.mjs` y `node pruebas/lector.mjs` (el OCR corre de verdad con las librerías de `node_modules`).
+
+## Lector de códigos (Equipos y Entregas)
+- `codigos.js`: lee con la cámara el código de barras o QR del serial (Code 128, Code 39, EAN, QR, Data Matrix…). Usa el lector del navegador (Chrome en Android) y, si no lo tiene (iPhone, Windows), el mismo lector hecho con ZXing (paquete `barcode-detector`, se descarga la primera vez y queda guardado).
+- Si la etiqueta tiene varios códigos (serial y número de producto), usa el serial que ya está en Equipos o deja escoger. Quita "S/N:" y saca el serial de los QR de Dell y Lenovo. Sin permiso de cámara se puede tomar una foto del código.
+- Dónde: Registrar recibido, Agregar equipo, Programar tarea, las búsquedas de Recibidos y Equipos, y "Escanear serial" en cada hoja de Entregas.
+
+## Compartir y conexión con Entregas (Equipos)
+- Recibido, ficha del equipo y cada tarea de la Agenda: **Avisar por WhatsApp** (abre WhatsApp con el mensaje listo; solo se escoge el contacto) y **Copiar resumen**.
+- Programar tarea: atajos de fecha (Hoy, Mañana, +3 días, +1 semana, +1 mes) y acciones rápidas: poner como responsable a quien tiene el equipo (si usa la app), pasarla a remoto si tiene AnyDesk, abrir o copiar el AnyDesk y avisarle por WhatsApp.
+- La ficha del equipo muestra las hojas de entrega y devolución que tiene en Entregas; al tocar una se abre en Entregas (`entregas/?hoja=ID`).
+- Prueba: `node pruebas/funciones.mjs`.
 
 ## Pruebas automáticas
 Cada vez que se sube un cambio a GitHub, **Actions** corre todo (pestaña *Actions*, en inglés "acciones"). Para correrlo en un computador:
@@ -45,18 +61,10 @@ npm run lighthouse  # velocidad, accesibilidad y buenas prácticas (solo avisa)
 - **Agenda de mantenimiento** (Equipos): `prog: { fecha, nota }` en el equipo; al hacerlo se actualiza `fechaMtto` y se agrega a `mttos`.
 
 ## Reglas de Firestore
-Están en `firestore.rules` (se prueban con `npm run reglas`). En Firebase → Firestore Database → Reglas (Rules):
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /espacios/{espacio}/{coleccion}/{id} {
-      allow read, write: if espacio.size() == 40
-        && coleccion in ['comunidades', 'evidencias', 'equipos', 'recibidos', 'entregas', 'archivos', 'avisos', 'tareas'];
-    }
-  }
-}
-```
+Están en `firestore.rules` (se prueban con `npm run reglas`). En Firebase → Firestore Database → Reglas (Rules) se pega el archivo completo.
+- Leer y borrar: solo dentro de un espacio de 40 letras y en las colecciones de las apps.
+- Crear y cambiar: además, el documento no puede quedar vacío ni tener más de 300 campos (evita escrituras rotas).
+- El peso de cada documento lo limita Firestore (1 MiB); las reglas no tienen forma de medirlo.
 
 ## Agenda de Equipos
 - Colección `tareas`: `{ serial, tipo: fisico|remoto|backup, fecha, nota, resp, creadoPor, estado, hist[], hecho }`.

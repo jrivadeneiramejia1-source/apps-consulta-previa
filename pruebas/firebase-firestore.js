@@ -34,4 +34,8 @@ export function onSnapshot(ref, opts, next, err) {
   setTimeout(() => next(snapCol(ref.path)), 30);
   return () => oyentes.delete(o);
 }
-export function writeBatch() { const ops = []; return { set(r, d, opt) { ops.push([r, d, opt]); }, async commit() { for (const [r, d, opt] of ops) await setDoc(r, d, opt); } }; }
+// window.__lotes: anota cada lote (cuántos documentos y cuántos bytes). window.__fsSoloContar: no los guarda (para lotes muy grandes).
+export function writeBatch() { const ops = []; return { set(r, d, opt) { ops.push([r, d, opt]); }, async commit() {
+  if (window.__lotes) { window.__lotes.push({ n: ops.length, bytes: ops.reduce((a, [, d]) => a + JSON.stringify(d).length, 0) }); if (window.__fsSoloContar) return; }
+  for (const [r, d, opt] of ops) await setDoc(r, d, opt);
+} }; }
