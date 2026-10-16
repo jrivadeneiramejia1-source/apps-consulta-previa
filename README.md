@@ -73,7 +73,7 @@ service cloud.firestore {
 - Máximo 5 errores distintos por sesión; el mismo error no se repite. Sin señal quedan en cola y se mandan al volver a abrir. Solo se envía desde GitHub Pages.
 - Desde el código de la app también se puede avisar a mano: `nube.reportarError(error, 'dónde')`.
 - El Worker los publica en Slack si tiene el secreto `SLACK_WEBHOOK`; sin él los acepta y no publica nada.
-- También recibe los errores de **Mis Claves** (Cloudflare Pages: `mis-claves.pages.dev` y sus vistas previas). Mis Claves solo puede mandar errores, no avisos.
+- También recibe los errores de **Mis Claves** (`mis-claves.jrivadeneiramejia1.workers.dev` y sus vistas previas; también `mis-claves.pages.dev`). Mis Claves solo puede mandar errores, no avisos.
 - Para activarlo: en Slack crea una app → *Incoming Webhooks* (webhooks entrantes) → *Add New Webhook* (agregar webhook) → escoge el canal y copia la dirección `https://hooks.slack.com/services/…`.
   En Cloudflare → Workers → avisos-equipos → *Settings* (configuración) → *Variables and Secrets* (variables y secretos) → *Add* (agregar) → tipo *Secret* (secreto), nombre `SLACK_WEBHOOK`, valor la dirección.
 - Prueba: `node pruebas/errores.mjs`.

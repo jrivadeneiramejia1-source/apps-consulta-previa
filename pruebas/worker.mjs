@@ -71,5 +71,10 @@ r = await W.default.fetch(new Request('https://avisos-equipos.x.workers.dev/erro
 r = await pedir({ subs: [sub], titulo: 'x' }, 'https://mis-claves.pages.dev'); t('Mis Claves no puede mandar avisos', r.status === 403);
 r = await pedirErr({ mensaje: 'x' }, env, 'https://mis-claves.pages.dev.otro.com'); t('un sitio que se hace pasar por Mis Claves no entra', r.status === 403);
 r = await pedirErr({ mensaje: 'x' }, env, 'https://otro-mis-claves.pages.dev'); t('ni otro proyecto con nombre parecido', r.status === 403);
+r = await pedirErr({ app: 'Mis Claves', version: '2.2', mensaje: 'TypeError: x' }, env, 'https://mis-claves.jrivadeneiramejia1.workers.dev'); t('Mis Claves publicada como Worker puede mandar errores', r.status === 202 && r.headers.get('Access-Control-Allow-Origin') === 'https://mis-claves.jrivadeneiramejia1.workers.dev');
+r = await W.default.fetch(new Request('https://avisos-equipos.x.workers.dev/errores', { method: 'OPTIONS', headers: { Origin: 'https://a1b2c3d4-mis-claves.jrivadeneiramejia1.workers.dev' } }), env); t('y su vista previa de versión también', r.status === 204);
+r = await pedir({ subs: [sub], titulo: 'x' }, 'https://mis-claves.jrivadeneiramejia1.workers.dev'); t('pero no puede mandar avisos', r.status === 403);
+r = await pedirErr({ mensaje: 'x' }, env, 'https://mis-claves.otra-cuenta.workers.dev'); t('Mis Claves de otra cuenta no entra', r.status === 403);
+r = await pedirErr({ mensaje: 'x' }, env, 'https://mis-claves.jrivadeneiramejia1.workers.dev.evil.com'); t('ni un sitio que se hace pasar por ella', r.status === 403);
 console.log(`\n${ok} bien, ${mal} mal${v.real ? '' : ' (con una llave de prueba)'}`);
 process.exit(mal ? 1 : 0);

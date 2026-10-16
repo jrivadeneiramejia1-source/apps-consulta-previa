@@ -9,8 +9,9 @@ const VAPID_X = 'YWkeAiPGn6veSXcFRzTM8JY4TNjmPWI3b4-TVv6MgCQ';
 const VAPID_Y = 'S9hYnx9UKCEk-9hRzpQmuz0uqNXCx_1W5PSkqARfd9Q';
 // Páginas que pueden pedir avisos.
 const ORIGENES = ['https://jrivadeneiramejia1-source.github.io', 'http://127.0.0.1:8811', 'http://localhost:8811'];
-// Mis Claves (Cloudflare Pages: mis-claves.pages.dev y sus vistas previas) solo puede mandar errores, no avisos.
-const ORIGEN_CLAVES = /^https:\/\/([a-z0-9-]+\.)?mis-claves(-[a-z0-9]+)?\.pages\.dev$/;
+// Mis Claves solo puede mandar errores, no avisos. Está publicada como Worker (mis-claves.jrivadeneiramejia1.workers.dev
+// y sus vistas previas "xxxx-mis-claves…"); también se acepta Cloudflare Pages (mis-claves.pages.dev) por si se pasa allá.
+const ORIGEN_CLAVES = /^https:\/\/(([a-z0-9]+-)?mis-claves\.jrivadeneiramejia1\.workers\.dev|([a-z0-9-]+\.)?mis-claves(-[a-z0-9]+)?\.pages\.dev)$/;
 const MAX_SUBS = 25, MAX_TEXTO = 600;
 
 const enc = new TextEncoder();
