@@ -11,7 +11,7 @@
     normal: { nombre: 'Normal', detalle: 'unos 400 KB por hoja · recomendada', ancho: 1700, largo: 2400, jpeg: 0.8, max: 3200 },
     alta: { nombre: 'Alta', detalle: 'unos 800 KB por hoja · letra pequeña', ancho: 2480, largo: 3508, jpeg: 0.9, max: 4200 }
   };
-  const FILTROS = { doc: 'Documento', gris: 'Gris', color: 'Color' };
+  const FILTROS = { doc: 'Documento', mejor: 'Mejorado', gris: 'Gris', color: 'Color' };
   const leer = (k, d, ok) => { try { const v = localStorage.getItem(k); return v && ok[v] ? v : d; } catch (e) { return d; } };
   const guardar = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   let calidad = leer('escaner.calidad', 'normal', CALIDADES), filtroPref = leer('escaner.filtro', 'doc', FILTROS);
@@ -331,28 +331,54 @@
       const c = document.createElement('canvas'); cv.imshow(c, dst); return c;
     } finally { [src, dst, a, b, M].forEach(m => m.delete()); }
   }
-  // Documento: quita sombras y deja el papel blanco y la tinta oscura. Gris: solo sin color. Color: como salió.
+  // Quita las sombras de un canal (gris o un color): el fondo (papel sin letras) se calcula en pequeño, se agranda
+  // y se divide. Después estira entre lo y hi: lo que pase de hi queda blanco y la tinta se ve fuerte.
+  function sinSombras(cv, canal, lo, hi) {
+    const w = canal.cols, h = canal.rows, sm = new cv.Mat(), bg = new cv.Mat(), n = new cv.Mat(), ks = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
+    try {
+      cv.resize(canal, sm, new cv.Size(Math.max(8, Math.round(w / 4)), Math.max(8, Math.round(h / 4))), 0, 0, cv.INTER_AREA);
+      cv.dilate(sm, sm, ks); cv.medianBlur(sm, sm, 15);
+      // Un bloque grande y oscuro (logo, recuadro relleno) no es sombra: el fondo no puede bajar de 55 % del papel.
+      const d = sm.data, hist = new Uint32Array(256); for (let i = 0; i < d.length; i++) hist[d[i]]++;
+      let acum = 0, p80 = 255; for (let v = 0; v < 256; v++) { acum += hist[v]; if (acum >= d.length * 0.8) { p80 = v; break; } }
+      const piso = Math.round(p80 * 0.55); for (let i = 0; i < d.length; i++) if (d[i] < piso) d[i] = piso;
+      cv.resize(sm, bg, new cv.Size(w, h), 0, 0, cv.INTER_LINEAR);
+      cv.divide(canal, bg, n, 255);
+      const al = 255 / (hi - lo); n.convertTo(canal, -1, al, -lo * al);
+    } finally { [sm, bg, n, ks].forEach(m => m.delete()); }
+  }
+  // Nitidez (máscara de desenfoque): bordes de las letras más definidos, para leer y para el OCR.
+  function enfocar(cv, m, fuerza) {
+    const b = new cv.Mat();
+    try { cv.GaussianBlur(m, b, new cv.Size(0, 0), 1.1); cv.addWeighted(m, 1 + fuerza, b, -fuerza, 0, m); } finally { b.delete(); }
+  }
+  // Documento: quita sombras y deja el papel blanco y la tinta oscura, con nitidez.
+  // Mejorado: igual, pero conserva los colores (firma en azul, sellos, resaltador) y corrige el tono de la luz.
+  // Gris: solo sin color. Color: como salió.
   function filtrar(cv, color, filtro) {
+    if (filtro === 'mejor') {
+      const src = cv.imread(color), rgb = new cv.Mat(), hsv = new cv.Mat(), out = new cv.Mat(), ch = new cv.MatVector(), hs = new cv.MatVector(), mats = [src, rgb, hsv, out, ch, hs];
+      try {
+        cv.cvtColor(src, rgb, cv.COLOR_RGBA2RGB);
+        // Cada canal con su propio fondo: el papel queda blanco aunque la luz sea amarilla o azulada.
+        cv.split(rgb, ch);
+        for (let i = 0; i < 3; i++) { const c = ch.get(i); mats.push(c); sinSombras(cv, c, 25, 240); }
+        cv.merge(ch, rgb);
+        // Colores un poco más vivos para que la firma y los sellos se distingan de la letra impresa.
+        cv.cvtColor(rgb, hsv, cv.COLOR_RGB2HSV);
+        cv.split(hsv, hs);
+        const s = hs.get(1); mats.push(s); s.convertTo(s, -1, 1.35, 0); cv.merge(hs, hsv);
+        cv.cvtColor(hsv, rgb, cv.COLOR_HSV2RGB);
+        enfocar(cv, rgb, 0.5);
+        cv.cvtColor(rgb, out, cv.COLOR_RGB2RGBA);
+        const c = document.createElement('canvas'); cv.imshow(c, out); return c;
+      } finally { mats.forEach(m => { try { m.delete(); } catch (e) {} }); }
+    }
     if (filtro !== 'doc' && filtro !== 'gris') return color;
-    const src = cv.imread(color), g = new cv.Mat(), out = new cv.Mat(), w = color.width, h = color.height;
+    const src = cv.imread(color), g = new cv.Mat(), out = new cv.Mat();
     try {
       cv.cvtColor(src, g, cv.COLOR_RGBA2GRAY);
-      if (filtro === 'doc') {
-        // El fondo (papel sin letras) se calcula en pequeño, se agranda y se divide: así se van las sombras.
-        const sm = new cv.Mat(), bg = new cv.Mat(), n = new cv.Mat(), ks = cv.getStructuringElement(cv.MORPH_RECT, new cv.Size(5, 5));
-        try {
-          cv.resize(g, sm, new cv.Size(Math.max(8, Math.round(w / 4)), Math.max(8, Math.round(h / 4))), 0, 0, cv.INTER_AREA);
-          cv.dilate(sm, sm, ks); cv.medianBlur(sm, sm, 15);
-          // Un bloque grande y oscuro (logo, recuadro relleno) no es sombra: el fondo no puede bajar de 55 % del papel.
-          const d = sm.data, hist = new Uint32Array(256); for (let i = 0; i < d.length; i++) hist[d[i]]++;
-          let acum = 0, p80 = 255; for (let v = 0; v < 256; v++) { acum += hist[v]; if (acum >= d.length * 0.8) { p80 = v; break; } }
-          const piso = Math.round(p80 * 0.55); for (let i = 0; i < d.length; i++) if (d[i] < piso) d[i] = piso;
-          cv.resize(sm, bg, new cv.Size(w, h), 0, 0, cv.INTER_LINEAR);
-          cv.divide(g, bg, n, 255);
-          // Lo que pase de 92 % de blanco queda blanco; lo demás se estira para que la letra se vea fuerte.
-          const lo = 60, hi = 235, al = 255 / (hi - lo); n.convertTo(g, -1, al, -lo * al);
-        } finally { [sm, bg, n, ks].forEach(m => m.delete()); }
-      }
+      if (filtro === 'doc') { sinSombras(cv, g, 60, 235); enfocar(cv, g, 0.6); }
       cv.cvtColor(g, out, cv.COLOR_GRAY2RGBA);
       const c = document.createElement('canvas'); cv.imshow(c, out); return c;
     } finally { [src, g, out].forEach(m => m.delete()); }
@@ -415,7 +441,7 @@
   .esc-estado.ocupado::before { content: ""; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); border-top-color: #46c2a6; animation: esc-gira .8s linear infinite; }
   @keyframes esc-gira { to { transform: rotate(360deg); } }
   .esc-filtros { display: flex; gap: 6px; justify-content: center; padding: 2px 12px 4px; flex-wrap: wrap; }
-  .esc-filtros .esc-btn { min-width: 92px; }
+  .esc-filtros .esc-btn { flex: 1 1 0; min-width: 0; max-width: 120px; padding: 8px 2px; font-size: .8rem; letter-spacing: -.01em; }
   .esc-filtros .esc-btn[aria-pressed="true"] { background: #fff; color: #0b100f; border-color: #fff; }
   .esc-pie { display: flex; align-items: stretch; gap: 8px; padding: 8px 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
   .esc-pie .esc-btn { flex: 1 1 0; min-width: 0; }

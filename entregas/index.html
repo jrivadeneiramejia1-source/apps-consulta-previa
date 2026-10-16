@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=22">
+<link rel="stylesheet" href="../comun.css?v=23">
 <style>
 
 /* --- Entregas --- */
@@ -23,7 +23,8 @@ label.subir { cursor: pointer; }
 .sub-botones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 520px) { .sub-botones { grid-template-columns: 1fr; } }
 .pag-cab { display: flex; justify-content: space-between; gap: 6px 10px; align-items: center; flex-wrap: wrap; }
-.pag-cab .btn { margin-left: auto; flex: 0 0 auto; white-space: nowrap; }
+.pag-cab .pag-btns { margin-left: auto; display: flex; gap: 6px; flex: 0 0 auto; }
+.pag-cab .btn { flex: 0 0 auto; white-space: nowrap; }
 .pag-cab b { white-space: nowrap; font-family: var(--f-display); font-weight: 720; }
 .card.hoja { flex-direction: row; align-items: flex-start; gap: 14px; }
 .mini-hoja { width: 64px; height: 88px; object-fit: cover; object-position: top; border-radius: 8px; border: 1px solid var(--line); flex: 0 0 auto; background: #fff; box-shadow: var(--shadow-sm); }
@@ -111,7 +112,7 @@ label.subir { cursor: pointer; }
   <!-- SECCIÓN 2: SUBIR -->
   <section class="view" id="vSub" aria-labelledby="tSub" hidden>
     <h2 class="titulo-vista" id="tSub">Subir hojas</h2>
-    <div class="note">Escanea las hojas con la cámara o sube el PDF o fotos. Cada página sale aparte: escribe a quién pertenece y guárdala. Si una persona tiene dos páginas, marca <b>Unir con la anterior</b>. Los datos los escribes tú; la app no lee la letra.</div>
+    <div class="note">Escanea las hojas con la cámara o sube el PDF o fotos. Cada página sale aparte: escribe a quién pertenece y guárdala. Si una persona tiene dos páginas, marca <b>Unir con la anterior</b>. Toca <b>Leer</b> en una página y la app llena la cédula, la fecha, el tipo y los seriales que estén <b>impresos</b>; la letra a mano casi nunca se lee. Revisa siempre antes de guardar.</div>
     <div class="aviso info" id="subEnlace" hidden><span>Esta app no está conectada con <b>Equipos</b>: las hojas se guardan, pero no actualizan la lista de equipos.</span><button class="btn small" type="button" id="btnConectarSub"><span data-ico="enlace"></span>Conectar</button></div>
     <div class="sub-botones solo-editar">
       <button class="btn primary big" type="button" id="btnEscanear"><span data-ico="camara"></span>Escanear con la cámara</button>
@@ -223,12 +224,13 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "22"};</script>
-<script src="../iconos.js?v=22"></script>
-<script src="../comun.js?v=22"></script>
-<script src="escaner.js?v=22"></script>
-<script src="../config.js?v=22"></script>
-<script src="../nube.js?v=22"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "23"};</script>
+<script src="../iconos.js?v=23"></script>
+<script src="../comun.js?v=23"></script>
+<script src="escaner.js?v=23"></script>
+<script src="lector.js?v=23"></script>
+<script src="../config.js?v=23"></script>
+<script src="../nube.js?v=23"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -335,7 +337,7 @@ async function loteGuardarYa() {
   const n = lote.length;
   try {
     // Solo datos simples y la imagen (Blob): así nunca falla la copia.
-    const paginas = lote.map(p => { const { blob, ...resto } = p; return Object.assign(JSON.parse(JSON.stringify(resto)), { blob }); });
+    const paginas = lote.map(p => { const { blob, leyendo: _leyendo, ...resto } = p; return Object.assign(JSON.parse(JSON.stringify(resto)), { blob }); });
     let espacio = ''; try { espacio = localStorage.getItem(ESPACIO_KEY) || ''; } catch (e) {}
     await loteTx('readwrite', st => paginas.length ? st.put({ v: 1, guardado: Date.now(), espacio, paginas }, 'actual') : st.delete('actual'));
     if (!loteT && lote.length === n) loteSeguro = true;
@@ -629,6 +631,37 @@ async function recortarPagina(i) {
     renderSub(); toast(`Página ${i + 1} recortada.`);
   } catch (err) { toast('No se pudo recortar: ' + (err.message || err)); }
 }
+// Lee el texto impreso de una página (OCR) y llena lo que esté vacío: nombre, cédula, fecha, tipo y seriales.
+function nombresConocidos() {
+  const n = lista().map(e => e.nombre).concat([...EQ.values()].map(e => e.asignado));
+  return [...new Set(n.map(x => String(x || '').trim()).filter(x => x && !/^bodega/i.test(x)))];
+}
+async function leerPagina(i) {
+  const p = lote[i]; if (!p || p.leyendo || !window.Lector) { if (!window.Lector) toast('El lector no cargó. Cierra y abre la app.'); return; }
+  p.leyendo = true; renderSub();
+  const num = () => lote.indexOf(p) + 1;
+  try {
+    const { texto } = await window.Lector.leer(p.blob, (etapa, pct) => { $('subEstado').textContent = `Página ${num()}: ${etapa}${pct ? ` ${pct} %` : ''}…`; });
+    if (!lote.includes(p)) return;
+    const d = window.Lector.extraer(texto, { seriales: [...EQ.values()].map(e => e.serial), nombres: nombresConocidos() });
+    const puestos = [];
+    ['nombre', 'cedula', 'fecha'].forEach(k => { if (d[k] && !String(p[k] || '').trim()) { p[k] = d[k]; puestos.push({ nombre: 'nombre', cedula: 'cédula', fecha: 'fecha' }[k]); } });
+    if (d.tipo && d.tipo !== p.tipo && p.tipo === 'entrega') { p.tipo = d.tipo; puestos.push('tipo ' + TIPOS.find(t => t.k === d.tipo).n); }
+    const ya = new Set(p.equipos.map(q => idSerial(q.serial)).filter(Boolean)); let nuevos = 0;
+    d.seriales.forEach(({ serial }) => {
+      const id = idSerial(serial); if (!id || ya.has(id)) return;
+      const eq = EQ.get(id), q = { tipo: eq && eq.tipo ? (EQ_A_TIPO[eq.tipo] || eq.tipo) : '', serial: eq ? eq.serial : serial };
+      if (eq) ['marca', 'modelo'].forEach(k => { if (eq[k]) q[k] = eq[k]; });
+      ya.add(id); nuevos++;
+      const vacia = p.equipos.findIndex(x => !String(x.serial || '').trim());
+      if (vacia >= 0) p.equipos[vacia] = q; else p.equipos.push(q);
+    });
+    if (nuevos) puestos.push(nuevos === 1 ? '1 serial' : `${nuevos} seriales`);
+    toast(puestos.length ? `Página ${num()}: llené ${puestos.join(', ').replace(/, ([^,]*)$/, ' y $1')}. Revisa antes de guardar.`
+      : `Página ${num()}: no encontré datos impresos nuevos. La letra a mano casi nunca se lee: escríbelos tú.`);
+  } catch (err) { toast('No se pudo leer la página: ' + (err.message || err)); }
+  finally { p.leyendo = false; avisoLote(); renderSub(); }
+}
 function renderSub() {
   loteGuardar();
   $('subAcciones').hidden = !lote.length;
@@ -637,7 +670,7 @@ function renderSub() {
   $('subGuardar').textContent = reg.length === 1 ? 'Guardar 1 hoja' : `Guardar ${reg.length} hojas`;
   $('subGuardar').disabled = !reg.length;
   $('subList').innerHTML = lote.map((p, i) => `<div class="card pag ${p.incluir ? '' : 'fuera'} ${p.unir ? 'unida' : ''}" data-i="${i}">
-      <div class="pag-cab"><b>Página ${i + 1}</b><span class="meta">${esc(p.origen)}</span><button type="button" class="btn small solo-editar" data-recortar="${i}">${ico('recortar')}Recortar</button></div>
+      <div class="pag-cab"><b>Página ${i + 1}</b><span class="meta">${esc(p.origen)}</span><span class="pag-btns">${p.unir ? '' : `<button type="button" class="btn small solo-editar" data-leer="${i}" ${p.leyendo ? 'disabled' : ''}>${ico('leer')}${p.leyendo ? 'Leyendo…' : 'Leer'}</button>`}<button type="button" class="btn small solo-editar" data-recortar="${i}">${ico('recortar')}Recortar</button></span></div>
       <img class="pag-img" src="${p.vista}" alt="Página ${i + 1}" data-ver="${i}">
       <div class="row">
         <label class="check"><input type="checkbox" data-k="incluir" ${p.incluir ? 'checked' : ''}> Guardar esta página</label>
@@ -1104,6 +1137,7 @@ $('subList').onclick = e => {
     return;
   }
   const rc = e.target.closest('[data-recortar]'); if (rc) return recortarPagina(Number(rc.dataset.recortar));
+  const lr = e.target.closest('[data-leer]'); if (lr) return leerPagina(Number(lr.dataset.leer));
   const v = e.target.closest('[data-ver]'); if (v) { const i = Number(v.dataset.ver); verGrande(lote[i].vista, `Página ${i + 1}`); } };
 $('btnEscanear').onclick = escanear;
 $('subGuardar').onclick = guardarLote;
