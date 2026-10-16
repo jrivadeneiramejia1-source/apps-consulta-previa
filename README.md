@@ -18,6 +18,13 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
   `node pruebas/sincronia.mjs` prueba la sincronía Entregas ↔ Equipos y la agenda de mantenimiento.
 - `package.json`, `eslint.config.js`, `lighthouserc.cjs`, `.github/workflows/`: solo para las pruebas automáticas; las apps no se compilan.
 
+## Escáner y lector de Entregas
+- `entregas/escaner.js`: la cámara del teléfono saca la foto; la app busca la hoja, la recorta y la endereza (OpenCV.js, unos 10 MB la primera vez).
+  Filtros: **Documento** (blanco y negro, sin sombras, con nitidez), **Mejorado** (sin sombras ni tono de la luz, pero conserva la firma en azul y los sellos), **Gris** y **Color**.
+- `entregas/lector.js`: botón **Leer** en cada página de Subir. Lee el texto impreso (Tesseract.js en español, unos 6 MB la primera vez) y llena lo que esté vacío: nombre, cédula, fecha, tipo (entrega o devolución) y seriales.
+  Los seriales se comparan con los de Equipos aunque el OCR lea mal 1 de cada 5 letras. Nunca cambia lo que ya escribiste. La letra a mano casi nunca se lee.
+- Pruebas: `node pruebas/escaner.mjs` y `node pruebas/lector.mjs` (el OCR corre de verdad con las librerías de `node_modules`).
+
 ## Pruebas automáticas
 Cada vez que se sube un cambio a GitHub, **Actions** corre todo (pestaña *Actions*, en inglés "acciones"). Para correrlo en un computador:
 ```

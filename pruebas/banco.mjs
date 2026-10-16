@@ -34,6 +34,14 @@ const LIBS = {
   'xlsx.full.min.js': require.resolve('xlsx/dist/xlsx.full.min.js'),
   'opencv.js': path.join(path.dirname(require.resolve('@techstark/opencv-js/package.json')), 'dist', 'opencv.js'),
 };
+// cdn.jsdelivr.net/npm/paquete@versión/ruta → node_modules/paquete/ruta, solo si la versión instalada es la que pide la app.
+function deJsdelivr(u) {
+  const m = u.match(/^https:\/\/cdn\.jsdelivr\.net\/npm\/((?:@[^/@]+\/)?[^/@]+)@([^/]+)\/(.+)$/);
+  if (!m) return null;
+  const dir = path.join(BASE, 'node_modules', m[1]), pkg = path.join(dir, 'package.json'), f = path.join(dir, m[3]);
+  if (!fs.existsSync(pkg) || JSON.parse(fs.readFileSync(pkg, 'utf8')).version !== m[2].replace(/^v/, '') || !f.startsWith(dir + path.sep) || !fs.existsSync(f)) return null;
+  return f;
+}
 export async function pagina(browser, { tema = 'light', ancho = 390, alto = 844, semilla = null, errores = [], quieto = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: ancho, height: alto }, colorScheme: tema, locale: 'es-CO', deviceScaleFactor: 2, reducedMotion: quieto ? 'reduce' : 'no-preference' });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, async r => {
@@ -41,6 +49,8 @@ export async function pagina(browser, { tema = 'light', ancho = 390, alto = 844,
     if (u.includes('/firebasejs/')) return r.fulfill({ path: path.join(RAIZ, 'pruebas', u.includes('firestore') ? 'firebase-firestore.js' : 'firebase-app.js'), contentType: 'text/javascript' });
     const lib = Object.keys(LIBS).find(k => u.endsWith(k) && fs.existsSync(LIBS[k]));
     if (lib) return r.fulfill({ path: LIBS[lib], contentType: 'text/javascript' });
+    const npm = deJsdelivr(u);
+    if (npm) return r.fulfill({ path: npm, contentType: npm.endsWith('.js') ? 'text/javascript' : 'application/octet-stream', headers: { 'access-control-allow-origin': '*' } });
     errores.push('externo: ' + u); return r.abort();
   });
   if (semilla) await ctx.addInitScript(s => { if (!localStorage.getItem('__sembrado')) { Object.entries(s).forEach(([k, v]) => localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v))); localStorage.setItem('__sembrado', '1'); } }, semilla);

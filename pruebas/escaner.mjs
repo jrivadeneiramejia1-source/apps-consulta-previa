@@ -82,6 +82,27 @@ for (const tema of ['light', 'dark']) {
   // filtros y giro
   await arriba(pg).locator('[data-f="color"]').click(); await esperarRevisar(pg);
   chequear(await arriba(pg).locator('[data-f="color"]').getAttribute('aria-pressed') === 'true', 'filtro Color');
+  if (tema === 'light') {
+    // Mejorado: papel blanco aunque haya sombra y luz amarilla, firma azul y letra negra. Documento: la firma queda gris.
+    const f = await pg.evaluate(async () => {
+      const { cv } = await Escaner.cargarCV(), c = document.createElement('canvas'); c.width = 800; c.height = 1000; const x = c.getContext('2d');
+      const g = x.createLinearGradient(0, 0, 800, 0); g.addColorStop(0, '#f2e6c8'); g.addColorStop(1, '#8a7f66'); x.fillStyle = g; x.fillRect(0, 0, 800, 1000);
+      x.fillStyle = '#222'; x.fillRect(100, 180, 300, 10);
+      x.strokeStyle = '#1f3fbf'; x.lineWidth = 8; x.beginPath(); x.moveTo(100, 600); x.lineTo(700, 600); x.stroke();
+      const px = (k, a, b) => [...k.getContext('2d').getImageData(a, b, 1, 1).data].slice(0, 3);
+      const m = Escaner._filtrar(cv, c, 'mejor'), d = Escaner._filtrar(cv, c, 'doc');
+      return { papel: px(m, 760, 900), firma: px(m, 400, 600), letra: px(m, 250, 185), firmaDoc: px(d, 400, 600), papelDoc: px(d, 760, 900) };
+    });
+    chequear(f.papel.every(v => v > 235), `Mejorado: papel blanco con sombra y luz amarilla (${f.papel})`);
+    chequear(f.firma[2] > 180 && f.firma[2] - f.firma[0] > 120, `Mejorado: la firma sigue azul (${f.firma})`);
+    chequear(f.letra.every(v => v < 70), `Mejorado: la letra queda negra (${f.letra})`);
+    chequear(f.firmaDoc[0] === f.firmaDoc[2] && f.papelDoc[0] > 235, `Documento: blanco y negro (${f.firmaDoc})`);
+  }
+  await arriba(pg).locator('[data-f="mejor"]').click(); await esperarRevisar(pg);
+  chequear(await arriba(pg).locator('[data-f="mejor"]').getAttribute('aria-pressed') === 'true', 'filtro Mejorado');
+  if (tema === 'light') await pg.screenshot({ path: `${OUT}/s1b-mejorado.png` });
+  await sinDesborde(pg, 'cuatro filtros'); await botonesGrandes(pg, 'cuatro filtros');
+  await arriba(pg).locator('[data-f="color"]').click(); await esperarRevisar(pg);
   await arriba(pg).locator('[data-a="girar"]').click(); await esperarRevisar(pg);
   const d2 = await dim(); chequear(d2.w === d.h && d2.h === d.w, 'Girar voltea la hoja 90°');
 
