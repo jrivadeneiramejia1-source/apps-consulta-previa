@@ -67,6 +67,11 @@ service cloud.firestore {
 - Al programar un mantenimiento con **Responsable**, la app le envía el aviso a los teléfonos de esa persona.
 - Pruebas: `node pruebas/worker.mjs` (cifrado y firma) y `node pruebas/avisos.mjs` (flujo en la app).
 
+## Instalar la app
+- `nube.js` ofrece instalarla en tres lugares: una franja arriba (se cierra por 7 días con la X), un botón en la pantalla de la clave (lo primero que ve quien abre el enlace) y un bloque fijo en Base de datos → "Copia de seguridad y acceso".
+- Android y computador con Chrome o Edge: abre el aviso del navegador. iPhone, o Android abierto desde WhatsApp: muestra los pasos (Safari → Compartir → Agregar a inicio; Chrome → ⋮ → Instalar aplicación).
+- Si ya está instalada no muestra nada. Prueba: `node pruebas/instalar.mjs`.
+
 ## Registro de errores (Slack)
 - `nube.js` captura los errores de código que pasan en los teléfonos (`error` y promesas sin atender) y los manda al mismo Worker, en `…/errores`.
 - Va solo: app, versión, mensaje, dónde pasó, nombre de la persona, navegador y cuántas veces. Nunca la clave, la huella del espacio, correos ni datos.

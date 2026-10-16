@@ -193,7 +193,15 @@
   .nube-barra.off { background: var(--warn-bg); color: var(--warn); }
   .nube-barra.env { background: var(--listo-bg); color: var(--listo); }
   .nube-instalar { display: flex; align-items: center; gap: 10px; justify-content: space-between; background: var(--accent-soft); color: var(--fg); border-radius: 14px; padding: 10px 12px; font-size: .88rem; }
-  .nube-instalar .row { flex-wrap: nowrap; }
+  .nube-instalar .row { flex-wrap: nowrap; flex: none; }
+  .nube-inst-ico { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--surface); color: var(--accent-txt, var(--accent)); }
+  .nube-inst-ico svg { width: 20px; height: 20px; }
+  .nube-inst-txt { flex: 1; min-width: 0; }
+  .nube-inst-clave { margin-top: 6px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px; border: 0; background: none; color: var(--accent-txt, var(--accent)); font: inherit; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+  .nube-inst-clave svg, .nube-inst-bloque .btn svg { width: 18px; height: 18px; }
+  .nube-inst-bloque { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .nube-inst-bloque .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .nube-dlg { z-index: 95; }
   .nube-x { width: 18px; height: 18px; display: block; }
   .nube-card { gap: 10px; }
   .nube-dlg .sheet { gap: 12px; }
@@ -216,24 +224,60 @@
   window.addEventListener('online', () => pintarEstado());
   window.addEventListener('offline', () => pintarEstado());
 
-  /* ---------- botón de instalar ---------- */
+  /* ---------- instalar la app en el teléfono ----------
+     Tres lugares: una franja arriba (se puede cerrar por 7 días), un botón en la pantalla de la clave
+     (lo primero que ve quien abre el enlace) y un bloque fijo en "Copia de seguridad y acceso".
+     Android y computador: el aviso propio del navegador. iPhone (y Android sin aviso): pasos para hacerlo a mano. */
   let promptInstalar = null;
+  const UA = navigator.userAgent || '';
+  const esIOS = /iphone|ipad|ipod/i.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const esAndroid = /android/i.test(UA);
   const instalada = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  const SIETE_DIAS = 7 * 864e5;
+  const icoN = n => (typeof window.ico === 'function' ? window.ico(n) : '');
+  const X = '<svg class="nube-x" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg>';
   window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); promptInstalar = e; pintarInstalar(); });
-  window.addEventListener('appinstalled', () => { promptInstalar = null; guardar('instalada', '1'); pintarInstalar(); });
+  window.addEventListener('appinstalled', () => { promptInstalar = null; guardar('instalada', '1'); pintarInstalar(); toast('App instalada: ábrela desde el ícono en la pantalla de inicio.'); });
+  function pasosInstalar() {
+    const n = APP.nombre || 'la app';
+    if (esIOS) return { titulo: 'Instalar en iPhone', texto: `1. Abre este enlace en Safari. Si lo abriste desde WhatsApp u otra app, toca el botón de Safari (la brújula) o los tres puntos y elige “Abrir en Safari”.\n2. Toca Compartir: el cuadro con la flecha hacia arriba (abajo o arriba de la pantalla).\n3. Baja y toca “Agregar a inicio” (en inglés “Add to Home Screen”).\n4. Toca Agregar. ${n} queda con su ícono en la pantalla de inicio.` };
+    if (esAndroid) return { titulo: 'Instalar en Android', texto: `1. Abre este enlace en Chrome. Si lo abriste desde WhatsApp u otra app, toca los tres puntos (⋮) y elige “Abrir en Chrome”.\n2. Toca el menú ⋮, arriba a la derecha.\n3. Toca “Instalar aplicación” o “Agregar a pantalla principal”.\n4. Confirma con Instalar. ${n} queda con su ícono en la pantalla de inicio.` };
+    return { titulo: 'Instalar en el computador', texto: `En Chrome o Edge: toca el ícono de instalar que aparece a la derecha de la barra de direcciones (una pantalla con una flecha), o el menú ⋮ → “Transmitir, guardar y compartir” → “Instalar página como app”.\nEn Firefox no se puede instalar: ábrela en Chrome o Edge.` };
+  }
+  async function instalarApp() {
+    if (promptInstalar) {
+      const p = promptInstalar; promptInstalar = null;
+      try { await p.prompt(); const r = await p.userChoice; if (r && r.outcome === 'accepted') guardar('instalada', '1'); } catch (e) {}
+      pintarInstalar(); return;
+    }
+    const pasos = pasosInstalar();
+    await pedir({ titulo: pasos.titulo, texto: pasos.texto, boton: 'Entendido', sinCancelar: true });
+  }
   function pintarInstalar() {
-    const main = document.querySelector('main'); if (!main) return;
+    const ya = instalada(), yaEnEste = !ya && leer('instalada') === '1';
+    // 1) franja arriba de la app
+    const main = document.querySelector('main');
     let box = document.getElementById('nubeInstalar');
-    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const mostrar = !instalada() && !leer('noInstalar') && (promptInstalar || ios);
-    if (!mostrar) { if (box) box.remove(); return; }
-    if (!box) { box = document.createElement('div'); box.id = 'nubeInstalar'; box.className = 'nube-instalar'; main.prepend(box); }
-    box.innerHTML = promptInstalar
-      ? `<span><b>Instala la app</b> en este teléfono: abre con un toque, sin navegador.</span><span class="row"><button class="btn small primary" type="button" id="nubeInstBtn">Instalar</button><button class="btn small ghost" type="button" id="nubeInstNo" aria-label="Ocultar"><svg class="nube-x" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button></span>`
-      : `<span><b>Para instalarla en iPhone:</b> toca <b>Compartir</b> y luego <b>Agregar a inicio</b>.</span><span class="row"><button class="btn small ghost" type="button" id="nubeInstNo" aria-label="Ocultar"><svg class="nube-x" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true"><path d="M208.49,191.51a12,12,0,0,1-17,17L128,145,64.49,208.49a12,12,0,0,1-17-17L111,128,47.51,64.49a12,12,0,0,1,17-17L128,111l63.51-63.52a12,12,0,0,1,17,17L145,128Z"/></svg></button></span>`;
-    const b = document.getElementById('nubeInstBtn');
-    if (b) b.onclick = async () => { const p = promptInstalar; promptInstalar = null; p.prompt(); try { await p.userChoice; } catch (e) {} pintarInstalar(); };
-    document.getElementById('nubeInstNo').onclick = () => { guardar('noInstalar', '1'); pintarInstalar(); };
+    const cerrada = Date.now() - Number(leer('noInstalar') || 0) < SIETE_DIAS;
+    const franja = main && !ya && !yaEnEste && !cerrada && (promptInstalar || esIOS || esAndroid);
+    if (!franja) { if (box) box.remove(); }
+    else {
+      if (!box) { box = document.createElement('div'); box.id = 'nubeInstalar'; box.className = 'nube-instalar'; box.setAttribute('role', 'region'); box.setAttribute('aria-label', 'Instalar la app'); main.prepend(box); }
+      box.innerHTML = `<span class="nube-inst-ico" aria-hidden="true">${icoN('cel')}</span><span class="nube-inst-txt"><b>Instala la app</b> y ábrela con un toque desde la pantalla de inicio.</span><span class="row"><button class="btn small primary" type="button" id="nubeInstBtn">${promptInstalar ? 'Instalar' : 'Cómo instalar'}</button><button class="btn small ghost" type="button" id="nubeInstNo" aria-label="Ocultar por 7 días" title="Ocultar por 7 días">${X}</button></span>`;
+      box.querySelector('#nubeInstBtn').onclick = instalarApp;
+      box.querySelector('#nubeInstNo').onclick = () => { guardar('noInstalar', String(Date.now())); pintarInstalar(); };
+    }
+    // 2) botón en la pantalla de la clave
+    const bc = document.getElementById('nubeInstClave');
+    if (bc) bc.hidden = ya || yaEnEste;
+    // 3) bloque fijo en "Copia de seguridad y acceso"
+    const info = document.getElementById('nubeInfo');
+    if (info) {
+      let bl = document.getElementById('nubeInstBloque');
+      if (!bl) { bl = document.createElement('div'); bl.id = 'nubeInstBloque'; bl.className = 'nube-inst-bloque'; info.after(bl); }
+      bl.innerHTML = `<b>Instalar en este teléfono</b><div class="meta">${ya ? 'Estás usando la app instalada. ✓' : yaEnEste ? 'Ya la instalaste en este teléfono: ábrela desde el ícono en la pantalla de inicio.' : 'Queda con su ícono en la pantalla de inicio, abre sin navegador y funciona sin internet.'}</div>${ya ? '' : `<div class="row"><button class="btn small" type="button" id="nubeInstBloqueBtn">${icoN('instalar')}${promptInstalar ? 'Instalar la app' : yaEnEste ? 'Cómo abrirla o instalarla otra vez' : 'Cómo instalar la app'}</button></div>`}`;
+      const b = bl.querySelector('#nubeInstBloqueBtn'); if (b) b.onclick = instalarApp;
+    }
   }
 
   /* ---------- diálogo propio (reemplaza prompt y confirm del navegador) ---------- */
@@ -249,7 +293,7 @@
         ${conCampo ? `<div class="field"><label for="${id}i">${escH(o.etiqueta)}</label><input id="${id}i" type="${o.clave ? 'password' : 'text'}" autocomplete="${o.clave ? 'current-password' : 'off'}" autocapitalize="off" spellcheck="false" value="${escH(o.valor || '')}"></div>` : ''}
         ${conCampo && o.clave ? '<label class="nube-ver"><input type="checkbox"> Mostrar la clave</label>' : ''}
         <div class="err" role="alert" hidden></div>
-        <div class="row nube-acc"><button class="btn" type="button" data-no>Cancelar</button><button class="btn ${o.peligro ? 'danger' : 'primary'}" type="submit">${escH(o.boton || 'Aceptar')}</button></div>
+        <div class="row nube-acc">${o.sinCancelar ? '' : '<button class="btn" type="button" data-no>Cancelar</button>'}<button class="btn ${o.peligro ? 'danger' : 'primary'}" type="submit">${escH(o.boton || 'Aceptar')}</button></div>
       </form>`;
       document.body.appendChild(b);
       const f = b.querySelector('form'), inp = b.querySelector('input:not([type=checkbox])'), err = b.querySelector('.err'), ok = f.querySelector('[type=submit]');
@@ -257,7 +301,7 @@
       let fin = false;
       const cerrar = v => { if (fin) return; fin = true; b.remove(); if (antes && antes.isConnected) try { antes.focus({ preventScroll: true }); } catch (e) {} resolver(v); };
       const ver = b.querySelector('.nube-ver input'); if (ver) ver.onchange = () => { inp.type = ver.checked ? 'text' : 'password'; };
-      b.querySelector('[data-no]').onclick = () => cerrar(null);
+      if (b.querySelector('[data-no]')) b.querySelector('[data-no]').onclick = () => cerrar(null);
       b.addEventListener('click', e => { if (e.target === b) cerrar(null); });
       f.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); cerrar(null); } });
       if (inp) inp.oninput = () => { err.hidden = true; inp.removeAttribute('aria-invalid'); };
@@ -294,11 +338,13 @@
         <div class="note" id="nubeVacio" role="status" hidden></div>
         <button class="btn primary big" type="submit" id="nubeEntrar">Entrar</button>
         <button class="btn" type="button" id="nubeNueva" hidden>Sí, empezar con esta clave nueva</button>
+        <button class="nube-inst-clave" type="button" id="nubeInstClave">${icoN('instalar')}Instalar la app en este teléfono</button>
       </form>`;
       document.body.appendChild(div);
       const f = div.querySelector('form'), $k = div.querySelector('#nubeK'), $n = div.querySelector('#nubeN');
       const $e = div.querySelector('#nubeErr'), $v = div.querySelector('#nubeVacio'), $b = div.querySelector('#nubeEntrar'), $nueva = div.querySelector('#nubeNueva');
       div.querySelector('#nubeVer').onchange = e => { $k.type = e.target.checked ? 'text' : 'password'; };
+      div.querySelector('#nubeInstClave').onclick = instalarApp; pintarInstalar();
       let candidato = null;
       const fallo = t => { $e.textContent = t; $e.hidden = false; };
       const terminar = () => { espacio = candidato; nombre = $n.value.trim().replace(/\s+/g, ' '); guardar('espacio', espacio); guardar('nombre', nombre); div.remove(); resolver(); };

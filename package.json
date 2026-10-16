@@ -7,7 +7,7 @@
   "scripts": {
     "lint": "eslint .",
     "enlaces": "node pruebas/enlaces.mjs",
-    "pruebas": "node pruebas/prueba.mjs && node pruebas/sincronia.mjs && node pruebas/avisos.mjs && node pruebas/worker.mjs && node pruebas/errores.mjs && node pruebas/movimiento.mjs && node pruebas/lote.mjs && node pruebas/escaner.mjs",
+    "pruebas": "node pruebas/prueba.mjs && node pruebas/sincronia.mjs && node pruebas/avisos.mjs && node pruebas/worker.mjs && node pruebas/errores.mjs && node pruebas/movimiento.mjs && node pruebas/lote.mjs && node pruebas/instalar.mjs && node pruebas/escaner.mjs",
     "reglas": "npx -y firebase-tools@15.34.0 emulators:exec --only firestore --project demo-consulta-previa \"node pruebas/reglas.mjs\"",
     "lighthouse": "lhci autorun"
   },
