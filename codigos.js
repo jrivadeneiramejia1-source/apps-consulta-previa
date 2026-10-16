@@ -48,12 +48,28 @@
     })().then(d => (detector = d), e => { cargando = null; throw e; });
     return cargando;
   }
-  // Busca códigos en una foto (archivo o Blob). Devuelve los textos ya limpios, sin repetir.
+  // El centro de una imagen o del video, agrandado: un código pequeño queda con más puntos por barra y se lee mejor.
+  // partW y partH: qué fracción del ancho y del alto se toma. Se agranda hasta 3 veces o hasta maxW puntos de ancho.
+  function centro(fuente, w, h, partW, partH, lienzo, maxW) {
+    const cw = Math.max(1, Math.round(w * partW)), ch = Math.max(1, Math.round(h * partH));
+    const k = Math.max(1, Math.min(3, (maxW || 2400) / cw));
+    const c = lienzo || document.createElement('canvas');
+    c.width = Math.round(cw * k); c.height = Math.round(ch * k);
+    const x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high';
+    x.drawImage(fuente, Math.round((w - cw) / 2), Math.round((h - ch) / 2), cw, ch, 0, 0, c.width, c.height);
+    return c;
+  }
+  const textos = r => [...new Set(r.map(x => limpiar(x.rawValue)).filter(Boolean))];
+  // Busca códigos en una foto (archivo o Blob). Si no encuentra en la foto completa, prueba con el centro agrandado
+  // (código pequeño en una foto grande). Devuelve los textos ya limpios, sin repetir.
   async function leerImagen(blob) {
     const det = await obtener();
     const bm = await createImageBitmap(blob);
-    try { return [...new Set((await det.detect(bm)).map(r => limpiar(r.rawValue)).filter(Boolean))]; }
-    finally { if (bm.close) bm.close(); }
+    try {
+      let r = await det.detect(bm);
+      for (const f of [0.5, 0.3]) { if (r.length) break; r = await det.detect(centro(bm, bm.width, bm.height, f, f)); }
+      return textos(r);
+    } finally { if (bm.close) bm.close(); }
   }
 
   /* ---------------- pantalla ---------------- */
@@ -76,6 +92,12 @@
   .cod-estado { text-align: center; font-size: .9rem; padding: 8px 14px; min-height: 1.6em; color: #d5ebe5; }
   .cod-elegir { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 0 12px 6px; }
   .cod-elegir .cod-btn { font-family: var(--f-mono, ui-monospace, monospace); }
+  .cod-ctrl { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 6px 12px 0; }
+  .cod-zoom { display: inline-flex; gap: 4px; background: rgba(255,255,255,.08); border-radius: 14px; padding: 4px; }
+  .cod-zoom .cod-btn { min-width: 52px; padding: 6px 10px; border-color: transparent; background: transparent; }
+  .cod-zoom .cod-btn[aria-pressed="true"] { background: #fff; border-color: #fff; color: #0b100f; }
+  .cod-ayuda { text-align: center; font-size: .84rem; color: #c9dcd6; padding: 0 16px 4px; line-height: 1.45; }
+  .cod-ayuda b { color: #fff; }
   .cod-pie { display: flex; gap: 8px; padding: 8px 12px; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
   .cod-pie .cod-btn { flex: 1 1 0; min-width: 0; }
   .cod-oculto { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
@@ -94,17 +116,21 @@
       caja.className = 'cod'; caja.setAttribute('role', 'dialog'); caja.setAttribute('aria-modal', 'true'); caja.setAttribute('aria-labelledby', 'codTit');
       caja.innerHTML = `<div class="cod-barra"><button class="cod-btn" type="button" data-a="cancelar">${icono('x')}<span>Cancelar</span></button><h2 id="codTit">${esc(opc.titulo || 'Escanear el código')}</h2><button class="cod-btn" type="button" data-a="linterna" aria-pressed="false" aria-label="Linterna" hidden>${icono('linterna')}</button></div>
         <div class="cod-escena"><video playsinline muted aria-hidden="true"></video><div class="cod-marco" aria-hidden="true"></div><div class="cod-sin" hidden></div></div>
+        <div class="cod-ctrl" hidden><div class="cod-zoom" role="group" aria-label="Acercar la imagen" hidden></div><button class="cod-btn" type="button" data-a="cerca" aria-pressed="false" hidden>${icono('lupaMas')}<span>Enfocar de cerca</span></button><button class="cod-btn" type="button" data-a="otra" hidden>${icono('girar')}<span>Cambiar cámara</span></button></div>
         <div class="cod-estado" role="status" aria-live="polite">Abriendo la cámara…</div>
+        <p class="cod-ayuda" hidden></p>
         <div class="cod-elegir" role="group" aria-label="Códigos encontrados" hidden></div>
         <div class="cod-pie"><button class="cod-btn" type="button" data-a="foto">${icono('camara')}<span>Tomar foto</span></button><button class="cod-btn" type="button" data-a="escribir">${icono('lapiz')}<span>Escribir a mano</span></button></div>
         <input class="cod-oculto" type="file" accept="image/*" capture="environment" tabindex="-1" aria-hidden="true">`;
       document.body.appendChild(caja); document.body.classList.add('con-cod');
       const $ = s => caja.querySelector(s), video = $('video'), estado = $('.cod-estado'), elegir = $('.cod-elegir'), sin = $('.cod-sin'), inFoto = $('input[type=file]');
       let flujo = null, fin = false, vistos = new Map(), timer = 0, empujado = false, linterna = false;
+      let pista = null, cap = {}, cerca = false, vueltas = 0, tAyuda = 0, traseras = [], camActual = '';
+      const lienzo = document.createElement('canvas');
       const ponerEstado = t => { estado.textContent = t; };
       function cerrar(v) {
         if (fin) return; fin = true;
-        clearTimeout(timer);
+        clearTimeout(timer); clearTimeout(tAyuda);
         if (flujo) flujo.getTracks().forEach(t => t.stop());
         window.removeEventListener('popstate', alAtras);
         caja.remove(); document.body.classList.remove('con-cod');
@@ -127,11 +153,84 @@
           ponerEstado(firmes.length > 1 ? 'Hay varios códigos: toca el del serial.' : 'Toca el código para usarlo, o sigue apuntando al serial.');
         }
       }
+      // Se turnan tres vistas: la imagen completa, el centro agrandado (el recuadro) y el centro muy agrandado.
+      // Con un código pequeño la imagen completa casi nunca alcanza; agrandado 2,5 a 3 veces sí se lee (se midió con un
+      // código de 230 puntos de ancho en un video de 1280).
+      const VISTAS = [null, [0.6, 0.35], [0.35, 0.25]];
       async function ciclo() {
         if (fin) return;
-        try { if (video.readyState >= 2) { const r = await detector.detect(video); if (r.length) revisar([...new Set(r.map(x => limpiar(x.rawValue)).filter(Boolean))]); } } catch (e) {}
-        if (!fin) timer = setTimeout(ciclo, 180);
+        try {
+          if (video.readyState >= 2 && video.videoWidth) {
+            const v = VISTAS[vueltas++ % VISTAS.length];
+            const fuente = v ? centro(video, video.videoWidth, video.videoHeight, v[0], v[1], lienzo) : video;
+            const r = await detector.detect(fuente); if (r.length) revisar(textos(r));
+          }
+        } catch (e) {}
+        if (!fin) timer = setTimeout(ciclo, 120);
       }
+      /* ---- enfoque, zoom y cámara: para códigos pequeños ----
+         La cámara principal no enfoca a menos de 10 o 15 cm: con zoom 2× o 3× el teléfono queda más lejos (donde sí enfoca)
+         y el código se ve grande. Cada opción aparece solo si el teléfono la permite. */
+      const ajustar = c => (pista && pista.applyConstraints ? pista.applyConstraints({ advanced: [c] }) : Promise.reject()).catch(() => false);
+      const modos = () => cap.focusMode || [];
+      function ponerZoom(z) {
+        ajustar({ zoom: z });
+        $('.cod-zoom').querySelectorAll('[data-zoom]').forEach(b => b.setAttribute('aria-pressed', Number(b.dataset.zoom) === z));
+      }
+      async function configurar() {
+        pista = flujo.getVideoTracks()[0];
+        cap = pista && pista.getCapabilities ? pista.getCapabilities() || {} : {};
+        if (cap.torch) $('[data-a=linterna]').hidden = false;
+        if (modos().includes('continuous')) await ajustar({ focusMode: 'continuous' });
+        const zz = cap.zoom && typeof cap.zoom.max === 'number' ? cap.zoom : null;
+        const niveles = zz ? [1, 2, 3, 4].filter(z => z >= (zz.min || 1) && z <= zz.max) : [];
+        const caja2 = $('.cod-zoom');
+        if (niveles.length > 1) {
+          caja2.innerHTML = niveles.map(z => `<button class="cod-btn" type="button" data-zoom="${z}" aria-pressed="false" aria-label="Zoom ${z} veces">${z}×</button>`).join('');
+          caja2.hidden = false; ponerZoom(niveles.includes(2) ? 2 : niveles[0]);
+        } else { caja2.hidden = true; caja2.innerHTML = ''; }
+        cerca = false; $('[data-a=cerca]').setAttribute('aria-pressed', 'false');
+        $('[data-a=cerca]').hidden = !(modos().includes('manual') && cap.focusDistance && typeof cap.focusDistance.min === 'number');
+        try {
+          traseras = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput' && !/front|frontal|user|delantera|selfie/i.test(d.label || ''));
+        } catch (e) { traseras = []; }
+        const ajustes = pista && pista.getSettings ? pista.getSettings() : {};
+        camActual = ajustes.deviceId || camActual;
+        $('[data-a=otra]').hidden = traseras.length < 2;
+        $('.cod-ctrl').hidden = caja2.hidden && $('[data-a=cerca]').hidden && $('[data-a=otra]').hidden;
+      }
+      const LS_CAM = 'codigos.camara';
+      const camGuardada = () => { try { return localStorage.getItem(LS_CAM) || ''; } catch (e) { return ''; } };
+      function pedirCamara(id) {
+        const v = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+        if (id) v.deviceId = { exact: id }; else v.facingMode = { ideal: 'environment' };
+        try { if (navigator.mediaDevices.getSupportedConstraints && navigator.mediaDevices.getSupportedConstraints().zoom) v.zoom = true; } catch (e) {}
+        return navigator.mediaDevices.getUserMedia({ video: v, audio: false });
+      }
+      async function usarCamara(id) {
+        const nuevo = await pedirCamara(id);
+        if (fin) { nuevo.getTracks().forEach(t => t.stop()); return; }
+        if (flujo) flujo.getTracks().forEach(t => t.stop());
+        flujo = nuevo; video.srcObject = flujo;
+        try { await video.play(); } catch (e) {}
+        await configurar();
+      }
+      function mostrarAyuda() {
+        const a = $('.cod-ayuda');
+        const zoom = !$('.cod-zoom').hidden ? ' Aleja un poco el teléfono y usa <b>2×</b> o <b>3×</b>.' : ' Aleja un poco el teléfono hasta que se vea nítido.';
+        a.innerHTML = `¿No lo lee? Si el código es pequeño:${zoom}${!$('[data-a=cerca]').hidden ? ' Prueba <b>Enfocar de cerca</b>.' : ''} O toca <b>Tomar foto</b>: la cámara del teléfono enfoca de cerca.`;
+        a.hidden = false;
+      }
+      // Tocar la imagen enfoca en ese punto (si el teléfono lo permite).
+      video.addEventListener('click', ev => {
+        if (!modos().includes('single-shot')) return;
+        const r = video.getBoundingClientRect(), punto = { x: (ev.clientX - r.left) / r.width, y: (ev.clientY - r.top) / r.height };
+        ponerEstado('Enfocando…');
+        ajustar({ focusMode: 'single-shot', pointsOfInterest: [punto] }).then(() => setTimeout(() => {
+          if (!fin && !cerca && modos().includes('continuous')) ajustar({ focusMode: 'continuous' });
+          if (!fin) ponerEstado('Apunta al código de barras o QR del serial, dentro del recuadro.');
+        }, 1800));
+      });
       function sinCamara(texto) {
         video.hidden = true; $('.cod-marco').hidden = true; sin.hidden = false;
         sin.textContent = texto; ponerEstado('');
@@ -141,21 +240,37 @@
         try { await obtener(); } catch (e) { sinCamara(e.message); $('[data-a=foto]').hidden = true; return; }
         if (fin) return;
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return sinCamara('Este navegador no deja usar la cámara en vivo. Toca “Tomar foto” y saca una foto clara del código.');
-        try { flujo = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }); }
-        catch (e) { return sinCamara(e && e.name === 'NotAllowedError' ? 'No diste permiso para la cámara. Puedes darlo en los ajustes del navegador, o tocar “Tomar foto”.' : 'No se pudo abrir la cámara en vivo. Toca “Tomar foto” y saca una foto clara del código.'); }
-        if (fin) { flujo.getTracks().forEach(t => t.stop()); return; }
-        video.srcObject = flujo;
-        try { await video.play(); } catch (e) {}
-        const pista = flujo.getVideoTracks()[0], cap = pista && pista.getCapabilities ? pista.getCapabilities() : {};
-        if (cap && cap.torch) $('[data-a=linterna]').hidden = false;
+        // La cámara que se escogió la última vez (si ya no existe, la trasera que dé el navegador).
+        try { await usarCamara(camGuardada()); }
+        catch (e0) {
+          try { await usarCamara(''); }
+          catch (e) { return sinCamara(e && e.name === 'NotAllowedError' ? 'No diste permiso para la cámara. Puedes darlo en los ajustes del navegador, o tocar “Tomar foto”.' : 'No se pudo abrir la cámara en vivo. Toca “Tomar foto” y saca una foto clara del código.'); }
+        }
+        if (fin) return;
         ponerEstado('Apunta al código de barras o QR del serial, dentro del recuadro.');
+        tAyuda = setTimeout(() => { if (!fin) mostrarAyuda(); }, 6000);
         ciclo();
       }
       caja.addEventListener('click', async ev => {
         const u = ev.target.closest('[data-usar]'); if (u) return cerrar(u.dataset.usar);
+        const zb = ev.target.closest('[data-zoom]'); if (zb) return ponerZoom(Number(zb.dataset.zoom));
         const a = ev.target.closest('[data-a]'); if (!a) return;
         if (a.dataset.a === 'cancelar' || a.dataset.a === 'escribir') cerrar(null);
         if (a.dataset.a === 'foto') { inFoto.value = ''; try { inFoto.click(); } catch (e) {} }
+        if (a.dataset.a === 'cerca' && pista) {
+          cerca = !cerca;
+          const ok = cerca ? await ajustar({ focusMode: 'manual', focusDistance: cap.focusDistance.min }) : await ajustar({ focusMode: modos().includes('continuous') ? 'continuous' : 'single-shot' });
+          if (ok === false) { cerca = false; ponerEstado('Este teléfono no dejó cambiar el enfoque. Usa el zoom o Tomar foto.'); }
+          a.setAttribute('aria-pressed', cerca);
+          if (cerca) ponerEstado('Enfoque de cerca: acerca el código a unos 8 a 12 cm.');
+        }
+        if (a.dataset.a === 'otra' && traseras.length > 1) {
+          const i = traseras.findIndex(d => d.deviceId === camActual), sig = traseras[(i + 1) % traseras.length];
+          a.disabled = true;
+          try { await usarCamara(sig.deviceId); try { localStorage.setItem(LS_CAM, sig.deviceId); } catch (e) {} ponerEstado(`Cámara ${traseras.indexOf(sig) + 1} de ${traseras.length}. Usa la que enfoque mejor.`); }
+          catch (e) { ponerEstado('No se pudo cambiar de cámara.'); }
+          a.disabled = false;
+        }
         if (a.dataset.a === 'linterna' && flujo) {
           linterna = !linterna;
           try { await flujo.getVideoTracks()[0].applyConstraints({ advanced: [{ torch: linterna }] }); a.setAttribute('aria-pressed', linterna); } catch (e) { linterna = false; }
