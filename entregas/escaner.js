@@ -385,6 +385,38 @@
       const c = document.createElement('canvas'); cv.imshow(c, out); return c;
     } finally { [src, g, out].forEach(m => m.delete()); }
   }
+  // ¿Salió borrosa u oscura? Se mide en la hoja ya enderezada, a 1000 puntos de ancho:
+  // - Nitidez: en el 1 % de los bordes más fuertes (letras, líneas), |Laplaciano| / gradiente. Un borde nítido es
+  //   angosto y da un valor alto; uno movido o desenfocado se ensancha y el valor baja. No depende de cuánto texto
+  //   tenga la hoja (la varianza del Laplaciano sí: una hoja con poco texto parecía borrosa).
+  //   Medido con las fotos de prueba: nítidas 0,034 a 0,118; con 2 px de desenfoque 0,018 a 0,025. Corte: 0,026.
+  // - Luz: brillo medio del papel; las hojas bien tomadas dan 225 a 250. Corte: 140.
+  // Con pocos bordes (hoja casi en blanco) no se juzga la nitidez.
+  const BORROSA = 0.026, OSCURA = 140;
+  function calidadHoja(cv, c) {
+    const k = Math.min(1, 1000 / c.width), s = document.createElement('canvas');
+    s.width = Math.max(1, Math.round(c.width * k)); s.height = Math.max(1, Math.round(c.height * k));
+    const sx = s.getContext('2d'); sx.imageSmoothingQuality = 'high'; sx.drawImage(c, 0, 0, s.width, s.height);
+    const m = cv.imread(s), g = new cv.Mat(), l = new cv.Mat(), gx = new cv.Mat(), gy = new cv.Mat();
+    try {
+      cv.cvtColor(m, g, cv.COLOR_RGBA2GRAY);
+      cv.Laplacian(g, l, cv.CV_32F, 1); cv.Sobel(g, gx, cv.CV_32F, 1, 0, 3); cv.Sobel(g, gy, cv.CV_32F, 0, 1, 3);
+      const L = l.data32F, X = gx.data32F, Y = gy.data32F, n = L.length, mag = new Float32Array(n), hist = new Uint32Array(2048);
+      for (let i = 0; i < n; i++) { const v = Math.sqrt(X[i] * X[i] + Y[i] * Y[i]); mag[i] = v; hist[Math.min(2047, v | 0)]++; }
+      let acum = 0, corte = 2047; for (let v = 2047; v >= 0; v--) { acum += hist[v]; if (acum >= n * 0.01) { corte = v; break; } }
+      let sl = 0, sg = 0, bordes = 0;
+      for (let i = 0; i < n; i++) if (mag[i] >= corte && mag[i] > 20) { sl += Math.abs(L[i]); sg += mag[i]; bordes++; }
+      const nitidez = bordes ? sl / sg : 1, brillo = cv.mean(g)[0];
+      return { nitidez, brillo, bordes, borrosa: bordes >= 500 && nitidez < BORROSA, oscura: brillo < OSCURA };
+    } finally { [m, g, l, gx, gy].forEach(x => x.delete()); s.width = 0; }
+  }
+  function avisoCalidad(cal, conRepetir) {
+    if (!cal) return '';
+    const p = [];
+    if (cal.borrosa) p.push(conRepetir ? 'La foto salió borrosa: toca Repetir y sostén el teléfono quieto hasta que se tome.' : 'La foto está borrosa: si puedes, tómala otra vez.');
+    if (cal.oscura) p.push('Poca luz: acércate a una ventana o usa el flash.');
+    return p.join(' ');
+  }
   function girar(c, grados) {
     if (!grados) return c;
     const o = document.createElement('canvas'), de = grados % 180 !== 0;
@@ -466,6 +498,7 @@
   .esc-escena canvas.res { display: block; max-width: calc(100% - 24px); max-height: calc(100% - 16px); background: #fff; box-shadow: 0 6px 28px rgba(0,0,0,.55); border-radius: 2px; }
   .esc-escena canvas.capa { position: absolute; pointer-events: none; }
   .esc-estado { text-align: center; font-size: .88rem; padding: 6px 14px; min-height: 1.6em; color: #d5ebe5; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .esc-estado.alerta { color: #ffd27a; font-weight: 700; }
   .esc-estado.ocupado::before { content: ""; width: 16px; height: 16px; flex: 0 0 auto; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); border-top-color: #46c2a6; animation: esc-gira .8s linear infinite; }
   @keyframes esc-gira { to { transform: rotate(360deg); } }
   .esc-filtros { display: flex; gap: 6px; justify-content: center; padding: 2px 12px 4px; flex-wrap: wrap; }
@@ -650,7 +683,7 @@
   function revisar(cv, foto, q, opc) {
     return new Promise(resolver => {
       const conCV = !!cv;
-      let filtro = opc.filtro || filtroPref, giro = opc.giro || 0, color = null, ver = null, hecho = false, ocupado = false;
+      let filtro = opc.filtro || filtroPref, giro = opc.giro || 0, color = null, ver = null, hecho = false, ocupado = false, cal = null;
       const p = pantalla(opc.titulo || 'Revisar la página', `
         <div class="esc-barra"><button class="esc-btn" data-a="cancelar" type="button">${icono('x')}<span>Descartar</span></button><h2 class="esc-titulo">${opc.titulo || 'Revisar la página'}</h2><button class="esc-btn" data-a="girar" type="button" aria-label="Girar la página">${icono('girar')}<span>Girar</span></button></div>
         <div class="esc-escena"></div>
@@ -662,18 +695,24 @@
           <button class="esc-btn si esc-grande" data-a="usar" type="button">${icono('check')}<span>${opc.textoUsar || 'Usar'}</span></button>
         </div>`, porAtras => fin({ accion: 'cancelar' }, porAtras));
       const caja = p.caja, escena = caja.querySelector('.esc-escena'), estado = caja.querySelector('.esc-estado');
-      const ponerEstado = (t, cargando) => { estado.textContent = t; estado.classList.toggle('ocupado', !!cargando); };
+      const ponerEstado = (t, cargando, alerta) => { estado.textContent = t; estado.classList.toggle('ocupado', !!cargando); estado.classList.toggle('alerta', !!alerta); };
       async function mostrar() {
         ocupado = true; caja.querySelectorAll('button').forEach(b => { b.dataset.antes = b.disabled; if (b.dataset.a !== 'cancelar') b.disabled = true; });
         ponerEstado(color ? 'Aplicando…' : 'Enderezando la hoja…', true); await respirar();
         try {
-          if (!color) color = conCV ? enderezar(cv, foto, q) : completa(foto);
+          if (!color) {
+            color = conCV ? enderezar(cv, foto, q) : completa(foto);
+            if (conCV) { try { cal = calidadHoja(cv, color); } catch (e) { cal = null; } }
+          }
           const f = conCV ? filtrar(cv, color, filtro) : color, g = girar(f, giro);
           if (f !== color && f !== g) f.width = 0;
           if (ver && ver !== color) ver.width = 0;
           ver = g; ver.className = 'res'; ver.setAttribute('role', 'img'); ver.setAttribute('aria-label', 'Vista previa de la hoja');
           escena.replaceChildren(ver);
-          ponerEstado(opc.estado || '');
+          const alerta = avisoCalidad(cal, !!opc.repetir);
+          ponerEstado(alerta || opc.estado || '', false, !!alerta);
+          // Con la foto borrosa u oscura, Repetir queda como la acción principal.
+          const rb = caja.querySelector('[data-a=repetir]'); if (rb) rb.classList.toggle('si', !!(cal && (cal.borrosa || cal.oscura)));
         } catch (e) { ponerEstado('No se pudo procesar la foto: ' + (e.message || e)); }
         caja.querySelectorAll('button').forEach(b => { b.disabled = b.dataset.antes === 'true'; delete b.dataset.antes; });
         ocupado = false;
@@ -737,7 +776,7 @@
         <div class="esc-panel" data-x="panel" role="group" aria-label="Calidad de las hojas" hidden></div>
         <div class="esc-guia" data-x="guia"><h3>Para que salga bien</h3><ol>
           <li><span>Pon la hoja <b>sobre una mesa oscura o de color</b>, con buena luz y que se vean las 4 esquinas.</span></li>
-          <li><span>Toca <b>Tomar foto</b>: se abre la cámara del teléfono. Ahí puedes usar el <b>flash</b> y tocar la hoja para enfocar.</span></li>
+          <li><span>Toca <b>Tomar foto</b>: se abre la cámara del teléfono. Ahí puedes usar el <b>flash</b> y tocar la hoja para enfocar. Sostén el teléfono <b>quieto</b> hasta que se tome.</span></li>
           <li><span>La app <b>recorta y endereza</b> la hoja sola. Revisa y toca <b>Usar</b>.</span></li></ol></div>
         <ol class="esc-paginas" data-x="lista" aria-label="Páginas escaneadas"></ol>
       </div>
@@ -849,5 +888,5 @@
     return { blob, width: w, height: h, calidadJpeg: q };
   }
 
-  window.Escaner = { abrir, recortar, cargarCV, CALIDADES, _detectar: detectar, _detectarEn: detectarEn, _proporcion: proporcion, _ordenar: ordenar, _enderezar: enderezar, _filtrar: filtrar, _comprimir: comprimir, _limpiarFondo: limpiarFondo, _estado: () => ({ calidad, filtro: filtroPref }) };
+  window.Escaner = { abrir, recortar, cargarCV, CALIDADES, _detectar: detectar, _detectarEn: detectarEn, _proporcion: proporcion, _ordenar: ordenar, _enderezar: enderezar, _filtrar: filtrar, _comprimir: comprimir, _limpiarFondo: limpiarFondo, _calidadHoja: calidadHoja, _estado: () => ({ calidad, filtro: filtroPref }) };
 })();

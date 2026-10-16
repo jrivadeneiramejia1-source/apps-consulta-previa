@@ -274,6 +274,51 @@ for (const tema of ['light', 'dark']) {
   await ctx.close();
 }
 
+// 11. Foto borrosa u oscura: avisa y deja Repetir como acción principal; las fotos nítidas no avisan.
+{
+  console.log('\n=== FOTO BORROSA U OSCURA ===');
+  const { ctx, pg, err } = await abrirEntregas();
+  const med = await pg.evaluate(async () => {
+    const { cv } = await Escaner.cargarCV(), out = {};
+    for (const foto of ['a4-mano.jpg', 'galeria-1.jpg', 'galeria-2.jpg', 'hoja-3.jpg', 'hoja-4.jpg', 'oficio.jpg', 'recortar.jpg']) {
+      const bm = await createImageBitmap(await (await fetch('/pruebas/fotos/' + foto)).blob());
+      const fila = {};
+      for (const [k, filtro] of [['nitida', ''], ['borrosa', 'blur(3px)'], ['oscura', 'brightness(0.45)']]) {
+        const c = document.createElement('canvas'); c.width = bm.width; c.height = bm.height; const x = c.getContext('2d');
+        if (filtro) x.filter = filtro; x.drawImage(bm, 0, 0);
+        const q = Escaner._detectar(cv, c), hoja = q ? Escaner._enderezar(cv, c, q) : c;
+        const r = Escaner._calidadHoja(cv, hoja); fila[k] = { borrosa: r.borrosa, oscura: r.oscura, n: Math.round(r.nitidez * 1000) / 1000, b: Math.round(r.brillo) };
+      }
+      out[foto] = fila;
+    }
+    return out;
+  });
+  for (const [foto, f] of Object.entries(med)) {
+    console.log(`  ${foto}: nítida ${f.nitida.n}/${f.nitida.b} · borrosa ${f.borrosa.n} · oscura brillo ${f.oscura.b}`);
+    chequear(!f.nitida.borrosa && !f.nitida.oscura, `${foto}: la foto nítida no avisa`);
+    chequear(f.borrosa.borrosa, `${foto}: con 3 px de desenfoque avisa que está borrosa`);
+    chequear(f.oscura.oscura, `${foto}: con poca luz avisa`);
+  }
+  // En pantalla: la foto movida avisa y Repetir pasa a ser la acción principal.
+  const borrosa = `${OUT}/borrosa-prueba.jpg`;
+  await pg.evaluate(async () => {
+    const bm = await createImageBitmap(await (await fetch('/pruebas/fotos/a4-mano.jpg')).blob());
+    const c = document.createElement('canvas'); c.width = bm.width; c.height = bm.height; const x = c.getContext('2d'); x.filter = 'blur(3px)'; x.drawImage(bm, 0, 0);
+    window.__borrosa = c.toDataURL('image/jpeg', 0.92);
+  });
+  fs.writeFileSync(borrosa, Buffer.from((await pg.evaluate(() => window.__borrosa)).split(',')[1], 'base64'));
+  await tomarFoto(pg, borrosa, () => pg.click('#btnEscanear'));
+  await esperarRevisar(pg);
+  const est = arriba(pg).locator('.esc-estado');
+  chequear(/borrosa/.test(await est.textContent()) && /Repetir/.test(await est.textContent()), 'avisa que salió borrosa y sugiere Repetir');
+  chequear(await est.evaluate(e => e.classList.contains('alerta')), 'el aviso se ve como alerta');
+  chequear(await arriba(pg).locator('[data-a="repetir"]').evaluate(b => b.classList.contains('si')), 'Repetir queda resaltado');
+  await axe(pg, 'aviso de foto borrosa');
+  fs.rmSync(borrosa, { force: true });
+  chequear(!err.length, 'sin errores' + (err.length ? ': ' + err.join(' | ') : ''));
+  await ctx.close();
+}
+
 console.log(`\nResultado: ${ok} bien, ${mal} mal`);
 await br.close(); srv.close();
 process.exit(mal ? 1 : 0);
