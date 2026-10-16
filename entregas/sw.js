@@ -1,7 +1,7 @@
 /* Guarda la app en el teléfono para que abra rápido y sin internet.
    Páginas propias: primero internet (para recibir actualizaciones) y si no hay, la copia guardada.
    Librerías y fuentes externas: primero la copia guardada. Firestore no pasa por aquí. */
-const VERSION = 'entregas-v24';
+const VERSION = 'entregas-v25';
 const BASICOS = ['./', './index.html', './manifest.webmanifest', './escaner.js', './lector.js', '../comun.css', '../comun.js', '../iconos.js', '../codigos.js', '../lib/confetti.js', '../fuentes/bricolage.woff2', '../fuentes/jetbrains-mono-500.woff2', '../nube.js', '../config.js', '../iconos/entregas-192.png', '../iconos/entregas-512.png'];
 const EXTERNOS = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
 // Las librerías van en un cajón aparte que no se borra al actualizar la app (el detector pesa unos 10 MB).
@@ -14,8 +14,34 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k.startsWith('entregas-v') && k !== VERSION).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
+/* Compartir → Entregas: Android manda aquí las fotos o PDF que se comparten desde WhatsApp, el escáner, Archivos…
+   (manifest.webmanifest → share_target). GitHub Pages no puede recibir archivos, así que este sw.js los guarda en el
+   teléfono (IndexedDB "entregas-compartidos") y abre la app, que los pone en Subir. */
+const COMP_DB = 'entregas-compartidos', COMP_ST = 'archivos';
+function guardarCompartidos(archivos) {
+  return new Promise((ok, mal) => {
+    const r = indexedDB.open(COMP_DB, 1);
+    r.onupgradeneeded = () => r.result.createObjectStore(COMP_ST);
+    r.onerror = () => mal(r.error);
+    r.onsuccess = () => {
+      const db = r.result, tx = db.transaction(COMP_ST, 'readwrite'), st = tx.objectStore(COMP_ST), q = st.get('pendiente');
+      // Si se comparte otra vez antes de abrir la app, se suman.
+      q.onsuccess = () => st.put({ archivos: ((q.result && q.result.archivos) || []).concat(archivos), t: Date.now() }, 'pendiente');
+      tx.oncomplete = () => { db.close(); ok(); }; tx.onerror = () => { db.close(); mal(tx.error); };
+    };
+  });
+}
+async function recibirCompartido(req) {
+  try {
+    const datos = await req.formData();
+    const archivos = datos.getAll('archivos').filter(f => f && typeof f === 'object' && f.size > 0);
+    if (archivos.length) await guardarCompartidos(archivos);
+  } catch (e) {}
+  return Response.redirect(new URL('./?compartido=1', self.registration.scope).href, 303);
+}
 self.addEventListener('fetch', e => {
   const req = e.request;
+  if (req.method === 'POST' && new URL(req.url).pathname.endsWith('/entregas/compartir')) { e.respondWith(recibirCompartido(req)); return; }
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin === self.location.origin) {

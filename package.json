@@ -1,13 +1,13 @@
 {
   "name": "apps-consulta-previa",
-  "version": "24.0.0",
+  "version": "25.0.0",
   "private": true,
   "description": "Apps Equipos, Entregas y Evidencias de Consulta Previa. Este archivo solo sirve para las pruebas automáticas; las apps no necesitan compilarse.",
   "type": "module",
   "scripts": {
     "lint": "eslint .",
     "enlaces": "node pruebas/enlaces.mjs",
-    "pruebas": "node pruebas/prueba.mjs && node pruebas/sincronia.mjs && node pruebas/avisos.mjs && node pruebas/worker.mjs && node pruebas/errores.mjs && node pruebas/movimiento.mjs && node pruebas/lote.mjs && node pruebas/instalar.mjs && node pruebas/escaner.mjs && node pruebas/lector.mjs && node pruebas/funciones.mjs",
+    "pruebas": "node pruebas/prueba.mjs && node pruebas/sincronia.mjs && node pruebas/avisos.mjs && node pruebas/worker.mjs && node pruebas/errores.mjs && node pruebas/movimiento.mjs && node pruebas/lote.mjs && node pruebas/instalar.mjs && node pruebas/escaner.mjs && node pruebas/lector.mjs && node pruebas/funciones.mjs && node pruebas/compartir.mjs",
     "reglas": "npx -y firebase-tools@15.34.0 emulators:exec --only firestore --project demo-consulta-previa \"node pruebas/reglas.mjs\"",
     "lighthouse": "lhci autorun"
   },

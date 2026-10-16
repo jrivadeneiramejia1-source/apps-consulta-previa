@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=24">
+<link rel="stylesheet" href="../comun.css?v=25">
 <style>
 
 /* --- Entregas --- */
@@ -237,14 +237,14 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "24"};</script>
-<script src="../iconos.js?v=24"></script>
-<script src="../comun.js?v=24"></script>
-<script src="escaner.js?v=24"></script>
-<script src="lector.js?v=24"></script>
-<script src="../codigos.js?v=24"></script>
-<script src="../config.js?v=24"></script>
-<script src="../nube.js?v=24"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "25"};</script>
+<script src="../iconos.js?v=25"></script>
+<script src="../comun.js?v=25"></script>
+<script src="escaner.js?v=25"></script>
+<script src="lector.js?v=25"></script>
+<script src="../codigos.js?v=25"></script>
+<script src="../config.js?v=25"></script>
+<script src="../nube.js?v=25"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -640,7 +640,7 @@ async function leerArchivos(files) {
         await pag.render({ canvasContext: ctx, viewport: vp }).promise;
         nuevas.push(await prepararPagina(c, `${f.name} · pág. ${i}`));
       }
-    } else if (f.type.startsWith('image/')) {
+    } else if (f.type.startsWith('image/') || (!f.type && /\.(jpe?g|png|webp|heic|heif|gif)$/i.test(f.name || ''))) {
       if (lote.length + nuevas.length >= MAX_PAGINAS) break;
       $('subEstado').textContent = `Preparando "${f.name}"…`;
       const img = await createImageBitmap(f);
@@ -648,6 +648,38 @@ async function leerArchivos(files) {
     } else toast(`"${f.name}" no es PDF ni foto.`);
   }
   return nuevas;
+}
+/* ---------- archivos compartidos ----------
+   Al tocar Compartir → Entregas en WhatsApp, el escáner o Archivos, el sw.js guarda los archivos en el teléfono
+   y abre la app con ?compartido=1. Aquí se sacan (una sola vez) y quedan como páginas en Subir. */
+function tomarCompartidos() {
+  return new Promise(ok => {
+    if (!window.indexedDB) return ok([]);
+    const r = indexedDB.open('entregas-compartidos', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('archivos');
+    r.onerror = () => ok([]);
+    r.onsuccess = () => {
+      const db = r.result, tx = db.transaction('archivos', 'readwrite'), st = tx.objectStore('archivos'), q = st.get('pendiente');
+      let archivos = [];
+      q.onsuccess = () => { archivos = (q.result && q.result.archivos) || []; st.delete('pendiente'); };
+      tx.oncomplete = () => { db.close(); ok(archivos); }; tx.onerror = () => { db.close(); ok([]); };
+    };
+  });
+}
+async function recibirCompartidos() {
+  const vino = /[?&]compartido=1/.test(location.search);
+  if (vino) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
+  const archivos = await tomarCompartidos();
+  if (!archivos.length) { if (vino) toast('No llegó ningún archivo. Comparte una foto o un PDF.'); return; }
+  if (soloLectura) { toast('Solo lectura: en este teléfono no se pueden subir hojas.'); return; }
+  ir('sub');
+  const caben = Math.max(0, MAX_PAGINAS - lote.length);
+  if (!caben) { toast(`Ya hay ${MAX_PAGINAS} páginas sin guardar. Guarda primero y vuelve a compartir.`); return; }
+  try {
+    const nuevas = await leerArchivos(archivos.slice(0, caben));
+    lote = lote.concat(nuevas); avisoLote(); renderSub();
+    if (nuevas.length) toast(`${nuevas.length === 1 ? 'Llegó 1 página' : `Llegaron ${nuevas.length} páginas`} desde Compartir. Escribe los datos y toca Guardar.`);
+  } catch (err) { $('subEstado').textContent = ''; toast('No se pudo abrir lo compartido: ' + (err.message || err)); renderSub(); }
 }
 /* ---------- escáner con la cámara ---------- */
 function avisoLote() { $('subEstado').textContent = lote.length ? `${lote.length} ${lote.length === 1 ? 'página lista' : 'páginas listas'}. Escribe los datos de cada una y toca Guardar.` : ''; }
@@ -1349,7 +1381,7 @@ async function iniciar() {
   const [db, user, dl] = await Promise.all([usar('db'), usar('user'), usar('downloads')]);
   DB = db; USER = user; DL = dl;
   $('btnExcel').hidden = !DL;
-  loteRecuperar().then(n => { if (n) toast(n === 1 ? 'Se recuperó 1 página que no se había guardado. Está en Subir.' : `Se recuperaron ${n} páginas que no se habían guardado. Están en Subir.`); });
+  loteRecuperar().then(n => { if (n) toast(n === 1 ? 'Se recuperó 1 página que no se había guardado. Está en Subir.' : `Se recuperaron ${n} páginas que no se habían guardado. Están en Subir.`); recibirCompartidos(); });
   if (USER) { try { miId = await USER.id(); } catch (e) {} }
   if (!DB) { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
   pintarAvisos(); suscribir(); reintentarPendientes();
