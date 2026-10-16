@@ -34,6 +34,7 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 ## Lector de códigos (Equipos y Entregas)
 - `codigos.js`: lee con la cámara el código de barras o QR del serial (Code 128, Code 39, EAN, QR, Data Matrix…). Usa el lector del navegador (Chrome en Android) y, si no lo tiene (iPhone, Windows), el mismo lector hecho con ZXing (paquete `barcode-detector`, se descarga la primera vez y queda guardado).
 - Si la etiqueta tiene varios códigos (serial y número de producto), usa el serial que ya está en Equipos o deja escoger. Quita "S/N:" y saca el serial de los QR de Dell y Lenovo. Sin permiso de cámara se puede tomar una foto del código.
+- Códigos pequeños: la cámara principal no enfoca a menos de 10 o 15 cm, así que el lector empieza con **zoom 2×** (el teléfono se aleja, enfoca, y el código se ve grande); hay botones 1× a 4×, **Enfocar de cerca** (enfoque manual a la distancia mínima), tocar la imagen para enfocar, **Cambiar cámara** (algunos teléfonos abren la gran angular, que enfoca mal de cerca; la escogida se recuerda) y linterna. Cada opción aparece solo si el teléfono la permite. Además se turnan tres vistas: la imagen completa y el centro agrandado 2,5 y 3 veces. Si en 6 s no lee, explica qué hacer. Prueba con cámara simulada: `node pruebas/camara.mjs`.
 - Dónde: Registrar recibido, Agregar equipo, Programar tarea, las búsquedas de Recibidos y Equipos, y "Escanear serial" en cada hoja de Entregas.
 
 ## Compartir y conexión con Entregas (Equipos)
