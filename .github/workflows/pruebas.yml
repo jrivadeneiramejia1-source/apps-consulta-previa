@@ -61,6 +61,10 @@ jobs:
           java-version: 21
       - run: npm ci
       - run: npm run reglas
+      - name: Navegador para el chat con los emuladores
+        run: npx playwright install --with-deps chromium
+      - name: Soporte (chat) con Firestore y el inicio anónimo de los emuladores
+        run: npm run chat-real
 
   lighthouse:
     name: Lighthouse (solo avisa)

@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=27">
+<link rel="stylesheet" href="../comun.css?v=28">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -78,6 +78,12 @@
     <div class="list" id="mtList"></div>
   </section>
 
+  <!-- SECCIÓN: SOPORTE (chat) -->
+  <section class="view" id="vSo" aria-labelledby="tSo" hidden>
+    <h2 class="titulo-vista" id="tSo">Soporte</h2>
+    <div class="list" id="soLista"></div>
+  </section>
+
   <!-- SECCIÓN 3: BASE DE DATOS -->
   <section class="view" id="vDb" aria-labelledby="tDb" hidden>
     <h2 class="titulo-vista" id="tDb">Base de datos</h2>
@@ -124,6 +130,10 @@
     <button class="tab" id="tabMt" type="button">
       <span class="tab-ico"><span class="ico-off" data-ico="calendario"></span><span class="ico-on" data-ico="calendarioF"></span><span class="badge" id="badgeMt" hidden>0</span></span>
       <span class="tab-lbl">Agenda</span>
+    </button>
+    <button class="tab" id="tabSo" type="button">
+      <span class="tab-ico"><span class="ico-off" data-ico="chat"></span><span class="ico-on" data-ico="chatF"></span><span class="badge" id="badgeSo" hidden>0</span></span>
+      <span class="tab-lbl">Soporte</span>
     </button>
     <button class="tab" id="tabDb" type="button">
       <span class="tab-ico"><span class="ico-off" data-ico="base"></span><span class="ico-on" data-ico="baseF"></span></span>
@@ -275,12 +285,13 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "27"};</script>
-<script src="../iconos.js?v=27"></script>
-<script src="../comun.js?v=27"></script>
-<script src="../codigos.js?v=27"></script>
-<script src="../config.js?v=27"></script>
-<script src="../nube.js?v=27"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "28"};</script>
+<script src="../iconos.js?v=28"></script>
+<script src="../comun.js?v=28"></script>
+<script src="../codigos.js?v=28"></script>
+<script src="../config.js?v=28"></script>
+<script src="../nube.js?v=28"></script>
+<script src="chat.js?v=28"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas';
@@ -530,12 +541,12 @@ function pintarAvisos() {
 /* ================= NAVEGACIÓN ================= */
 function ir(v) {
   vista = v;
-  $('vRec').hidden = v !== 'rec'; $('vEq').hidden = v !== 'eq'; $('vMt').hidden = v !== 'mt'; $('vDb').hidden = v !== 'db';
-  [['tabRec', 'rec'], ['tabEq', 'eq'], ['tabMt', 'mt'], ['tabDb', 'db']].forEach(([id, k]) => {
+  $('vRec').hidden = v !== 'rec'; $('vEq').hidden = v !== 'eq'; $('vMt').hidden = v !== 'mt'; $('vDb').hidden = v !== 'db'; $('vSo').hidden = v !== 'so';
+  [['tabRec', 'rec'], ['tabEq', 'eq'], ['tabMt', 'mt'], ['tabSo', 'so'], ['tabDb', 'db']].forEach(([id, k]) => {
     if (k === v) $(id).setAttribute('aria-current', 'page'); else $(id).removeAttribute('aria-current');
   });
   render(); window.scrollTo(0, 0);
-  UI.entrar($({ rec: 'vRec', eq: 'vEq', mt: 'vMt', db: 'vDb' }[v]));
+  UI.entrar($({ rec: 'vRec', eq: 'vEq', mt: 'vMt', db: 'vDb', so: 'vSo' }[v]));
 }
 function render() {
   pintarConexion();
@@ -544,6 +555,7 @@ function render() {
   if (vista === 'eq') renderEq();
   if (vista === 'mt') renderMt();
   if (vista === 'db') renderDb();
+  if (vista === 'so' && window.ChatSoporte) ChatSoporte.pintar();
   UI.insignia($('badgeMt'), tareasActivas().filter(paraMi).length);
 }
 function actualizarListas() {
@@ -1648,7 +1660,7 @@ function pintarHojasEq(id) {
 
 /* ================= EVENTOS ================= */
 if (ui.tablaDb === 'rec') tablaDb = 'rec';
-$('tabRec').onclick = () => ir('rec'); $('tabEq').onclick = () => ir('eq'); $('tabMt').onclick = () => ir('mt'); $('tabDb').onclick = () => ir('db');
+$('tabRec').onclick = () => ir('rec'); $('tabEq').onclick = () => ir('eq'); $('tabMt').onclick = () => ir('mt'); $('tabDb').onclick = () => ir('db'); $('tabSo').onclick = () => ir('so');
 $('btnNewMt').onclick = () => abrirMt(null);
 $('qMt').oninput = renderMt;
 $('chipsResp').onclick = e => { const b = e.target.closest('[data-resp]'); if (!b) return; filtroResp = b.dataset.resp; renderMt(); };
@@ -1792,7 +1804,8 @@ async function iniciar() {
     pendientes.forEach(aplicarLocal);
   }
   if (/[?&]agenda=1/.test(location.search)) filtroMt = 'mias';
-  pintarConexion(); pintarAvisos(); ir(/[?&]agenda=1/.test(location.search) ? 'mt' : 'rec');
+  const chatPedido = new URLSearchParams(location.search).get('chat');   // viene de una notificación del chat
+  pintarConexion(); pintarAvisos(); ir(chatPedido ? 'so' : /[?&]agenda=1/.test(location.search) ? 'mt' : 'rec');
   if (!window.claude || typeof window.claude.use !== 'function') { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
   const usar = n => window.claude.use(n).catch(() => null);
   const [db, user, dl] = await Promise.all([usar('db'), usar('user'), usar('downloads')]);
@@ -1802,6 +1815,11 @@ async function iniciar() {
     try { miId = await USER.id(); } catch (e) {}
     try { puedeEscribir = await USER.can('data.write'); } catch (e) { puedeEscribir = null; }
     if (puedeEscribir === false) soloLectura = true;
+  }
+  // Soporte (chat): arranca aparte; si falta algo (inicio anónimo, reglas, internet) lo explica en su pestaña.
+  if (window.ChatSoporte) {
+    ChatSoporte.iniciar({ nombre: () => miId, toast, confirmar, avisar: (n, a) => enviarAviso(n, a, true), insignia: n => UI.insignia($('badgeSo'), n) });
+    if (chatPedido) ChatSoporte.abrir(chatPedido);
   }
   if (!DB) { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
   pintarAvisos(); suscribir(); reintentarPendientes();

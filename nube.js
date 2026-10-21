@@ -13,7 +13,7 @@
   let espacio = leer('espacio');
   let claveTmp = null;
   let nombre = leer('nombre') || '';
-  let F = null, fs = null, enVuelo = 0, errorFirebase = '';
+  let F = null, fs = null, appFb = null, enVuelo = 0, errorFirebase = '';
   let avisar = () => {};
   let soltar; const listo = new Promise(r => { soltar = r; });
 
@@ -104,9 +104,12 @@
     if (!window.FIREBASE_CONFIG || !window.FIREBASE_CONFIG.projectId) throw new Error('Falta la configuración de Firebase (config.js).');
     const [A, FF] = await Promise.all([import(SDK + 'firebase-app.js'), import(SDK + 'firebase-firestore.js')]);
     F = FF;
-    const app = A.initializeApp(window.FIREBASE_CONFIG);
-    try { fs = F.initializeFirestore(app, { ignoreUndefinedProperties: true, localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) }); }
+    const app = appFb = A.initializeApp(window.FIREBASE_CONFIG);
+    // Pruebas con los emuladores de Firebase: window.FIREBASE_EMULADORES = { firestore: '127.0.0.1:8080', auth: 'http://127.0.0.1:9099' }.
+    const emu = window.FIREBASE_EMULADORES;
+    try { fs = F.initializeFirestore(app, Object.assign({ ignoreUndefinedProperties: true }, emu ? {} : { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) })); }
     catch (e) { try { fs = F.initializeFirestore(app, { ignoreUndefinedProperties: true }); } catch (e2) { fs = F.getFirestore(app); } }
+    if (emu && emu.firestore && F.connectFirestoreEmulator) { const [h, p] = emu.firestore.split(':'); F.connectFirestoreEmulator(fs, h, Number(p)); }
   }
   const ruta = col => ['espacios', espacio, col];
 
@@ -381,6 +384,30 @@
     });
   }
 
+  /* ---------- sesión del chat (inicio anónimo de Firebase) ---------- */
+  // Cada teléfono recibe una identidad anónima propia. Con ella las reglas dejan leer un chat privado
+  // solo a las dos personas que lo tienen. Si en el teléfono entra otra persona, la identidad se cambia.
+  let AU = null, auth = null, sesionP = null;
+  const alSalir = [];
+  function sesionChat() {
+    sesionP = sesionP || (async () => {
+      await listo;
+      if (!fs || !espacio) throw Object.assign(new Error('La base de datos no está abierta.'), { code: 'sin-db' });
+      AU = AU || await import(SDK + 'firebase-auth.js');
+      auth = auth || AU.getAuth(appFb);
+      const emu = window.FIREBASE_EMULADORES;
+      if (emu && emu.auth && !auth.__emu) { AU.connectAuthEmulator(auth, emu.auth, { disableWarnings: true }); auth.__emu = true; }
+      if (auth.authStateReady) await auth.authStateReady();
+      const dueno = leer('chat_dueno'), yo = sinTildesN(nombre);
+      if (auth.currentUser && dueno && dueno !== yo) await AU.signOut(auth);   // el teléfono cambió de persona
+      const u = auth.currentUser || (await AU.signInAnonymously(auth)).user;
+      guardar('chat_dueno', yo);
+      return { uid: u.uid, F, fs, espacio };
+    })().catch(e => { sesionP = null; throw e; });
+    return sesionP;
+  }
+  const sinTildesN = t => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
   /* ---------- copia de seguridad ---------- */
   async function leerTodo() {
     const out = {};
@@ -478,12 +505,20 @@
       guardar('nombre', n.replace(/\s+/g, ' ')); location.reload();
     },
     salir() {
-      const hacer = () => { guardar('espacio', null); (APP.enlaces || []).forEach(en => guardar('enlace_' + en.id, null)); location.reload(); };
+      const hacer = async () => {
+        // El chat quita este teléfono de la persona antes de cerrar la identidad anónima.
+        for (const f of alSalir) { try { await Promise.race([f(), new Promise(r => setTimeout(r, 4000))]); } catch (e) {} }
+        try { if (auth && AU) await AU.signOut(auth); } catch (e) {}
+        guardar('chat_dueno', null);
+        guardar('espacio', null); (APP.enlaces || []).forEach(en => guardar('enlace_' + en.id, null)); location.reload();
+      };
       if (typeof window.confirmar === 'function') window.confirmar('Salir de este teléfono', 'Se olvida la clave en este teléfono. Para volver a entrar tendrás que escribirla otra vez. Los datos no se borran.', 'Salir', hacer);
       else preguntar('Salir de este teléfono', 'Se olvida la clave en este teléfono. Los datos no se borran.', 'Salir', true).then(ok => { if (ok) hacer(); });
     },
     get nombre() { return nombre; }
   };
+  nube.sesionChat = sesionChat;
+  nube.alSalir = f => { if (typeof f === 'function') alSalir.push(f); };
   nube.reportarError = reportarError;
   window.nube = nube;
 

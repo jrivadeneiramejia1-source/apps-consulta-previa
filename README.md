@@ -56,6 +56,7 @@ npm run lint        # revisa el código (ESLint), también el que está dentro d
 npm run pruebas     # las apps en un navegador de verdad (Playwright) con Firebase falso, y la accesibilidad (axe)
 npm run enlaces     # enlaces, íconos y archivos que guarda cada sw.js
 npm run reglas      # reglas de Firestore en el emulador de Firebase (necesita Java)
+npm run chat-real   # el chat de Soporte con los emuladores de Firestore e inicio anónimo (necesita Java)
 npm run lighthouse  # velocidad, accesibilidad y buenas prácticas (solo avisa)
 ```
 
@@ -72,6 +73,7 @@ Están en `firestore.rules` (se prueban con `npm run reglas`). En Firebase → F
 - Leer y borrar: solo dentro de un espacio de 40 letras y en las colecciones de las apps.
 - Crear y cambiar: además, el documento no puede quedar vacío ni tener más de 300 campos (evita escrituras rotas).
 - El peso de cada documento lo limita Firestore (1 MiB); las reglas no tienen forma de medirlo.
+- Soporte (`gente`, `chat`, `privados`, `vinculos`): solo con sesión anónima; cada quien escribe a su nombre y los privados solo los leen sus dos personas.
 
 ## Agenda de Equipos
 - Colección `tareas`: `{ serial, tipo: fisico|remoto|backup, fecha, nota, resp, creadoPor, estado, hist[], hecho }`.
@@ -88,6 +90,16 @@ Están en `firestore.rules` (se prueban con `npm run reglas`). En Firebase → F
 - Cada teléfono que activa las notificaciones queda en la colección `avisos` (nombre de la persona y su suscripción).
 - Al programar un mantenimiento con **Responsable**, la app le envía el aviso a los teléfonos de esa persona.
 - Pruebas: `node pruebas/worker.mjs` (cifrado y firma) y `node pruebas/avisos.mjs` (flujo en la app).
+
+## Soporte (chat de Equipos)
+Pestaña **Soporte**: un chat de todos («Soporte · Todos») y un chat privado con cada persona que ya abrió Equipos. Sale quién está conectado, «visto hace…», mensajes sin leer, responder citando, copiar y borrar los propios. En el privado sale «Enviado» y «Visto».
+- **Antes de usarlo**, en Firebase → Authentication (autenticación) → Método de acceso (Sign-in method) → **Anónimo (Anonymous)** → Habilitar, y pegar el `firestore.rules` nuevo. Sin eso la pestaña explica qué falta; el resto de la app sigue igual.
+- Cada teléfono recibe una identidad anónima (sin correo ni contraseña). La persona (`gente/{nombre sin tildes}`) guarda sus teléfonos en `uids` (máximo 10).
+- Privados de verdad: `privados/{a__b}/mensajes` solo lo leen los teléfonos de esas dos personas (lo revisan las reglas, no la app).
+- **Otro teléfono con el mismo nombre** muestra un código de 6 números; en el teléfono que ya está anotado: Soporte → **Vincular otro teléfono** y se escribe el código (`vinculos/{código}`, se borra al usarlo).
+- **Salir** quita ese teléfono de la persona (si tiene otro).
+- Los avisos usan las mismas notificaciones de la Agenda (si la persona las activó). Tocar el aviso abre ese chat (`?chat=todos` o `?chat=nombre`).
+- Pruebas: `node pruebas/chat.mjs` (interfaz, con Firebase falso) y `npm run chat-real` (tres personas y un segundo teléfono contra los emuladores).
 
 ## Instalar la app
 - `nube.js` ofrece instalarla en tres lugares: una franja arriba (se cierra por 7 días con la X), un botón en la pantalla de la clave (lo primero que ve quien abre el enlace) y un bloque fijo en Base de datos → "Copia de seguridad y acceso".

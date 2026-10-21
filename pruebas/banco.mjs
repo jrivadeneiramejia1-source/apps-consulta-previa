@@ -46,7 +46,7 @@ export async function pagina(browser, { tema = 'light', ancho = 390, alto = 844,
   const ctx = await browser.newContext({ viewport: { width: ancho, height: alto }, colorScheme: tema, locale: 'es-CO', deviceScaleFactor: 2, reducedMotion: quieto ? 'reduce' : 'no-preference' });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, async r => {
     const u = r.request().url();
-    if (u.includes('/firebasejs/')) return r.fulfill({ path: path.join(RAIZ, 'pruebas', u.includes('firestore') ? 'firebase-firestore.js' : 'firebase-app.js'), contentType: 'text/javascript' });
+    if (u.includes('/firebasejs/')) return r.fulfill({ path: path.join(RAIZ, 'pruebas', u.includes('firestore') ? 'firebase-firestore.js' : u.includes('auth') ? 'firebase-auth.js' : 'firebase-app.js'), contentType: 'text/javascript' });
     const lib = Object.keys(LIBS).find(k => u.endsWith(k) && fs.existsSync(LIBS[k]));
     if (lib) return r.fulfill({ path: LIBS[lib], contentType: 'text/javascript' });
     const npm = deJsdelivr(u);

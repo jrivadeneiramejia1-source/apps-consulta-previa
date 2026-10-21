@@ -21,7 +21,10 @@ async function sinDesborde(page, nombre) {
   const r = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
   chequear(r[0] <= r[1], `sin desplazamiento lateral: ${nombre} (${r[0]} > ${r[1]})`);
 }
-async function enfocadoDentro(page, sel) { return page.evaluate(s => { const el = document.querySelector(s); return !!el && el.contains(document.activeElement); }, sel); }
+// El foco pasa a la hoja en el siguiente cuadro (requestAnimationFrame): se espera hasta 2 s antes de revisarlo.
+async function enfocadoDentro(page, sel) {
+  return page.waitForFunction(s => { const el = document.querySelector(s); return !!el && el.contains(document.activeElement); }, sel, { timeout: 2000 }).then(() => true, () => false);
+}
 
 const srv = await servir();
 const br = await lanzar();
