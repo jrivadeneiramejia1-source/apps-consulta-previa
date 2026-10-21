@@ -204,6 +204,7 @@
   .nube-inst-clave svg, .nube-inst-bloque .btn svg { width: 18px; height: 18px; }
   .nube-inst-bloque { display: flex; flex-direction: column; gap: 6px; padding-top: 10px; border-top: 1px solid var(--line); }
   .nube-inst-bloque .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .nube-vieja { color: var(--warn); font-weight: 650; }
   .nube-dlg { z-index: 95; }
   .nube-x { width: 18px; height: 18px; display: block; }
   .nube-card { gap: 10px; }
@@ -455,6 +456,7 @@
         const colecciones = await leerTodo();
         const n = Object.values(colecciones).reduce((a, c) => a + Object.keys(c).length, 0);
         await DL.save({ filename: `Copia ${APP.nombre} ${hoy()}.json`, data: JSON.stringify({ app: APP.id, fecha: new Date().toISOString(), colecciones }, null, 1) });
+        guardar('copia', String(Date.now())); pintarCopia();
         toast(`Copia descargada (${n} registros)`);
       } catch (e) { toast('No se pudo hacer la copia: ' + (e.message || e)); }
     },
@@ -522,6 +524,20 @@
   nube.reportarError = reportarError;
   window.nube = nube;
 
+  /* ---------- cuándo se descargó la última copia ---------- */
+  // Cualquiera con la clave puede borrar; con una copia reciente se recupera. Se recuerda en este teléfono (no se sabe si otro la hizo).
+  const DIAS_COPIA = 30;
+  function pintarCopia() {
+    const info = document.getElementById('nubeInfo'); if (!info || !DB) return;
+    let el = document.getElementById('nubeCopia');
+    if (!el) { el = document.createElement('div'); el.id = 'nubeCopia'; el.className = 'meta'; info.after(el); }
+    const t = Number(leer('copia') || 0), dias = t ? Math.max(0, Math.floor((Date.now() - t) / 864e5)) : null;
+    const porque = ' Si alguien borra algo por error, con la copia se recupera.';
+    el.classList.toggle('nube-vieja', dias === null || dias >= DIAS_COPIA);
+    el.textContent = dias === null ? `En este teléfono todavía no has descargado una copia. Descarga una cada mes.${porque}`
+      : `Última copia descargada en este teléfono: ${dias === 0 ? 'hoy' : dias === 1 ? 'ayer' : `hace ${dias} días`}.${dias >= DIAS_COPIA ? ` Ya toca otra.${porque}` : ''}`;
+  }
+
   /* ---------- versión nueva ---------- */
   // Si en GitHub hay una versión más nueva que la que está abierta, recarga con ella (una sola vez por versión).
   async function revisarVersion() {
@@ -558,6 +574,7 @@
     if (!DB && errorFirebase) console.warn('Firebase:', errorFirebase);
     const info = document.getElementById('nubeInfo');
     if (info) info.textContent = (DB ? `Estás como ${nombre || 'sin nombre'}. Los datos se guardan en Firebase y se ven en todos los teléfonos que usen la misma clave.` : 'No se pudo conectar con la base de datos.') + ` Versión ${APP.v || '?'}.`;
+    pintarCopia();
     soltar();
   }
   if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {

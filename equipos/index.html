@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=28">
+<link rel="stylesheet" href="../comun.css?v=29">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -285,13 +285,13 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "28"};</script>
-<script src="../iconos.js?v=28"></script>
-<script src="../comun.js?v=28"></script>
-<script src="../codigos.js?v=28"></script>
-<script src="../config.js?v=28"></script>
-<script src="../nube.js?v=28"></script>
-<script src="chat.js?v=28"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "29"};</script>
+<script src="../iconos.js?v=29"></script>
+<script src="../comun.js?v=29"></script>
+<script src="../codigos.js?v=29"></script>
+<script src="../config.js?v=29"></script>
+<script src="../nube.js?v=29"></script>
+<script src="chat.js?v=29"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas';
@@ -1022,9 +1022,16 @@ function guardarEq(ev) {
 }
 function borrarEq(id) {
   const e = Q.get(id); if (!e) return;
+  // Sus tareas de la Agenda quedarían sueltas (no se pueden editar sin el equipo): se ofrece quitarlas también.
+  const act = activasDe(id), rec = pendienteDe(e.serial);
+  const opc = (act.length ? `<label class="check"><input type="checkbox" id="cfBorrarTareas" checked> También quitar de la Agenda ${act.length === 1 ? 'su tarea programada' : `sus ${act.length} tareas programadas`}: ${esc(act.map(t => `${tipoT(t).n.toLowerCase()} del ${fechaBonita(t.fecha)}`).join(', '))}</label>` : '')
+    + (rec ? `<p class="nota-cf">Está en Recibidos (${esc(estadoRec(rec).n.toLowerCase())}): ese registro no se borra. Si le das Listo, el equipo vuelve a la lista.</p>` : '');
   confirmar('Eliminar equipo', `Se borra el equipo ${e.serial} de la lista principal, para todos. No se puede deshacer.`, 'Eliminar', () => {
-    escribir({ tipo: 'delete', col: COL_Q, id }); cerrarEq(); toast('Equipo eliminado');
-  });
+    const conTareas = !!($('cfBorrarTareas') && $('cfBorrarTareas').checked);
+    escribir({ tipo: 'delete', col: COL_Q, id }); cerrarEq();
+    if (conTareas) act.forEach(t => escribir({ tipo: 'delete', col: COL_T, id: t.id }));
+    toast('Equipo eliminado' + (conTareas && act.length ? ` y ${act.length === 1 ? 'su tarea quitada' : `sus ${act.length} tareas quitadas`} de la Agenda` : ''));
+  }, null, opc);
 }
 function mostrarErr(id, t) { $(id).textContent = t; $(id).hidden = false; }
 let cfAccion = null, cfGen = 0;
@@ -1550,7 +1557,17 @@ function filasExcel() {
   const lab = { pend: 'Pendiente', hecho: 'Hecho', na: 'No aplica' };
   const rec = [['SERIAL', 'TIPO DE EQUIPO', 'MARCA', 'MODELO', 'A NOMBRE DE', 'PROYECTO', 'FECHA QUE LO TRAJERON', 'MANTENIMIENTO', 'FECHA MANTENIMIENTO', 'BACKUP', 'FECHA BACKUP', 'ESTADO', 'ACCESORIOS', 'OBSERVACIONES']]
     .concat(recibidosLista().sort((a, b) => String(a.fechaIngreso || '').localeCompare(String(b.fechaIngreso || ''))).map(r => [r.serial, r.tipo || '', r.marca || '', r.modelo || '', r.persona || '', r.proyecto || '', aFecha(r.fechaIngreso), lab[r.mtto || 'pend'], aFecha(r.mttoFecha), lab[r.backup || 'pend'], aFecha(r.backupFecha), estadoRec(r).n, (r.acc || []).join(', '), r.obs || '']));
-  return { eq, rec };
+  // Historial: cada mantenimiento y backup hecho, de la Agenda (mttos del equipo) y de Recibidos. Sirve para el informe del mes.
+  const TRABAJO = { fisico: 'Mantenimiento físico', remoto: 'Mantenimiento remoto', backup: 'Backup' };
+  const his = [];
+  equiposOrdenados().forEach(e => (e.mttos || []).forEach(m => his.push([aFecha(m.fecha), e.serial, e.tipo || '', e.marca || '', e.modelo || '', TRABAJO[m.tipo] || TRABAJO.fisico, 'Agenda', m.por || '', e.asignado || '', m.disco || '', m.nota || ''])));
+  recibidosLista().forEach(r => {
+    const e = Q.get(idSerial(r.serial)) || {}, fila = trabajo => [r.serial, r.tipo || e.tipo || '', r.marca || e.marca || '', r.modelo || e.modelo || '', trabajo, 'Recibidos', '', r.persona || '', '', r.obs || ''];
+    if (r.mtto === 'hecho' && r.mttoFecha) his.push([aFecha(r.mttoFecha)].concat(fila(TRABAJO.fisico)));
+    if (r.backup === 'hecho' && r.backupFecha) his.push([aFecha(r.backupFecha)].concat(fila(TRABAJO.backup)));
+  });
+  his.sort((a, b) => (b[0] ? b[0].getTime() : 0) - (a[0] ? a[0].getTime() : 0) || cmp(a[1], b[1]));
+  return { eq, rec, his: [['FECHA', 'SERIAL', 'TIPO DE EQUIPO', 'MARCA', 'MODELO', 'TRABAJO', 'DÓNDE SE REGISTRÓ', 'HECHO POR', 'A NOMBRE DE', 'DISCO DEL BACKUP', 'NOTA']].concat(his) };
 }
 function csv(filas) {
   return '﻿' + filas.map(f => f.map(v => { if (v instanceof Date) v = v.toISOString().slice(0, 10); const s = String(v ?? ''); return /[";\n,]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(';')).join('\r\n');
@@ -1564,14 +1581,15 @@ async function descargarExcel() {
   const btn = $('btnExcel'), txt = btn.lastElementChild; btn.disabled = true; txt.textContent = 'Preparando…';
   const hoy = hoyIso();
   try {
-    const { eq, rec } = filasExcel();
+    const { eq, rec, his } = filasExcel();
     let data, filename;
     if (!window.XLSX) { try { await cargarScript(XLSX_URL); } catch (e) {} }
     if (window.XLSX) {
       const X = window.XLSX, wb = X.utils.book_new();
       const h1 = X.utils.aoa_to_sheet(eq, { cellDates: true }); ponerFormato(h1, eq, [10, 12, 13], [16, 20, 12, 18, 32, 34, 12, 20, 14, 14, 18, 30, 16, 16, 16, 22]);
       const h2 = X.utils.aoa_to_sheet(rec, { cellDates: true }); ponerFormato(h2, rec, [6, 8, 10], [16, 18, 12, 18, 30, 18, 14, 14, 14, 12, 14, 24, 26, 30]);
-      X.utils.book_append_sheet(wb, h1, 'Equipos'); X.utils.book_append_sheet(wb, h2, 'Recibidos');
+      const h3 = X.utils.aoa_to_sheet(his, { cellDates: true }); ponerFormato(h3, his, [0], [12, 16, 18, 12, 18, 22, 14, 18, 30, 18, 34]);
+      X.utils.book_append_sheet(wb, h1, 'Equipos'); X.utils.book_append_sheet(wb, h2, 'Recibidos'); X.utils.book_append_sheet(wb, h3, 'Historial');
       data = new Blob([X.write(wb, { bookType: 'xlsx', type: 'array', compression: true, cellDates: true })]);
       filename = `Equipos Consulta Previa ${hoy}.xlsx`;
     } else { data = csv(eq); filename = `Equipos Consulta Previa ${hoy}.csv`; }
