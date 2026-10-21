@@ -1,10 +1,13 @@
 /* codigos.js — Lee con la cámara el código de barras o QR del serial de un equipo (Equipos y Entregas).
    Usa el lector que trae el navegador (BarcodeDetector: Chrome en Android) y, si no lo tiene (iPhone, Windows),
-   el mismo lector hecho con ZXing (paquete barcode-detector, se descarga la primera vez, unos 1,5 MB, y queda guardado).
-   Si no hay permiso para la cámara, se puede tomar una foto del código.
+   el mismo lector hecho con ZXing (paquete barcode-detector), que viene dentro de la app en lib/codigos/ (sin internet).
+   La cámara se abre al instante, mientras el lector se prepara. Si la cámara falla, dice por qué y cómo arreglarlo,
+   y siempre queda "Tomar foto" (la cámara del teléfono) o "Escribir a mano".
    Uso: const serial = await Codigos.leer({ titulo, conocidos: [seriales] }) → texto o null si se cancela. */
 (function () {
   'use strict';
+  // Lector propio: primero el que viene con la app; si no carga, el mismo desde internet (jsDelivr).
+  const LOCAL = new URL('lib/codigos/', (document.currentScript && document.currentScript.src) || new URL('../', location.href)).href;
   const POLY = 'https://cdn.jsdelivr.net/npm/barcode-detector@3.2.2/dist/iife/ponyfill.js';
   const WASM = 'https://cdn.jsdelivr.net/npm/zxing-wasm@3.1.3/dist/reader/';
   const FORMATOS = ['code_128', 'code_39', 'code_93', 'codabar', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e', 'qr_code', 'data_matrix', 'pdf417'];
@@ -41,10 +44,17 @@
           if (f.includes('code_128') && f.includes('qr_code')) return new window.BarcodeDetector({ formats: f });
         } catch (e) {}
       }
-      if (!window.BarcodeDetectionAPI) await cargarScript(POLY);
+      let wasm = LOCAL;
+      if (!window.BarcodeDetectionAPI) {
+        try { await cargarScript(LOCAL + 'ponyfill.js'); } catch (e) { await cargarScript(POLY); wasm = WASM; }
+      }
       const api = window.BarcodeDetectionAPI;
-      api.setZXingModuleOverrides({ locateFile: (p, pre) => (p.endsWith('.wasm') ? WASM : pre) + p });
-      return new api.BarcodeDetector({ formats: FORMATOS });
+      api.setZXingModuleOverrides({ locateFile: (p, pre) => (p.endsWith('.wasm') ? wasm : pre) + p });
+      const det = new api.BarcodeDetector({ formats: FORMATOS });
+      // El motor (wasm) se baja y arranca en la primera lectura: se hace ya con una imagen vacía para no perder ese tiempo.
+      const c = document.createElement('canvas'); c.width = c.height = 8;
+      await det.detect(c);
+      return det;
     })().then(d => (detector = d), e => { cargando = null; throw e; });
     return cargando;
   }
@@ -88,7 +98,10 @@
   .cod-marco { position: absolute; left: 8%; right: 8%; top: 34%; height: 32%; border: 3px solid #46c2a6; border-radius: 16px; box-shadow: 0 0 0 9999px rgba(0,0,0,.45); pointer-events: none; }
   .cod-marco::after { content: ""; position: absolute; left: 6%; right: 6%; top: 50%; height: 2px; background: #ff6b5a; opacity: .85; animation: cod-linea 1.8s ease-in-out infinite alternate; }
   @keyframes cod-linea { from { transform: translateY(-40px); } to { transform: translateY(40px); } }
-  .cod-sin { padding: 24px; max-width: 420px; text-align: center; line-height: 1.5; }
+  .cod-sin { padding: 24px; max-width: 440px; text-align: center; line-height: 1.5; display: flex; flex-direction: column; gap: 14px; align-items: center; }
+  .cod-sin p { margin: 0; }
+  .cod-sin .cod-pasos { text-align: left; font-size: .9rem; color: #d5ebe5; margin: 0; padding-left: 1.2em; }
+  .cod-sin .cod-btn { min-width: 180px; }
   .cod-estado { text-align: center; font-size: .9rem; padding: 8px 14px; min-height: 1.6em; color: #d5ebe5; }
   .cod-elegir { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 0 12px 6px; }
   .cod-elegir .cod-btn { font-family: var(--f-mono, ui-monospace, monospace); }
@@ -115,7 +128,7 @@
       const caja = document.createElement('div');
       caja.className = 'cod'; caja.setAttribute('role', 'dialog'); caja.setAttribute('aria-modal', 'true'); caja.setAttribute('aria-labelledby', 'codTit');
       caja.innerHTML = `<div class="cod-barra"><button class="cod-btn" type="button" data-a="cancelar">${icono('x')}<span>Cancelar</span></button><h2 id="codTit">${esc(opc.titulo || 'Escanear el código')}</h2><button class="cod-btn" type="button" data-a="linterna" aria-pressed="false" aria-label="Linterna" hidden>${icono('linterna')}</button></div>
-        <div class="cod-escena"><video playsinline muted aria-hidden="true"></video><div class="cod-marco" aria-hidden="true"></div><div class="cod-sin" hidden></div></div>
+        <div class="cod-escena"><video playsinline muted aria-hidden="true"></video><div class="cod-marco" aria-hidden="true"></div><div class="cod-sin" role="alert" hidden></div></div>
         <div class="cod-ctrl" hidden><div class="cod-zoom" role="group" aria-label="Acercar la imagen" hidden></div><button class="cod-btn" type="button" data-a="cerca" aria-pressed="false" hidden>${icono('lupaMas')}<span>Enfocar de cerca</span></button><button class="cod-btn" type="button" data-a="otra" hidden>${icono('girar')}<span>Cambiar cámara</span></button></div>
         <div class="cod-estado" role="status" aria-live="polite">Abriendo la cámara…</div>
         <p class="cod-ayuda" hidden></p>
@@ -133,12 +146,21 @@
         clearTimeout(timer); clearTimeout(tAyuda);
         if (flujo) flujo.getTracks().forEach(t => t.stop());
         window.removeEventListener('popstate', alAtras);
+        document.removeEventListener('visibilitychange', alVisibilidad);
         caja.remove(); document.body.classList.remove('con-cod');
         if (empujado) { empujado = false; try { history.back(); } catch (e) {} }
         if (antes && antes.isConnected) try { antes.focus({ preventScroll: true }); } catch (e) {}
         resolver(v);
       }
       const alAtras = () => { empujado = false; cerrar(null); };
+      // Al salir de la app la cámara se apaga (el iPhone la corta igual) y al volver se abre otra vez.
+      let pausada = false;
+      const alVisibilidad = () => {
+        if (fin) return;
+        if (document.hidden && flujo) { pausada = true; flujo.getTracks().forEach(t => t.stop()); flujo = null; }
+        else if (!document.hidden && pausada) { pausada = false; arrancar(); }
+      };
+      document.addEventListener('visibilitychange', alVisibilidad);
       try { history.pushState({ codigos: 1 }, ''); empujado = true; window.addEventListener('popstate', alAtras); } catch (e) {}
       // Varios códigos en la etiqueta (serial, número de producto…): la persona escoge. Uno solo que se lee dos veces seguidas: se usa.
       function revisar(valores) {
@@ -157,15 +179,23 @@
       // Con un código pequeño la imagen completa casi nunca alcanza; agrandado 2,5 a 3 veces sí se lee (se midió con un
       // código de 230 puntos de ancho en un video de 1280).
       const VISTAS = [null, [0.6, 0.35], [0.35, 0.25]];
+      let fallas = 0, avisoFalla = false;
       async function ciclo() {
         if (fin) return;
         try {
-          if (video.readyState >= 2 && video.videoWidth) {
+          if (detector && video.readyState >= 2 && video.videoWidth) {
             const v = VISTAS[vueltas++ % VISTAS.length];
             const fuente = v ? centro(video, video.videoWidth, video.videoHeight, v[0], v[1], lienzo) : video;
-            const r = await detector.detect(fuente); if (r.length) revisar(textos(r));
+            const r = await detector.detect(fuente); fallas = 0; if (r.length) revisar(textos(r));
           }
-        } catch (e) {}
+        } catch (e) {
+          // Si el lector falla una y otra vez, se dice (antes quedaba mudo y parecía que no leía).
+          if (++fallas === 15 && !avisoFalla) {
+            avisoFalla = true;
+            ponerEstado('El lector de códigos está fallando en este teléfono. Toca Tomar foto o Escribir a mano.');
+            if (window.nube && window.nube.reportarError) window.nube.reportarError(e, 'codigos.detectar');
+          }
+        }
         if (!fin) timer = setTimeout(ciclo, 120);
       }
       /* ---- enfoque, zoom y cámara: para códigos pequeños ----
@@ -201,18 +231,57 @@
       }
       const LS_CAM = 'codigos.camara';
       const camGuardada = () => { try { return localStorage.getItem(LS_CAM) || ''; } catch (e) { return ''; } };
-      function pedirCamara(id) {
-        const v = { width: { ideal: 1920 }, height: { ideal: 1080 } };
-        if (id) v.deviceId = { exact: id }; else v.facingMode = { ideal: 'environment' };
-        try { if (navigator.mediaDevices.getSupportedConstraints && navigator.mediaDevices.getSupportedConstraints().zoom) v.zoom = true; } catch (e) {}
-        return navigator.mediaDevices.getUserMedia({ video: v, audio: false });
+      // Algunos teléfonos rechazan pedidos exigentes (resolución, zoom) o se quedan pegados: se prueba de lo más
+      // completo a lo más simple, y cada intento tiene un tiempo máximo.
+      const conTiempo = (p, ms) => new Promise((ok, mal) => {
+        const t = setTimeout(() => { const e = new Error('La cámara no respondió'); e.name = 'Tiempo'; mal(e); p.then(f => f && f.getTracks().forEach(x => x.stop()), () => {}); }, ms);
+        p.then(v => { clearTimeout(t); ok(v); }, e => { clearTimeout(t); mal(e); });
+      });
+      // No se pide "zoom: true": en Chrome para Android eso abre un segundo permiso ("usar y mover la cámara") y, si la
+      // persona lo cierra o lo niega, la cámara no abre. El zoom se usa solo si la cámara ya lo ofrece; si no, el lector
+      // agranda el centro de la imagen por su cuenta (VISTAS).
+      function intentos(id) {
+        const donde = id ? { deviceId: { exact: id } } : { facingMode: { ideal: 'environment' } };
+        const hd = { width: { ideal: 1920 }, height: { ideal: 1080 } };
+        const l = [Object.assign({}, donde, hd), Object.assign({}, donde)];
+        if (!id) l.push(true);
+        return l;
       }
+      async function pedirCamara(id) {
+        let ultimo = null;
+        let ocupada = false;
+        for (const v of intentos(id)) {
+          if (fin) return null;
+          try { return await conTiempo(navigator.mediaDevices.getUserMedia({ video: v, audio: false }), window.__codigosEspera || 12000); }
+          catch (e) {
+            ultimo = e;
+            // Cámara ocupada (a veces es la misma app que la soltó hace un instante): se espera medio segundo y se repite una vez.
+            if (e && e.name === 'NotReadableError' && !ocupada) {
+              ocupada = true; await new Promise(r => setTimeout(r, 500));
+              try { return await conTiempo(navigator.mediaDevices.getUserMedia({ video: v, audio: false }), window.__codigosEspera || 12000); } catch (e2) { ultimo = e2; }
+            }
+            // Sin permiso o sin https: otro intento no cambia nada.
+            // Sin permiso, sin https o cámara pegada: otro intento no cambia nada (y haría esperar más).
+            if (e && (e.name === 'NotAllowedError' || e.name === 'SecurityError' || e.name === 'PermissionDeniedError' || e.name === 'Tiempo')) throw e;
+          }
+        }
+        throw ultimo || new Error('No se pudo abrir la cámara');
+      }
+      // Espera a que lleguen imágenes de verdad (hay cámaras que "abren" pero no mandan nada).
+      const conImagen = () => new Promise((ok, mal) => {
+        if (video.readyState >= 2 && video.videoWidth) return ok();
+        const t = setTimeout(() => { video.removeEventListener('loadeddata', listo); const e = new Error('La cámara no manda imagen'); e.name = 'SinImagen'; mal(e); }, window.__codigosEspera || 8000);
+        function listo() { clearTimeout(t); ok(); }
+        video.addEventListener('loadeddata', listo, { once: true });
+      });
       async function usarCamara(id) {
         const nuevo = await pedirCamara(id);
+        if (!nuevo) return;
         if (fin) { nuevo.getTracks().forEach(t => t.stop()); return; }
         if (flujo) flujo.getTracks().forEach(t => t.stop());
         flujo = nuevo; video.srcObject = flujo;
         try { await video.play(); } catch (e) {}
+        await conImagen();
         await configurar();
       }
       function mostrarAyuda() {
@@ -231,25 +300,69 @@
           if (!fin) ponerEstado('Apunta al código de barras o QR del serial, dentro del recuadro.');
         }, 1800));
       });
-      function sinCamara(texto) {
-        video.hidden = true; $('.cod-marco').hidden = true; sin.hidden = false;
-        sin.textContent = texto; ponerEstado('');
+      // Por qué no abrió la cámara y qué hacer, según el error y el teléfono.
+      const ua = navigator.userAgent || '';
+      const enOtraApp = /FBAN|FBAV|Instagram|WhatsApp|Line\/|MicroMessenger|; wv\)/i.test(ua);
+      const esIphone = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const esAndroid = /Android/.test(ua);
+      function explicar(e) {
+        const n = (e && e.name) || '';
+        if (!window.isSecureContext) return { t: 'La cámara solo funciona si la app se abre con https. Ábrela desde su enlace https.' };
+        if (enOtraApp) return { t: 'Estás viendo la app dentro de otra aplicación (WhatsApp, Facebook…), que no deja usar la cámara.', pasos: [esIphone ? 'Toca los tres puntos o el botón de compartir y escoge «Abrir en Safari».' : 'Toca el menú de tres puntos y escoge «Abrir en Chrome».', 'O instala la app y ábrela desde su ícono.'] };
+        if (n === 'NotAllowedError' || n === 'PermissionDeniedError' || n === 'SecurityError') {
+          return { t: 'La cámara está bloqueada para esta app.', pasos: esIphone
+            ? ['Abre Ajustes → Safari → Cámara y escoge «Preguntar» o «Permitir».', 'Si instalaste la app: Ajustes → la app → Cámara.', 'Vuelve aquí y toca Reintentar.']
+            : esAndroid
+              ? ['Toca el candado o el ícono junto a la dirección → Permisos → Cámara → Permitir.', 'Si instalaste la app: mantén presionado su ícono → Información de la app → Permisos → Cámara → Permitir.', 'Vuelve aquí y toca Reintentar.']
+              : ['Haz clic en el candado junto a la dirección y permite la cámara.', 'Vuelve aquí y toca Reintentar.'] };
+        }
+        if (n === 'NotFoundError' || n === 'DevicesNotFoundError' || n === 'OverconstrainedError') return { t: 'No encontré una cámara que se pueda usar en este dispositivo.' };
+        if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError') return { t: 'Otra app está usando la cámara (la cámara del teléfono, WhatsApp, una videollamada…).', pasos: ['Cierra esa app.', 'Vuelve aquí y toca Reintentar.'] };
+        if (n === 'Tiempo' || n === 'SinImagen') return { t: 'La cámara no respondió.', pasos: ['Cierra otras apps que usen la cámara.', 'Toca Reintentar. Si sigue igual, reinicia el navegador.'] };
+        return { t: 'No se pudo abrir la cámara' + (n ? ` (${n})` : '') + '.', pasos: ['Toca Reintentar.'] };
+      }
+      function sinCamara(info, reintentar) {
+        video.hidden = true; $('.cod-marco').hidden = true; $('.cod-ctrl').hidden = true; sin.hidden = false;
+        sin.innerHTML = `<p>${esc(info.t)}</p>${info.pasos ? `<ol class="cod-pasos">${info.pasos.map(x => `<li>${esc(x)}</li>`).join('')}</ol>` : ''}${reintentar ? `<button class="cod-btn si" type="button" data-a="reintentar">${icono('girar')}<span>Reintentar</span></button>` : ''}<p class="cod-ayuda">Mientras tanto, <b>Tomar foto</b> abre la cámara del teléfono y lee el código de la foto.</p>`;
+        ponerEstado('');
         $('[data-a=foto]').classList.add('si');
+        const b = sin.querySelector('[data-a=reintentar]'); if (b) b.focus();
+      }
+      // El lector y la cámara arrancan a la vez: la imagen sale enseguida aunque el lector tarde en prepararse.
+      let lector = null;
+      function prepararLector() {
+        lector = lector || obtener().then(d => { detector = d; if (!fin && flujo) ponerEstado('Apunta al código de barras o QR del serial, dentro del recuadro.'); return d; }, e => {
+          lector = null;
+          if (!fin) ponerEstado('No se pudo preparar el lector de códigos. Toca Escribir a mano, o cierra y vuelve a intentar con internet.');
+          if (window.nube && window.nube.reportarError) window.nube.reportarError(e, 'codigos.lector');
+          throw e;
+        });
+        return lector;
       }
       async function arrancar() {
-        try { await obtener(); } catch (e) { sinCamara(e.message); $('[data-a=foto]').hidden = true; return; }
-        if (fin) return;
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return sinCamara('Este navegador no deja usar la cámara en vivo. Toca “Tomar foto” y saca una foto clara del código.');
+        prepararLector().catch(() => {});
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          return sinCamara(enOtraApp || !window.isSecureContext ? explicar(null) : { t: 'Este navegador no deja usar la cámara en vivo.', pasos: ['Toca Tomar foto y saca una foto clara del código.'] }, false);
+        }
+        video.hidden = false; $('.cod-marco').hidden = false; sin.hidden = true; ponerEstado('Abriendo la cámara…');
         // La cámara que se escogió la última vez (si ya no existe, la trasera que dé el navegador).
         try { await usarCamara(camGuardada()); }
         catch (e0) {
-          try { await usarCamara(''); }
-          catch (e) { return sinCamara(e && e.name === 'NotAllowedError' ? 'No diste permiso para la cámara. Puedes darlo en los ajustes del navegador, o tocar “Tomar foto”.' : 'No se pudo abrir la cámara en vivo. Toca “Tomar foto” y saca una foto clara del código.'); }
+          try {
+            if (!camGuardada() || (e0 && e0.name === 'NotAllowedError')) throw e0;
+            try { localStorage.removeItem(LS_CAM); } catch (x) {}
+            await usarCamara('');
+          } catch (e) {
+            if (fin) return;
+            const n = e && e.name;
+            if (n !== 'NotAllowedError' && n !== 'PermissionDeniedError' && window.nube && window.nube.reportarError) window.nube.reportarError(e, 'codigos.camara');
+            return sinCamara(explicar(e), true);
+          }
         }
         if (fin) return;
-        ponerEstado('Apunta al código de barras o QR del serial, dentro del recuadro.');
-        tAyuda = setTimeout(() => { if (!fin) mostrarAyuda(); }, 6000);
-        ciclo();
+        ponerEstado(detector ? 'Apunta al código de barras o QR del serial, dentro del recuadro.' : 'Preparando el lector de códigos…');
+        clearTimeout(tAyuda); tAyuda = setTimeout(() => { if (!fin) mostrarAyuda(); }, 6000);
+        clearTimeout(timer); ciclo();
       }
       caja.addEventListener('click', async ev => {
         const u = ev.target.closest('[data-usar]'); if (u) return cerrar(u.dataset.usar);
@@ -257,6 +370,7 @@
         const a = ev.target.closest('[data-a]'); if (!a) return;
         if (a.dataset.a === 'cancelar' || a.dataset.a === 'escribir') cerrar(null);
         if (a.dataset.a === 'foto') { inFoto.value = ''; try { inFoto.click(); } catch (e) {} }
+        if (a.dataset.a === 'reintentar') { $('[data-a=foto]').classList.remove('si'); arrancar(); }
         if (a.dataset.a === 'cerca' && pista) {
           cerca = !cerca;
           const ok = cerca ? await ajustar({ focusMode: 'manual', focusDistance: cap.focusDistance.min }) : await ajustar({ focusMode: modos().includes('continuous') ? 'continuous' : 'single-shot' });
@@ -280,6 +394,7 @@
         const f = inFoto.files && inFoto.files[0]; inFoto.value = ''; if (!f) return;
         ponerEstado('Buscando el código en la foto…');
         try {
+          await prepararLector();
           const v = await leerImagen(f);
           if (!v.length) { ponerEstado('No encontré un código en la foto. Acércate más, con buena luz y sin reflejos.'); return; }
           vistos = new Map(v.map(x => [x, 2]));

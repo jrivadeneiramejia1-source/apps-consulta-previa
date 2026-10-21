@@ -1,14 +1,15 @@
 {
   "name": "apps-consulta-previa",
-  "version": "26.0.0",
+  "version": "28.0.0",
   "private": true,
   "description": "Apps Equipos, Entregas y Evidencias de Consulta Previa. Este archivo solo sirve para las pruebas automáticas; las apps no necesitan compilarse.",
   "type": "module",
   "scripts": {
     "lint": "eslint .",
     "enlaces": "node pruebas/enlaces.mjs",
-    "pruebas": "node pruebas/prueba.mjs && node pruebas/sincronia.mjs && node pruebas/avisos.mjs && node pruebas/worker.mjs && node pruebas/errores.mjs && node pruebas/movimiento.mjs && node pruebas/lote.mjs && node pruebas/instalar.mjs && node pruebas/escaner.mjs && node pruebas/lector.mjs && node pruebas/funciones.mjs && node pruebas/compartir.mjs && node pruebas/camara.mjs",
+    "pruebas": "node pruebas/prueba.mjs && node pruebas/sincronia.mjs && node pruebas/avisos.mjs && node pruebas/worker.mjs && node pruebas/errores.mjs && node pruebas/movimiento.mjs && node pruebas/lote.mjs && node pruebas/instalar.mjs && node pruebas/escaner.mjs && node pruebas/lector.mjs && node pruebas/funciones.mjs && node pruebas/compartir.mjs && node pruebas/camara.mjs && node pruebas/chat.mjs",
     "reglas": "npx -y firebase-tools@15.34.0 emulators:exec --only firestore --project demo-consulta-previa \"node pruebas/reglas.mjs\"",
+    "chat-real": "npx -y firebase-tools@15.34.0 emulators:exec --only firestore,auth --project demo-consulta-previa \"node pruebas/chat-real.mjs\"",
     "lighthouse": "lhci autorun"
   },
   "devDependencies": {

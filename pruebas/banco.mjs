@@ -17,7 +17,7 @@ export const AXE_JS = fs.readFileSync(require.resolve('axe-core/axe.min.js'), 'u
 export const FOTOS = path.join(RAIZ, 'pruebas', 'fotos');
 export const SALIDA = process.env.CAPTURAS || path.join(os.tmpdir(), 'capturas-apps');
 fs.mkdirSync(SALIDA, { recursive: true });
-const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml' };
+const TIPOS = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.webmanifest': 'application/manifest+json', '.svg': 'image/svg+xml', '.wasm': 'application/wasm' };
 export function servir(puerto = 8811) {
   const srv = http.createServer((req, res) => {
     const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
@@ -46,7 +46,7 @@ export async function pagina(browser, { tema = 'light', ancho = 390, alto = 844,
   const ctx = await browser.newContext({ viewport: { width: ancho, height: alto }, colorScheme: tema, locale: 'es-CO', deviceScaleFactor: 2, reducedMotion: quieto ? 'reduce' : 'no-preference' });
   await ctx.route(/^https?:\/\/(?!127\.0\.0\.1)/, async r => {
     const u = r.request().url();
-    if (u.includes('/firebasejs/')) return r.fulfill({ path: path.join(RAIZ, 'pruebas', u.includes('firestore') ? 'firebase-firestore.js' : 'firebase-app.js'), contentType: 'text/javascript' });
+    if (u.includes('/firebasejs/')) return r.fulfill({ path: path.join(RAIZ, 'pruebas', u.includes('firestore') ? 'firebase-firestore.js' : u.includes('auth') ? 'firebase-auth.js' : 'firebase-app.js'), contentType: 'text/javascript' });
     const lib = Object.keys(LIBS).find(k => u.endsWith(k) && fs.existsSync(LIBS[k]));
     if (lib) return r.fulfill({ path: LIBS[lib], contentType: 'text/javascript' });
     const npm = deJsdelivr(u);

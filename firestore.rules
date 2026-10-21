@@ -16,5 +16,74 @@ service cloud.firestore {
         && request.resource.data.keys().size() > 0
         && request.resource.data.keys().size() <= 300;
     }
+
+    // ---------- Soporte: chat de todos y chats privados (app Equipos) ----------
+    // Cada teléfono entra con una identidad anónima de Firebase (request.auth.uid; hay que activar
+    // Authentication → Anónimo). gente/{clave} es una persona (su nombre sin tildes) con los teléfonos
+    // (uids) que hablan por ella. Un chat privado solo lo leen los teléfonos de esas dos personas.
+    function esDe(espacio, clave) {
+      return request.auth != null && clave is string && clave.size() > 0 && clave.size() <= 60
+        && exists(/databases/$(database)/documents/espacios/$(espacio)/gente/$(clave))
+        && request.auth.uid in get(/databases/$(database)/documents/espacios/$(espacio)/gente/$(clave)).data.uids;
+    }
+    // Limpieza para no llenar el plan gratis: lo viejo lo puede borrar cualquier teléfono del chat.
+    function hace(dias) { return request.time - duration.value(dias, 'd'); }
+    function textoChat(v) { return v is string && v.size() > 0 && v.size() <= 2000; }
+    function cita(c) {
+      return c == null || (c is map && c.keys().hasOnly(['id', 'texto', 'nombre'])
+        && c.id is string && c.id.size() <= 60 && c.texto is string && c.texto.size() <= 200 && c.nombre is string && c.nombre.size() <= 60);
+    }
+    function persona(d) {
+      return d.keys().hasOnly(['nombre', 'uids', 'visto', 'creado'])
+        && d.nombre is string && d.nombre.size() > 0 && d.nombre.size() <= 60
+        && d.uids is list && d.uids.size() >= 1 && d.uids.size() <= 10;
+    }
+    match /espacios/{espacio}/gente/{clave} {
+      allow read: if espacio.size() == 40 && request.auth != null;
+      allow create: if espacio.size() == 40 && request.auth != null && clave.size() <= 60
+        && persona(request.resource.data) && request.resource.data.uids == [request.auth.uid];
+      // Solo un teléfono de esa persona la cambia (por ejemplo, para vincular otro teléfono o quitarse).
+      allow update: if espacio.size() == 40 && request.auth != null && request.auth.uid in resource.data.uids
+        && persona(request.resource.data);
+    }
+    match /espacios/{espacio}/chat/{id} {
+      allow read: if espacio.size() == 40 && request.auth != null;
+      allow create: if espacio.size() == 40 && esDe(espacio, request.resource.data.de)
+        && request.resource.data.keys().hasOnly(['de', 'nombre', 'texto', 'en', 'cita'])
+        && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 60
+        && textoChat(request.resource.data.texto) && request.resource.data.en == request.time
+        && cita(request.resource.data.get('cita', null));
+      allow delete: if espacio.size() == 40 && (esDe(espacio, resource.data.de)
+        || (request.auth != null && resource.data.en is timestamp && resource.data.en < hace(7)));
+    }
+    // conv = las dos claves en orden alfabético, unidas por "__".
+    match /espacios/{espacio}/privados/{conv}/mensajes/{id} {
+      function lado(i) { return conv.split('__')[i]; }
+      function par() { return espacio.size() == 40 && conv.split('__').size() == 2 && lado(0) < lado(1); }
+      allow read: if par() && (esDe(espacio, lado(0)) || esDe(espacio, lado(1)));
+      allow create: if par() && request.resource.data.de in [lado(0), lado(1)] && esDe(espacio, request.resource.data.de)
+        && request.resource.data.keys().hasOnly(['de', 'texto', 'en', 'leido', 'cita'])
+        && textoChat(request.resource.data.texto) && request.resource.data.en == request.time
+        && request.resource.data.leido == false && cita(request.resource.data.get('cita', null));
+      // Quien lo recibe solo puede marcarlo como leído.
+      allow update: if par()
+        && ((resource.data.de == lado(0) && esDe(espacio, lado(1))) || (resource.data.de == lado(1) && esDe(espacio, lado(0))))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['leido'])
+        && request.resource.data.leido == true;
+      // Lo borra quien lo escribió o, si ya está viejo (7 días leído o 30 sin leer), cualquiera de los dos.
+      allow delete: if par() && (esDe(espacio, resource.data.de)
+        || ((esDe(espacio, lado(0)) || esDe(espacio, lado(1))) && resource.data.en is timestamp
+            && (resource.data.en < hace(30) || (resource.data.leido == true && resource.data.en < hace(7)))));
+    }
+    // Código de 6 números para vincular otro teléfono de la misma persona.
+    match /espacios/{espacio}/vinculos/{codigo} {
+      allow get: if espacio.size() == 40 && request.auth != null;
+      allow create: if espacio.size() == 40 && request.auth != null && codigo.size() == 6
+        && request.resource.data.keys().hasOnly(['uid', 'clave', 'creado'])
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.clave is string && request.resource.data.clave.size() <= 60;
+      allow delete: if espacio.size() == 40 && request.auth != null
+        && (resource.data.uid == request.auth.uid || esDe(espacio, resource.data.clave));
+    }
   }
 }

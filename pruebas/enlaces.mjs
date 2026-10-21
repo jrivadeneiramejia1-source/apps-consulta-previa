@@ -17,6 +17,12 @@ for (const sw of ['sw.js', 'equipos/sw.js', 'entregas/sw.js', 'evidencias/sw.js'
     return !(fs.existsSync(p) && (fs.statSync(p).isFile() || fs.existsSync(path.join(p, 'index.html'))));
   });
   t(`${sw}: existen los ${[...lista.matchAll(/'/g)].length / 2} archivos que guarda`, !faltan.length, faltan.join(', '));
+  // El lector de códigos va en un cajón aparte (CODIGOS_ARCH): también tiene que existir.
+  const cod = (fs.readFileSync(f, 'utf8').match(/const CODIGOS_ARCH = \[([^\]]*)\]/) || [])[1];
+  if (cod) {
+    const faltanCod = [...cod.matchAll(/'([^']+)'/g)].map(m => m[1]).filter(u => !fs.existsSync(path.resolve(path.dirname(f), u)));
+    t(`${sw}: existe el lector de códigos que guarda`, !faltanCod.length, faltanCod.join(', '));
+  }
 }
 
 // 2) Enlaces de las páginas (linkinator sirve la carpeta y sigue los enlaces internos).
