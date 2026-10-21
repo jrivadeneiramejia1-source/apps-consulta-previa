@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=29">
+<link rel="stylesheet" href="../comun.css?v=30">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -285,13 +285,13 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "29"};</script>
-<script src="../iconos.js?v=29"></script>
-<script src="../comun.js?v=29"></script>
-<script src="../codigos.js?v=29"></script>
-<script src="../config.js?v=29"></script>
-<script src="../nube.js?v=29"></script>
-<script src="chat.js?v=29"></script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "30"};</script>
+<script src="../iconos.js?v=30"></script>
+<script src="../comun.js?v=30"></script>
+<script src="../codigos.js?v=30"></script>
+<script src="../config.js?v=30"></script>
+<script src="../nube.js?v=30"></script>
+<script src="chat.js?v=30"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas';
@@ -327,7 +327,7 @@ let ENTDB = null;   // conexión con la app de Entregas (para actualizar o borra
 let filtroMt = 'prog', mtActual = null, listoT = false, tareasBloqueadas = false;
 let filtroResp = '';   // '' = todas las personas; '-' = sin responsable; o el nombre (sin tildes) del responsable
 let AV = new Map(), avisosBloqueados = false;   // teléfonos con sesión: id -> { nombre, equipo, visto, sub }
-let listoQ = false, listoR = false, conexion = 'cargando', fechaCache = null;
+let listoQ = false, listoR = false, conexion = 'cargando', fechaCache = null, errorDb = '';   // errorDb: por qué Firebase no deja leer
 let pendientes = lsGet(PEND_KEY) || [];
 let vista = 'rec', tablaDb = 'eq', filtroRec = 'pendientes', rcActual = null, eqActual = null;
 let renderPendiente = false;
@@ -484,7 +484,7 @@ async function reintentarPendientes() {
   lsSet(PEND_KEY, pendientes); pintarAvisos();
 }
 function ponerSoloLectura() { soloLectura = true; document.body.classList.add('ro'); pintarAvisos(); pedirRender(); }
-function marcarDesconectado() { conexion = 'off'; pintarConexion(); pintarAvisos(); }
+function marcarDesconectado() { conexion = 'off'; pintarConexion(); pintarAvisos(); pedirRender(); }
 
 let tCache = null;
 function guardarCacheLuego() {
@@ -493,13 +493,13 @@ function guardarCacheLuego() {
 }
 function trasSnapshot() {
   pendientes.forEach(aplicarLocal);
-  if (listoQ && listoR) { conexion = 'vivo'; guardarCacheLuego(); if (!trasSnapshot.primera) { trasSnapshot.primera = true; setTimeout(avisarNuevosParaMi, 800); } migrarProgramados(); }
+  if (listoQ && listoR) { conexion = 'vivo'; errorDb = ''; guardarCacheLuego(); if (!trasSnapshot.primera) { trasSnapshot.primera = true; setTimeout(avisarNuevosParaMi, 800); } migrarProgramados(); }
   pintarConexion(); pintarAvisos(); pedirRender();
 }
 const subs = [];
 function suscribir() {
   subs.splice(0).forEach(u => { try { u(); } catch (e) {} });
-  const alError = e => { marcarDesconectado(); if (e && e.code === 'unavailable') setTimeout(suscribir, 5000); };
+  const alError = e => { errorDb = (e && e.code) || 'unavailable'; marcarDesconectado(); if (e && e.code === 'unavailable') setTimeout(suscribir, 5000); };
   subs.push(DB.collection(COL_Q).limit(1000).onSnapshot(s => {
     Q = new Map(s.docs.map(d => [d.id, Object.assign({}, d.data())])); listoQ = true; trasSnapshot();
     if (s.size >= 1000) toast('Hay 1000 equipos o más: avísale a quien mantiene la app.');
@@ -526,14 +526,17 @@ function pintarConexion() {
   $('subtitulo').textContent = Q.size || R.size ? `${Q.size} equipos · ${pend} en espera` : 'Consulta Previa';
   UI.insignia($('badgeRec'), pend);
 }
+const causaDb = () => (window.nube && window.nube.causa ? window.nube.causa(errorDb) : 'Revisa tu internet y vuelve a abrir la app.');
+// Lista vacía porque Firebase no responde: nunca se dice "no hay equipos", que parece que se borró todo.
+const vacioRed = () => UI.vacio('sinRed', 'No se pudo leer la base de datos', esc(causaDb()));
 function pintarAvisos() {
   document.body.classList.toggle('ro', soloLectura);
   $('avisoRo').hidden = !soloLectura;
   const off = conexion === 'off' || (!DB && conexion !== 'cargando');
   $('avisoOff').hidden = !off;
-  if (off) $('avisoOffTxt').textContent = Q.size
-    ? `No hay conexión con la base de datos. Estás viendo la última copia guardada en este teléfono${fechaCache ? ' (' + hace(new Date(fechaCache).toISOString()) + ')' : ''}.`
-    : 'No hay conexión con la base de datos. Revisa tu internet y vuelve a abrir la app.';
+  if (off) $('avisoOffTxt').textContent = (Q.size
+    ? `No se puede leer la base de datos. Estás viendo la última copia guardada en este teléfono${fechaCache ? ' (' + hace(new Date(fechaCache).toISOString()) + ')' : ''}.`
+    : 'No se puede leer la base de datos.') + ' ' + causaDb();
   $('avisoPend').hidden = !pendientes.length;
   $('avisoPendTxt').textContent = pendientes.length === 1 ? '1 cambio todavía no se ha enviado a la base de datos.' : `${pendientes.length} cambios todavía no se han enviado a la base de datos.`;
 }
@@ -615,7 +618,7 @@ function renderRec() {
   if (!todos.length) {
     $('recList').innerHTML = conexion === 'cargando'
       ? UI.esqueleto(3)
-      : !DB ? UI.vacio('sinRed', 'No se pudo abrir la base de datos', 'Revisa tu internet y vuelve a abrir la app.')
+      : !DB || conexion === 'off' ? vacioRed()
       : UI.vacio('vacio', 'No hay equipos en espera', 'Cuando te traigan uno, toca “Registrar equipo recibido”.');
     return;
   }
@@ -934,7 +937,7 @@ function renderEq() {
   $('eqCount').textContent = todos.length ? `Mostrando ${lista.length} de ${todos.length} equipos` : '';
   if (!todos.length) {
     $('eqList').innerHTML = conexion === 'cargando' ? UI.esqueleto(4)
-      : !DB ? UI.vacio('sinRed', 'No se pudo abrir la base de datos', 'Revisa tu internet y vuelve a abrir la app.')
+      : !DB || conexion === 'off' ? vacioRed()
       : UI.vacio('equipos', 'Todavía no hay equipos', 'Toca “Agregar equipo” para crear el primero.');
     return;
   }
@@ -1159,7 +1162,7 @@ function renderMt() {
   }
   if (filtroMt === 'sug') $('chipsResp').hidden = true;
   $('mtCount').textContent = (filtroMt === 'sug' ? `Equipos con ${MESES_ALERTA} meses o más sin mantenimiento físico, o sin fecha. ` : '') + (total ? `Mostrando ${vistos} de ${total}` : '');
-  if (!Q.size) { $('mtList').innerHTML = conexion === 'cargando' ? UI.esqueleto(3) : UI.vacio('equipos', 'Todavía no hay equipos', 'Agrega equipos en la pestaña Equipos.'); return; }
+  if (!Q.size) { $('mtList').innerHTML = conexion === 'cargando' ? UI.esqueleto(3) : conexion === 'off' ? vacioRed() : UI.vacio('equipos', 'Todavía no hay equipos', 'Agrega equipos en la pestaña Equipos.'); return; }
   const moverMt = UI.antes($('mtList'));
   $('mtList').innerHTML = html || (q ? UI.vacio('buscar', 'Nada coincide', 'Prueba con otra búsqueda.')
     : filtroMt === 'sug' ? UI.vacio('checkCirculo', 'Todos al día', `Ningún equipo lleva ${MESES_ALERTA} meses o más sin mantenimiento.`, 'bien')

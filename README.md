@@ -55,6 +55,15 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - **Última copia** (las tres apps, en "Copia de seguridad y acceso"): dice cuándo se descargó la copia en ese teléfono; si nunca o hace 30 días o más, lo resalta. Se guarda en el teléfono (`nube_<app>_copia`): no sabe si otra persona hizo la copia.
 - Prueba: `node pruebas/datos.mjs`.
 
+## Cuando Firebase no deja leer (v30)
+- Si Equipos o Entregas no pueden leer la base de datos, el aviso de arriba y la lista dicen **la causa**, en vez de "No hay equipos en espera" (que parecía que se había borrado todo):
+  - **Reglas** (`permission-denied`): las reglas publicadas en Firebase no son las de `firestore.rules`. Se pega el archivo completo en Firestore Database → Reglas y se toca Publicar.
+  - **Cupo gratis** (`resource-exhausted`): se llegó a las 50.000 lecturas al día del plan gratis. Se renueva cada madrugada; se ve en Firestore Database → Uso.
+  - **Red** (`unavailable`): sin internet o una red (SENA, empresa) que bloquea Firebase.
+- Un teléfono con copia guardada sigue mostrando lo último y además explica la causa.
+- Entregas se quedaba en "Cargando la base de datos…" para siempre cuando fallaba la lectura; ahora se vuelve a pintar.
+- Prueba: `node pruebas/sin-datos.mjs` (computador nuevo sin copia, las tres causas y un teléfono con copia). El Firestore falso falla al leer con `window.__snapErr`.
+
 ## Pruebas automáticas
 Cada vez que se sube un cambio a GitHub, **Actions** corre todo (pestaña *Actions*, en inglés "acciones"). Para correrlo en un computador:
 ```
