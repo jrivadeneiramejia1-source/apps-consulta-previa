@@ -105,9 +105,14 @@
     const [A, FF] = await Promise.all([import(SDK + 'firebase-app.js'), import(SDK + 'firebase-firestore.js')]);
     F = FF;
     const app = appFb = A.initializeApp(window.FIREBASE_CONFIG);
+    // Equipos, Entregas y Evidencias comparten el almacenamiento del navegador y, con él, una sola conexión de Firestore entre pestañas
+    // (la lleva la pestaña que se abrió primero). Si esa pestaña no tiene el inicio de sesión del chat, el chat de Equipos recibe
+    // "permiso denegado" y parece que fallan las reglas. Por eso todas abren Authentication y usan el mismo usuario.
+    try { const a = await abrirAuth(); if (a.authStateReady) await Promise.race([a.authStateReady(), new Promise(r => setTimeout(r, 3000))]); } catch (e) {}
     // Pruebas con los emuladores de Firebase: window.FIREBASE_EMULADORES = { firestore: '127.0.0.1:8080', auth: 'http://127.0.0.1:9099' }.
+    // Con los emuladores no se usa la caché del navegador, salvo que se pida con persistencia: true (prueba de varias pestañas).
     const emu = window.FIREBASE_EMULADORES;
-    try { fs = F.initializeFirestore(app, Object.assign({ ignoreUndefinedProperties: true }, emu ? {} : { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) })); }
+    try { fs = F.initializeFirestore(app, Object.assign({ ignoreUndefinedProperties: true }, emu && !emu.persistencia ? {} : { localCache: F.persistentLocalCache({ tabManager: F.persistentMultipleTabManager() }) })); }
     catch (e) { try { fs = F.initializeFirestore(app, { ignoreUndefinedProperties: true }); } catch (e2) { fs = F.getFirestore(app); } }
     if (emu && emu.firestore && F.connectFirestoreEmulator) { const [h, p] = emu.firestore.split(':'); F.connectFirestoreEmulator(fs, h, Number(p)); }
   }
@@ -389,15 +394,19 @@
   // Cada teléfono recibe una identidad anónima propia. Con ella las reglas dejan leer un chat privado
   // solo a las dos personas que lo tienen. Si en el teléfono entra otra persona, la identidad se cambia.
   let AU = null, auth = null, sesionP = null;
+  async function abrirAuth() {
+    AU = AU || await import(SDK + 'firebase-auth.js');
+    auth = auth || AU.getAuth(appFb);
+    const emu = window.FIREBASE_EMULADORES;
+    if (emu && emu.auth && !auth.__emu) { AU.connectAuthEmulator(auth, emu.auth, { disableWarnings: true }); auth.__emu = true; }
+    return auth;
+  }
   const alSalir = [];
   function sesionChat() {
     sesionP = sesionP || (async () => {
       await listo;
       if (!fs || !espacio) throw Object.assign(new Error('La base de datos no está abierta.'), { code: 'sin-db' });
-      AU = AU || await import(SDK + 'firebase-auth.js');
-      auth = auth || AU.getAuth(appFb);
-      const emu = window.FIREBASE_EMULADORES;
-      if (emu && emu.auth && !auth.__emu) { AU.connectAuthEmulator(auth, emu.auth, { disableWarnings: true }); auth.__emu = true; }
+      await abrirAuth();
       if (auth.authStateReady) await auth.authStateReady();
       const dueno = leer('chat_dueno'), yo = sinTildesN(nombre);
       if (auth.currentUser && dueno && dueno !== yo) await AU.signOut(auth);   // el teléfono cambió de persona

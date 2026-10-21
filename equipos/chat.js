@@ -9,7 +9,8 @@
   const K_VISTO = 'eqcp_chat_visto_todos';
   let o = null, S = null, yo = null, estado = 'cargando', detalle = '';
   let gente = new Map(), todos = null;
-  const privados = new Map(), subsPriv = new Map(), reintentos = new Map(), conocidos = new Map(), subs = [];
+  const privados = new Map(), subsPriv = new Map(), reintentos = new Map(), conocidos = new Map();
+  let subGente = null, subTodos = null, intentosPermiso = 0;
   let abierto = null, cita = null, sel = null, pendiente = null, codigoMio = '', tLatido = 0, creando = false, volverA = null, miaPendiente = false;
 
   const DIA = 864e5, DIAS_TODOS = 7, DIAS_LEIDOS = 7, DIAS_SIN_LEER = 30, LIMPIAR_CADA = DIA / 2;
@@ -48,8 +49,11 @@
     const c = (e && e.code) || '';
     return /permission/.test(c) ? 'la base de datos no lo permitió.' : /unavailable/.test(c) ? 'sin internet: se envía al volver la señal.' : (e && e.message) || 'error desconocido.';
   }
-  function fallo(e) {
+  // reintentar: cómo volver a pedir lo que falló. Un "permiso denegado" justo al arrancar suele ser pasajero (la sesión anónima
+  // todavía no llegó a la pestaña que lleva la conexión de Firestore): se reintenta unas veces antes de culpar a las reglas.
+  function fallo(e, reintentar) {
     const c = (e && (e.code || e.message)) || '';
+    if (/permission/.test(c) && reintentar && intentosPermiso < 3) { intentosPermiso++; setTimeout(reintentar, 1500 * intentosPermiso); return; }
     estado = /permission/.test(c) ? 'sin-reglas' : /resource-exhausted|quota/.test(c) ? 'sin-cupo' : 'error'; detalle = c; pintar();
   }
 
@@ -67,13 +71,18 @@
       detalle = c; return pintar();
     }
     window.nube.alSalir(quitarEsteTelefono);
-    subs.push(S.F.onSnapshot(col('gente'), { includeMetadataChanges: true }, s => {
+    escucharGente();
+  }
+  function escucharGente() {
+    if (subGente) subGente();
+    subGente = S.F.onSnapshot(col('gente'), { includeMetadataChanges: true }, s => {
+      intentosPermiso = 0;
       gente = new Map(s.docs.map(d => [d.id, d.data({ serverTimestamps: 'estimate' })]));
       const d = s.docs.find(x => x.id === yo.clave);
       miaPendiente = !!(d && d.metadata && d.metadata.hasPendingWrites);
       revisarIdentidad(); if (estado === 'listo') escucharPrivados(); pintar();
       if (abierto && abierto !== 'todos') pintarCabeza();
-    }, fallo));
+    }, e => fallo(e, escucharGente));
   }
   async function revisarIdentidad() {
     const mia = gente.get(yo.clave);
@@ -166,9 +175,10 @@
   const leer = s => s.docs.map(d => Object.assign({ id: d.id, pend: !!(d.metadata && d.metadata.hasPendingWrites) }, d.data({ serverTimestamps: 'estimate' })))
     .sort((a, b) => ms(a.en) - ms(b.en));
   function escucharTodos() {
-    subs.push(S.F.onSnapshot(S.F.query(col('chat'), S.F.orderBy('en', 'desc'), S.F.limit(300)), { includeMetadataChanges: true }, s => {
-      todos = leer(s); avisarNuevos('todos', todos); pintar(); if (abierto === 'todos') { pintarChat(); marcarVistoTodos(); }
-    }, fallo));
+    if (subTodos) subTodos();
+    subTodos = S.F.onSnapshot(S.F.query(col('chat'), S.F.orderBy('en', 'desc'), S.F.limit(300)), { includeMetadataChanges: true }, s => {
+      intentosPermiso = 0; todos = leer(s); avisarNuevos('todos', todos); pintar(); if (abierto === 'todos') { pintarChat(); marcarVistoTodos(); }
+    }, e => fallo(e, escucharTodos));
   }
   function escucharPrivados() {
     for (const c of gente.keys()) {
@@ -197,7 +207,7 @@
   }
   const sinLeerTodos = () => { const v = Number(lsGet(K_VISTO)) || 0; return (todos || []).filter(m => m.de !== yo.clave && ms(m.en) > v).length; };
   const sinLeerConv = conv => (privados.get(conv) || []).filter(m => m.de !== yo.clave && !m.leido).length;
-  function marcarVistoTodos() { const u = (todos || [])[todos.length - 1]; if (u && document.visibilityState === 'visible') lsSet(K_VISTO, Math.max(Number(lsGet(K_VISTO)) || 0, ms(u.en))); }
+  function marcarVistoTodos() { const l = todos || [], u = l[l.length - 1]; if (u && document.visibilityState === 'visible') lsSet(K_VISTO, Math.max(Number(lsGet(K_VISTO)) || 0, ms(u.en))); }
   function marcarLeidos(conv) {
     if (document.visibilityState !== 'visible') return;
     const nuevos = (privados.get(conv) || []).filter(m => m.de !== yo.clave && !m.leido && !m.pend);
