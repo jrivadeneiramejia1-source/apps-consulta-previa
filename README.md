@@ -55,6 +55,12 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - **Última copia** (las tres apps, en "Copia de seguridad y acceso"): dice cuándo se descargó la copia en ese teléfono; si nunca o hace 30 días o más, lo resalta. Se guarda en el teléfono (`nube_<app>_copia`): no sabe si otra persona hizo la copia.
 - Prueba: `node pruebas/datos.mjs`.
 
+## Soporte con las otras apps abiertas (v32)
+- Equipos, Entregas y Evidencias comparten el almacenamiento del navegador y **una sola conexión de Firestore entre pestañas** (la lleva la que se abrió primero). Si esa no tenía el inicio de sesión anónimo del chat, Soporte mostraba **"Falta pegar las reglas"** aunque las reglas estuvieran bien, y se quitaba solo al cerrar esa pestaña. Por eso salía "a veces".
+- Ahora las tres apps abren Firebase Authentication antes de Firestore (`nube.js`, `abrirAuth`) y usan el mismo usuario anónimo. Además el chat reintenta unas veces un "permiso denegado" del arranque antes de culpar a las reglas.
+- También se arregló un error al abrir el chat de todos antes de que llegaran los mensajes (`marcarVistoTodos`).
+- Prueba: `pruebas/chat-pestanas.mjs`, con los emuladores y la caché del navegador activada (`persistencia: true` en `FIREBASE_EMULADORES`). Corre con `npm run chat-real`.
+
 ## Tipos de tarea en la Agenda (v31)
 - **Programar tarea** tiene tres opciones: **Mantenimiento físico**, **Actualización de antivirus** y **Backup y mantenimiento remoto** (esta pide el nombre del disco y, al terminarla, en cuál quedó).
 - Solo cambian los nombres que se ven en la Agenda. Dentro de la base de datos siguen los mismos códigos (`fisico`, `remoto`, `backup`): las tareas ya guardadas no se tocan, y una tarea vieja de "mantenimiento remoto" ahora se lee como "Actualización de antivirus". `fechaRemoto` es la fecha de la última actualización de antivirus.

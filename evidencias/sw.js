@@ -1,7 +1,7 @@
 /* Guarda la app en el teléfono para que abra rápido y sin internet.
    Páginas propias: primero internet (para recibir actualizaciones) y si no hay, la copia guardada.
    Librerías y fuentes externas: primero la copia guardada. Firestore no pasa por aquí. */
-const VERSION = 'evidencias-v31';
+const VERSION = 'evidencias-v32';
 const BASICOS = ['./', './index.html', './manifest.webmanifest', '../nube.js', '../config.js', '../iconos/evidencias-192.png', '../iconos/evidencias-512.png'];
 const EXTERNOS = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];
 
