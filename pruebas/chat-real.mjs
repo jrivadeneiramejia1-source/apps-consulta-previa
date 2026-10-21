@@ -118,6 +118,24 @@ try {
   }, codigo));
   await jeiler2.page.screenshot({ path: `${SALIDA}/chat-real-privado.png` });
 
+  console.log('Limpieza de lo viejo con las reglas de verdad');
+  const DOCS = `http://${FS}/v1/projects/${PROYECTO}/databases/(default)/documents/espacios/${H}`;
+  const dias = n => ({ timestampValue: new Date(Date.now() - n * 864e5).toISOString() });
+  const crear = (ruta, id, f) => fetch(`${DOCS}/${ruta}?documentId=${id}`, { method: 'POST', headers: { authorization: 'Bearer owner' }, body: JSON.stringify({ fields: f }) }).then(r => r.ok);
+  const S = v => ({ stringValue: v });
+  const PV = 'privados/ana-gomez__jeiler/mensajes';
+  await crear('chat', 'viejo', { de: S('luis'), nombre: S('Luis'), texto: S('de hace 8 días'), en: dias(8) });
+  await crear(PV, 'leidoViejo', { de: S('ana-gomez'), texto: S('leído hace 8 días'), en: dias(8), leido: { booleanValue: true } });
+  // En una conversación que nadie tiene abierta (si estuviera abierta, quedaría leída al instante).
+  await crear('privados/jeiler__luis/mensajes', 'sinLeer8', { de: S('jeiler'), texto: S('sin leer'), en: dias(8), leido: { booleanValue: false } });
+  const existe = async ruta => (await fetch(`${DOCS}/${ruta}`, { headers: { authorization: 'Bearer owner' } })).ok;
+  const nb = await jeiler.page.evaluate(() => ChatSoporte.limpiar());
+  log('Jeiler borra lo de todos de 8 días (aunque lo escribió Luis)', !(await existe('chat/viejo')));
+  log('…y el privado que leyó hace 8 días', !(await existe(`${PV}/leidoViejo`)));
+  log('…pero no el que Luis aún no ha leído', await existe('privados/jeiler__luis/mensajes/sinLeer8') && (await luis.page.evaluate(() => ChatSoporte.limpiar())) === 0 && await existe('privados/jeiler__luis/mensajes/sinLeer8'));
+  log('lo reciente sigue ahí', await enChat(ana, 'Ya voy para allá'));
+  log('borró 2', nb === 2, nb);
+
   console.log('Salir en el segundo teléfono');
   await jeiler2.page.evaluate(() => nube.salir()); await jeiler2.page.waitForSelector('#cfSheet:not([hidden])'); await jeiler2.page.click('#cfYes');
   log('al salir, ese teléfono se quita de Jeiler (el primero sigue)', await ana.page.evaluate(async () => {

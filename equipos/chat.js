@@ -12,6 +12,8 @@
   const privados = new Map(), subsPriv = new Map(), reintentos = new Map(), conocidos = new Map(), subs = [];
   let abierto = null, cita = null, sel = null, pendiente = null, codigoMio = '', tLatido = 0, creando = false, volverA = null, miaPendiente = false;
 
+  const DIA = 864e5, DIAS_TODOS = 7, DIAS_LEIDOS = 7, DIAS_SIN_LEER = 30, LIMPIAR_CADA = DIA / 2;
+
   /* ---------- utilidades ---------- */
   const $ = id => document.getElementById(id);
   const esc = v => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -48,7 +50,7 @@
   }
   function fallo(e) {
     const c = (e && (e.code || e.message)) || '';
-    estado = /permission/.test(c) ? 'sin-reglas' : 'error'; detalle = c; pintar();
+    estado = /permission/.test(c) ? 'sin-reglas' : /resource-exhausted|quota/.test(c) ? 'sin-cupo' : 'error'; detalle = c; pintar();
   }
 
   /* ---------- arranque e identidad ---------- */
@@ -92,6 +94,33 @@
     if (codigoMio) { S.F.deleteDoc(ref('vinculos', codigoMio)).catch(() => {}); codigoMio = ''; }
     escucharTodos(); escucharPrivados(); pintar();
     if (pendiente) { const p = pendiente; pendiente = null; abrir(p); }
+    setTimeout(limpiar, 8000);
+  }
+
+  /* ---------- limpieza: el plan gratis de Firebase no se llena ---------- */
+  // Chat de todos: se borra a los 7 días. Privados: a los 7 días de leídos y, sin leer, a los 30.
+  // Lo hace cualquier teléfono que abra el chat, máximo dos veces al día (las reglas solo dejan borrar lo viejo).
+  async function limpiar(forzar) {
+    const k = 'eqcp_chat_limpieza', ahora = Date.now();
+    if (!forzar && ahora - (Number(lsGet(k)) || 0) < LIMPIAR_CADA) return 0;
+    lsSet(k, ahora);
+    const viejos = async (c, dias) => {
+      const s = await S.F.getDocs(S.F.query(c, S.F.where('en', '<', new Date(ahora - dias * DIA)), S.F.limit(200))).catch(() => null);
+      return s ? s.docs.filter(d => ahora - ms(d.data({ serverTimestamps: 'estimate' }).en) > dias * DIA) : [];
+    };
+    let borrar = await viejos(col('chat'), DIAS_TODOS);
+    for (const c of gente.keys()) {
+      if (c === yo.clave) continue;
+      const l = await viejos(col('privados', convCon(c), 'mensajes'), DIAS_LEIDOS);
+      borrar = borrar.concat(l.filter(d => { const m = d.data(); return m.leido || ahora - ms(m.en) > DIAS_SIN_LEER * DIA; }));
+    }
+    let n = 0;
+    for (let i = 0; i < borrar.length; i += 400) {
+      const b = S.F.writeBatch(S.fs);
+      borrar.slice(i, i + 400).forEach(d => b.delete(d.ref));
+      await b.commit().then(() => { n += Math.min(400, borrar.length - i); }, () => {});
+    }
+    return n;
   }
   function latir() { if (estado === 'listo' && document.visibilityState === 'visible') S.F.updateDoc(ref('gente', yo.clave), { visto: S.F.serverTimestamp() }).catch(() => {}); }
 
@@ -210,6 +239,7 @@
     if (estado === 'sin-db' || estado === 'sin-red') { v.innerHTML = aviso('warn', 'El chat necesita internet la primera vez. Revisa la señal y vuelve a abrir la app.'); return; }
     if (estado === 'sin-anonimo') { v.innerHTML = aviso('warn', 'El chat necesita un paso en Firebase, una sola vez, de quien administra la app: <b>Authentication → Método de acceso (Sign-in method) → Anónimo (Anonymous) → Habilitar</b>.'); return; }
     if (estado === 'sin-reglas') { v.innerHTML = aviso('warn', 'Falta pegar en Firebase las reglas nuevas de Firestore (traen el chat). Quien administra la app las pega en <b>Firestore Database → Reglas</b>.'); return; }
+    if (estado === 'sin-cupo') { v.innerHTML = aviso('warn', 'Se acabó por hoy el cupo gratis de Firebase para el chat. Mañana vuelve a funcionar solo; el resto de la app sigue igual.'); return; }
     if (estado === 'error') { v.innerHTML = aviso('warn', 'No se pudo abrir el chat. Vuelve a abrir la app.' + (detalle ? ` <span class="meta">(${esc(detalle)})</span>` : '')); return; }
     if (estado === 'vincular') {
       v.innerHTML = `<div class="card so-vincular" role="region" aria-label="Vincular este teléfono">
@@ -238,7 +268,7 @@
         <span class="so-txt"><span class="so-nombre">${esc(x.g.nombre)}</span><span class="so-prev">${x.u ? prev(x.u) : esc(haceCuanto(ms(x.g.visto)))}</span></span>
         <span class="so-lado">${x.u ? `<span class="so-hora">${hora(ms(x.u.en))}</span>` : ''}${x.n ? `<span class="so-n" aria-label="${x.n} sin leer">${x.n}</span>` : `<span class="so-est">${x.en ? 'conectado' : ''}</span>`}</span>
       </button>`).join('') : (window.UI ? UI.vacio('grupo', 'Todavía no hay nadie más', 'Cada persona aparece aquí cuando abre Equipos con la clave. Mientras, puedes escribir en <b>Soporte · Todos</b>.') : '')}
-      <div class="note so-nota">${ico('candado')}<span>Los chats privados solo los ven las dos personas. ¿Usas Equipos en otro teléfono? <button type="button" class="btn small" data-so="vincular">${ico('vincular')}Vincular otro teléfono</button></span></div>`;
+      <div class="note so-nota">${ico('candado')}<span>Los chats privados solo los ven las dos personas. Los mensajes se borran solos: los de todos a los ${DIAS_TODOS} días y los privados ${DIAS_LEIDOS} días después de leídos. ¿Usas Equipos en otro teléfono? <button type="button" class="btn small" data-so="vincular">${ico('vincular')}Vincular otro teléfono</button></span></div>`;
   }
 
   /* ---------- pantalla de un chat ---------- */
@@ -396,5 +426,5 @@
     if (b.dataset.so === 'nombre') return window.nube && window.nube.cambiarNombre();
   });
 
-  window.ChatSoporte = Object.freeze({ iniciar, abrir, pintar, get estado() { return estado; } });
+  window.ChatSoporte = Object.freeze({ iniciar, abrir, pintar, limpiar: () => limpiar(true), get estado() { return estado; } });
 })();

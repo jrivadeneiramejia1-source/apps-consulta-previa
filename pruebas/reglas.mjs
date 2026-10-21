@@ -125,6 +125,27 @@ await t('salir: un teléfono se quita y deja de leer', (async () => {
 })());
 await t('gente: no se puede dejar a una persona sin teléfonos', assertFails(J1.doc(`${G}/jeiler`).update({ uids: [] })));
 
+// ---------- Limpieza de lo viejo (plan gratis) ----------
+const dias = n => firebase.firestore.Timestamp.fromMillis(Date.now() - n * 864e5);
+await env.withSecurityRulesDisabled(async c => {
+  const d = c.firestore();
+  await d.doc(`espacios/${H}/chat/viejo`).set({ de: 'jeiler', nombre: 'Jeiler', texto: 'viejo', en: dias(8) });
+  await d.doc(`espacios/${H}/chat/nuevo`).set({ de: 'jeiler', nombre: 'Jeiler', texto: 'nuevo', en: dias(2) });
+  await d.doc(`${CONV}/leidoViejo`).set({ de: 'jeiler', texto: 'x', en: dias(8), leido: true });
+  await d.doc(`${CONV}/sinLeer8`).set({ de: 'jeiler', texto: 'x', en: dias(8), leido: false });
+  await d.doc(`${CONV}/sinLeer31`).set({ de: 'jeiler', texto: 'x', en: dias(31), leido: false });
+});
+await t('limpieza: lo del chat de todos de más de 7 días lo borra cualquiera', assertSucceeds(LUIS.doc(`espacios/${H}/chat/viejo`).delete()));
+await t('limpieza: lo reciente de otro no se puede borrar', assertFails(LUIS.doc(`espacios/${H}/chat/nuevo`).delete()));
+await t('limpieza: sin sesión no se borra nada', assertFails(db.doc(`espacios/${H}/chat/nuevo`).delete()));
+await t('limpieza: privado leído de 8 días lo borra la otra persona', assertSucceeds(ANA.doc(`${CONV}/leidoViejo`).delete()));
+await t('limpieza: privado sin leer de 8 días no lo borra la otra persona', assertFails(ANA.doc(`${CONV}/sinLeer8`).delete()));
+await t('limpieza: privado de 31 días se borra aunque no se haya leído', assertSucceeds(ANA.doc(`${CONV}/sinLeer31`).delete()));
+await t('limpieza: alguien de afuera no borra un privado viejo', (async () => {
+  await env.withSecurityRulesDisabled(c => c.firestore().doc(`${CONV}/otroViejo`).set({ de: 'jeiler', texto: 'x', en: dias(40), leido: true }));
+  await assertFails(LUIS.doc(`${CONV}/otroViejo`).delete());
+})());
+
 await env.cleanup();
 console.log(`\n${ok} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

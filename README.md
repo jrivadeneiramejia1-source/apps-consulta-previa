@@ -98,6 +98,7 @@ Pestaña **Soporte**: un chat de todos («Soporte · Todos») y un chat privado 
 - Privados de verdad: `privados/{a__b}/mensajes` solo lo leen los teléfonos de esas dos personas (lo revisan las reglas, no la app).
 - **Otro teléfono con el mismo nombre** muestra un código de 6 números; en el teléfono que ya está anotado: Soporte → **Vincular otro teléfono** y se escribe el código (`vinculos/{código}`, se borra al usarlo).
 - **Salir** quita ese teléfono de la persona (si tiene otro).
+- **Limpieza automática** (para no llenar el plan gratis de Firebase): el chat de todos se borra a los 7 días; los privados, 7 días después de leídos o a los 30 sin leer. La hace cualquier teléfono al abrir el chat, máximo dos veces al día; las reglas solo dejan borrar lo viejo. Si un día se acaba el cupo gratis, la pestaña lo explica y el resto de la app sigue igual.
 - Los avisos usan las mismas notificaciones de la Agenda (si la persona las activó). Tocar el aviso abre ese chat (`?chat=todos` o `?chat=nombre`).
 - Pruebas: `node pruebas/chat.mjs` (interfaz, con Firebase falso) y `npm run chat-real` (tres personas y un segundo teléfono contra los emuladores).
 

@@ -137,6 +137,23 @@ try {
   log('el resto de la app sigue funcionando', (await p3.page.click('#tabRec'), await p3.page.locator('#recList .card').count()) > 0);
   await p3.ctx.close();
 
+  console.log('Limpieza automática (plan gratis de Firebase)');
+  const sv = semilla(), FV = sv.__fs_falso, dia = 864e5, PV = `${B}/privados/ana-gomez__jeiler/mensajes`;
+  FV[`${B}/chat/viejo`] = { de: 'luis', nombre: 'Luis', texto: 'de hace 8 días', en: ahora - 8 * dia };
+  FV[`${PV}/viejoLeido`] = { de: 'ana-gomez', texto: 'leído hace 8 días', en: ahora - 8 * dia, leido: true };
+  FV[`${PV}/viejoSinLeer`] = { de: 'ana-gomez', texto: 'sin leer de 8 días', en: ahora - 8 * dia, leido: false };
+  FV[`${PV}/muyViejo`] = { de: 'jeiler', texto: 'de hace 31 días', en: ahora - 31 * dia, leido: false };
+  const p5 = await pagina(b, { semilla: sv, errores: [] });
+  await p5.page.goto(URL); await p5.page.click('#tabSo'); await p5.page.waitForSelector('#soLista .so-fila');
+  const nBorrados = await p5.page.evaluate(() => ChatSoporte.limpiar());
+  const dv = await fsDe(p5.page);
+  log('se borra lo del chat de todos de más de 7 días', !dv[`${B}/chat/viejo`] && !!dv[`${B}/chat/c1`]);
+  log('privado: se borra lo leído de más de 7 días y todo lo de más de 30', !dv[`${PV}/viejoLeido`] && !dv[`${PV}/muyViejo`]);
+  log('privado: lo que no se ha leído (8 días) se guarda', !!dv[`${PV}/viejoSinLeer`] && !!dv[`${PV}/p1`]);
+  log('cuenta lo que borró', nBorrados === 3, nBorrados);
+  log('la lista dice cuándo se borran los mensajes', /se borran solos: los de todos a los 7 días/.test(await p5.page.textContent('#soLista')));
+  await p5.ctx.close();
+
   console.log('Celular angosto (320 px)');
   const p4 = await pagina(b, { semilla: semilla(), errores: [], ancho: 320, alto: 640 });
   await p4.page.goto(URL); await p4.page.click('#tabSo'); await p4.page.waitForSelector('#soLista .so-fila');
