@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=28">
+<link rel="stylesheet" href="../comun.css?v=29">
 <style>
 
 /* --- Entregas --- */
@@ -77,6 +77,9 @@ label.subir { cursor: pointer; }
 .sug-chips .chip .ph { width: 16px; height: 16px; }
 .eq-acc { display: flex; flex-wrap: wrap; gap: 8px; }
 .mas-pag { display: flex; flex-wrap: wrap; gap: 8px; }
+.espacio-barra { height: 10px; border-radius: 5px; }
+.espacio-barra span { border-radius: 5px; }
+.espacio-barra.lleno span { background: var(--warn); }
 .visor { position: fixed; inset: 0; z-index: 80; background: #000; display: flex; flex-direction: column; }
 .visor:focus { outline: none; }
 .visor-barra { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top)); color: #fff; font-size: .9rem; font-weight: 600; }
@@ -123,6 +126,7 @@ label.subir { cursor: pointer; }
   <section class="view" id="vSub" aria-labelledby="tSub" hidden>
     <h2 class="titulo-vista" id="tSub">Subir hojas</h2>
     <div class="note">Escanea las hojas con la cámara o sube el PDF o fotos. Cada página sale aparte: escribe a quién pertenece y guárdala. Si una persona tiene dos páginas, marca <b>Unir con la anterior</b>. Toca <b>Leer</b> en una página y la app llena la cédula, la fecha, el tipo y los seriales que estén <b>impresos</b>; la letra a mano casi nunca se lee. Revisa siempre antes de guardar.</div>
+    <div class="aviso warn" id="subEspacio" hidden><span id="subEspacioTxt"></span></div>
     <div class="aviso info" id="subEnlace" hidden><span>Esta app no está conectada con <b>Equipos</b>: las hojas se guardan, pero no actualizan la lista de equipos.</span><button class="btn small" type="button" id="btnConectarSub"><span data-ico="enlace"></span>Conectar</button></div>
     <div class="sub-botones solo-editar">
       <button class="btn primary big" type="button" id="btnEscanear"><span data-ico="camara"></span>Escanear con la cámara</button>
@@ -150,6 +154,7 @@ label.subir { cursor: pointer; }
       <h3 class="card-title"><span data-ico="nube"></span>Copia de seguridad y acceso</h3>
       <div class="meta" id="nubeInfo"></div>
       <div class="meta">La copia incluye las hojas escaneadas, así que puede pesar bastante.</div>
+      <div class="enlace"><b>Espacio en Firebase</b><div class="prog espacio-barra" id="espacioBarra" aria-hidden="true"><span></span></div><div class="meta" id="espacioInfo"></div></div>
       <div class="enlace"><b>Conexión con Equipos</b><div class="meta" id="enlaceInfo"></div><div class="row" id="enlaceBtn"></div></div>
       <div class="row">
         <button class="btn" type="button" id="btnCopia"><span data-ico="descargar"></span>Descargar copia (JSON)</button>
@@ -237,14 +242,14 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "28"};</script>
-<script src="../iconos.js?v=28"></script>
-<script src="../comun.js?v=28"></script>
-<script src="escaner.js?v=28"></script>
-<script src="lector.js?v=28"></script>
-<script src="../codigos.js?v=28"></script>
-<script src="../config.js?v=28"></script>
-<script src="../nube.js?v=28"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "29"};</script>
+<script src="../iconos.js?v=29"></script>
+<script src="../comun.js?v=29"></script>
+<script src="escaner.js?v=29"></script>
+<script src="lector.js?v=29"></script>
+<script src="../codigos.js?v=29"></script>
+<script src="../config.js?v=29"></script>
+<script src="../nube.js?v=29"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -539,7 +544,7 @@ function ir(v) {
   UI.entrar($({ ent: 'vEnt', sub: 'vSub', db: 'vDb' }[v]));
 }
 function render() {
-  pintarConexion(); actualizarNombres();
+  pintarConexion(); actualizarNombres(); pintarEspacio();
   if (vista === 'ent') renderEnt();
   if (vista === 'db') renderDb();
 }
@@ -547,6 +552,34 @@ function actualizarNombres() {
   const n = [...new Set(lista().map(e => (e.nombre || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
   const sig = n.join('|'); if (actualizarNombres.sig === sig) return; actualizarNombres.sig = sig;
   $('dlNombres').innerHTML = n.map(v => `<option value="${esc(v)}"></option>`).join('');
+}
+
+/* ================= ESPACIO EN FIREBASE ================= */
+// El plan gratis de Firestore guarda 1 GiB y las hojas escaneadas ocupan casi todo: cada página va en base64 (un tercio más que el JPEG).
+// Es un cálculo aproximado con lo que dice cada hoja; Firebase no deja medirlo desde la app.
+const LIMITE_GRATIS = 1024 ** 3, AVISO_ESPACIO = 0.8;
+function espacioUsado() {
+  let b = 0, paginas = 0;
+  for (const e of ENT.values()) {
+    for (const p of e.paginas || []) { b += (p.bytes ? Math.ceil(p.bytes / 3) * 4 : (p.trozos || 1) * TROZO * 0.6) + (p.trozos || 1) * 2000; paginas++; }
+    b += String(e.miniatura || '').length + 2000;   // la hoja con sus datos y sus índices
+  }
+  return { b, paginas };
+}
+function pesoBonito(b) { return b >= LIMITE_GRATIS ? `${(b / LIMITE_GRATIS).toFixed(2).replace('.', ',')} GB` : b < 1048576 ? 'menos de 1 MB' : `${Math.round(b / 1048576).toLocaleString('es-CO')} MB`; }
+function pintarEspacio() {
+  if (!DB || !ENT.size) { $('subEspacio').hidden = true; $('espacioInfo').textContent = DB ? 'Todavía no hay hojas guardadas. El plan gratis de Firebase guarda 1 GB.' : ''; $('espacioBarra').hidden = !DB; return; }
+  const { b, paginas } = espacioUsado(), k = b / LIMITE_GRATIS, pct = Math.min(100, Math.round(k * 100)), lleno = k >= AVISO_ESPACIO;
+  // Se cuenta en páginas (lo que se escanea): una hoja puede tener 1 o 20.
+  const caben = Math.max(0, Math.floor((LIMITE_GRATIS - b) / (b / Math.max(1, paginas))));
+  const txtCaben = caben >= 1 ? `caben unas ${caben.toLocaleString('es-CO')} ${caben === 1 ? 'página más' : 'páginas más'} como las que ya hay` : '';
+  $('espacioBarra').hidden = false; $('espacioBarra').classList.toggle('lleno', lleno);
+  $('espacioBarra').firstElementChild.style.width = Math.max(pct, 1) + '%';
+  const qHacer = 'Descarga una copia y borra las hojas viejas que ya no necesites, o pasa Firebase al plan Blaze (pago por uso).';
+  $('espacioInfo').textContent = `Usado: ${pesoBonito(b)} de 1 GB del plan gratis (${pct} %), aproximado. ${k >= 1 ? 'Firebase ya no recibe hojas nuevas. ' + qHacer : [txtCaben && txtCaben[0].toUpperCase() + txtCaben.slice(1) + '.', lleno ? qHacer : ''].filter(Boolean).join(' ')}`;
+  $('subEspacio').hidden = !lleno;
+  $('subEspacioTxt').textContent = k >= 1 ? `Firebase está lleno (${pesoBonito(b)} de 1 GB): las hojas nuevas no se van a guardar. Mira «Espacio en Firebase» en Base de datos.`
+    : `Firebase va en ${pct} % de su espacio gratis${txtCaben ? ` (${txtCaben})` : ''}. Mira «Espacio en Firebase» en Base de datos.`;
 }
 
 /* ================= HOJAS GUARDADAS ================= */
