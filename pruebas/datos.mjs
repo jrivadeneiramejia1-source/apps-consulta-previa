@@ -54,9 +54,9 @@ log('X1. el Excel trae Equipos, Recibidos e Historial', JSON.stringify(wb.SheetN
 const his = XLSX.utils.sheet_to_json(wb.Sheets.Historial, { header: 1, raw: false, dateNF: 'yyyy-mm-dd' });
 const filas = his.slice(1);
 log('X2. encabezados del historial', his[0].join('|') === 'FECHA|SERIAL|TIPO DE EQUIPO|MARCA|MODELO|TRABAJO|DÓNDE SE REGISTRÓ|HECHO POR|A NOMBRE DE|DISCO DEL BACKUP|NOTA', his[0].join('|'));
-const bk = filas.find(f => f[1] === 'GPS778812' && f[5] === 'Backup');
+const bk = filas.find(f => f[1] === 'GPS778812' && f[5] === 'Backup y mantenimiento remoto');
 log('X3. backup de la Agenda: quién, disco y nota', bk && bk[6] === 'Agenda' && bk[7] === 'Ana Gómez' && bk[9] === 'Disco Backup 1' && bk[10] === 'carpeta GPS', JSON.stringify(bk));
-log('X4. mantenimiento remoto de la Agenda', filas.some(f => f[1] === 'GPS778812' && f[5] === 'Mantenimiento remoto'), JSON.stringify(filas));
+log('X4. actualización de antivirus de la Agenda', filas.some(f => f[1] === 'GPS778812' && f[5] === 'Actualización de antivirus'), JSON.stringify(filas));
 const rc = filas.find(f => f[1] === 'R58N90AB');
 log('X5. mantenimiento hecho en Recibidos, a nombre de quien lo trajo', rc && rc[5] === 'Mantenimiento físico' && rc[6] === 'Recibidos' && rc[8] === 'María Epieyú', JSON.stringify(rc));
 log('X6. solo lo que se hizo (3 filas: nada pendiente)', filas.length === 3, JSON.stringify(filas));
@@ -76,7 +76,7 @@ log('C4. a los 45 días pide otra copia, resaltado', /hace 45 días\. Ya toca ot
 await page.click('#tabEq'); await page.fill('#qEq', 'PF2XYZ01'); await page.click('[data-eq="PF2XYZ01"]'); await page.waitForSelector('#eqSheet:not([hidden])');
 await page.click('#eqDel'); await page.waitForSelector('#cfSheet:not([hidden])');
 const o1 = await page.evaluate(() => ({ visible: !document.getElementById('cfOpc').hidden, marcado: !!(document.getElementById('cfBorrarTareas') || {}).checked, t: document.getElementById('cfOpc').textContent }));
-log('B1. ofrece quitar sus 2 tareas de la Agenda, marcado', o1.visible && o1.marcado && /sus 2 tareas programadas/.test(o1.t) && /mantenimiento remoto del/.test(o1.t) && /backup del/.test(o1.t), JSON.stringify(o1));
+log('B1. ofrece quitar sus 2 tareas de la Agenda, marcado', o1.visible && o1.marcado && /sus 2 tareas programadas/.test(o1.t) && /actualización de antivirus del/.test(o1.t) && /backup y mantenimiento remoto del/.test(o1.t), JSON.stringify(o1));
 await axe(page, 'borrar equipo con tareas');
 await page.click('#cfYes'); await esp(400);
 const d1 = await fsDe(page);

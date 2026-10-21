@@ -55,6 +55,12 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - **Última copia** (las tres apps, en "Copia de seguridad y acceso"): dice cuándo se descargó la copia en ese teléfono; si nunca o hace 30 días o más, lo resalta. Se guarda en el teléfono (`nube_<app>_copia`): no sabe si otra persona hizo la copia.
 - Prueba: `node pruebas/datos.mjs`.
 
+## Tipos de tarea en la Agenda (v31)
+- **Programar tarea** tiene tres opciones: **Mantenimiento físico**, **Actualización de antivirus** y **Backup y mantenimiento remoto** (esta pide el nombre del disco y, al terminarla, en cuál quedó).
+- Solo cambian los nombres que se ven en la Agenda. Dentro de la base de datos siguen los mismos códigos (`fisico`, `remoto`, `backup`): las tareas ya guardadas no se tocan, y una tarea vieja de "mantenimiento remoto" ahora se lee como "Actualización de antivirus". `fechaRemoto` es la fecha de la última actualización de antivirus.
+- **Recibidos no cambia**: sigue con Mantenimiento, Backup y En espera.
+- Prueba: `node pruebas/tipos.mjs`.
+
 ## Cuando Firebase no deja leer (v30)
 - Si Equipos o Entregas no pueden leer la base de datos, el aviso de arriba y la lista dicen **la causa**, en vez de "No hay equipos en espera" (que parecía que se había borrado todo):
   - **Reglas** (`permission-denied`): las reglas publicadas en Firebase no son las de `firestore.rules`. Se pega el archivo completo en Firestore Database → Reglas y se toca Publicar.

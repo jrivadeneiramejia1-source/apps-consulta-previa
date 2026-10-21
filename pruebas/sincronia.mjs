@@ -181,7 +181,7 @@ log('G7. el número de AnyDesk queda en el equipo', s[`${B}/equipos/GPS778812`].
 const tidB = tk[0][0].split('/').pop();
 log('G8. aparece como atrasada, con el AnyDesk y su botón para abrirlo', (await eqp.locator('#mtList .card.mt.atras').count()) === 1 && (await eqp.getAttribute('#mtList a[href^="anydesk:"]', 'href')) === 'anydesk:123456789');
 await eqp.click('#btnNewMt'); await eqp.click('#mtTipo [data-tipo="backup"]'); await eqp.fill('#mtSerial', 'GPS778812'); await eqp.fill('#mtFecha', '2026-02-02'); await eqp.click('#mtGuardar'); await esp(100);
-log('G9. no deja programar dos veces el mismo tipo al mismo equipo', (await eqp.textContent('#mtErr')).includes('ya tiene el backup'));
+log('G9. no deja programar dos veces el mismo tipo al mismo equipo', (await eqp.textContent('#mtErr')).includes('ya tiene programada esa tarea (backup y mantenimiento remoto)'));
 await eqp.click('#mtCancel'); await esp(100); if (await eqp.locator('#cfSheet').isVisible()) await eqp.click('#cfYes');
 // Ida y vuelta: prender el equipo
 await eqp.click(`[data-t-acc="encender"][data-t="${tidB}"]`); await eqp.waitForSelector('#cfSheet:not([hidden])'); await eqp.click('#cfYes'); await esp(300);
