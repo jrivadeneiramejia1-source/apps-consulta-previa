@@ -71,7 +71,7 @@ await page.addScriptTag({ content: AXE }); await esp(200);
 v = await page.evaluate(async () => (await axe.run(document, { runOnly: ['wcag2a', 'wcag2aa', 'best-practice'] })).violations.map(x => x.id));
 log('10. la hoja de la tarea es accesible (axe)', !v.length, v.join(', '));
 await page.click('#mtGuardar'); await esp(500);
-log('11. aviso a Jeiler: qué tarea, de qué equipo, AnyDesk y quién la programó', envios.length === 2 && ultimoEnvio().subs[0].endpoint.includes('/send/Jeiler') && ultimoEnvio().titulo === 'Te asignaron: backup de GPS778812' && ultimoEnvio().cuerpo.includes('AnyDesk 987 654 321') && ultimoEnvio().cuerpo.includes('programó Carlos') && ultimoEnvio().cuerpo.includes('Disco de backup: Disco Backup 2'), JSON.stringify(ultimoEnvio()));
+log('11. aviso a Jeiler: qué tarea, de qué equipo, AnyDesk y quién la programó', envios.length === 2 && ultimoEnvio().subs[0].endpoint.includes('/send/Jeiler') && ultimoEnvio().titulo === 'Te asignaron: backup y mantenimiento remoto de GPS778812' && ultimoEnvio().cuerpo.includes('AnyDesk 987 654 321') && ultimoEnvio().cuerpo.includes('programó Carlos') && ultimoEnvio().cuerpo.includes('Disco de backup: Disco Backup 2'), JSON.stringify(ultimoEnvio()));
 s = await st(); const tid = tareas(s).find(([, x]) => x.tipo === 'backup')[0].split('/').pop();
 await page.click('#btnNewMt'); await page.fill('#mtSerial', 'PF2XYZ01'); await page.fill('#mtFecha', '2026-10-25');
 await page.selectOption('#mtResp', '__otro'); await page.fill('#mtRespOtro', 'Pedro'); await esp(80);
@@ -81,7 +81,7 @@ log('13. y no intenta enviar (dice que lo verá al abrir la app)', envios.length
 // Cada uno ve para quién es cada tarea
 await page.click('#tabMt'); await esp(200);
 const textos = await page.locator('#mtList .para-t').allInnerTexts();
-log('13b. cada tarjeta dice "… programado para …" y quién la programó', textos.some(x => /Backup\s+programado para Jeiler/.test(x) && x.includes('lo programó tú')) && textos.some(x => /Mantenimiento físico\s+programado para Pedro/.test(x)), textos.join(' | '));
+log('13b. cada tarjeta dice "… programado para …" y quién la programó', textos.some(x => /Backup y mantenimiento remoto\s+programado para Jeiler/.test(x) && x.includes('lo programó tú')) && textos.some(x => /Mantenimiento físico\s+programado para Pedro/.test(x)), textos.join(' | '));
 const chips = (await page.locator('#chipsResp .chip').allInnerTexts()).map(x => x.replace(/\s+/g, ' ').trim());
 log('13c. botones por persona con su cantidad', chips.join('|') === 'Todas 2|Jeiler 1|Pedro 1', chips.join('|'));
 await page.click('#chipsResp [data-resp="pedro"]'); await esp(100);
@@ -91,7 +91,7 @@ await page.click('#tabDb'); await page.click('#notiBtns [data-noti="activar"]');
 
 // Jeiler abre la app: le dice lo que le asignaron y pide prender el equipo
 await como('Jeiler', { eqcp_agenda_vista: '2000-01-01' }); await esp(1200);
-log('14. al abrir, Jeiler ve "Te asignaron una tarea"', (await page.textContent('#toast')).includes('Te asignaron una tarea: backup de GPS778812'));
+log('14. al abrir, Jeiler ve "Te asignaron una tarea"', (await page.textContent('#toast')).includes('Te asignaron una tarea: backup y mantenimiento remoto de GPS778812'));
 log('15. la pestaña Agenda cuenta lo que le toca', (await page.textContent('#badgeMt')) === '1');
 await page.click('#tabMt'); await page.click('#sumMt [data-filtro="mias"]'); await esp(100);
 log('16. "Para mí" muestra su tarea', (await page.locator('#mtList .card.mt').count()) === 1);
@@ -113,7 +113,7 @@ await como('Jeiler');
 await page.click('#tabMt'); await page.click(`[data-t-acc="hecho"][data-t="${tid}"]`); await page.waitForSelector('#cfSheet:not([hidden])');
 log('20b. al terminar propone el disco que se programó', (await page.inputValue('#cfTDisco')) === 'Disco Backup 2');
 await page.click('#cfYes'); await esp(500);
-log('21. Carlos recibe "Backup hecho": en qué disco y que ya puede desconectarlo', ultimoEnvio().subs[0].endpoint.includes('/send/Carlos') && ultimoEnvio().titulo === 'Backup hecho: GPS778812' && ultimoEnvio().cuerpo.includes('en el disco Disco Backup 2. Ya puedes desconectar el disco'), JSON.stringify(ultimoEnvio()));
+log('21. Carlos recibe "Backup + remoto hecho": en qué disco y que ya puede desconectarlo', ultimoEnvio().subs[0].endpoint.includes('/send/Carlos') && ultimoEnvio().titulo === 'Backup + remoto hecho: GPS778812' && ultimoEnvio().cuerpo.includes('en el disco Disco Backup 2. Ya puedes desconectar el disco'), JSON.stringify(ultimoEnvio()));
 s = await st();
 log('22. la tarea queda con todo su recorrido', s[`${B}/tareas/${tid}`].hist.map(h => h.quien + ':' + h.que).join(',') === 'Carlos:programada,Jeiler:encender,Carlos:encendido,Jeiler:hecho');
 

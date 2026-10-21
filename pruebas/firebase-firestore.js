@@ -45,6 +45,8 @@ export async function updateDoc(r, data) { quiza(); const d = leer(); if (!d[r.p
 export async function deleteDoc(r) { quiza(); const d = leer(); delete d[r.path]; escribir(d); avisar(r.path); }
 export function onSnapshot(ref, opts, next, err) {
   if (typeof opts === 'function') { err = next; next = opts; }
+  // window.__snapErr = 'permission-denied' | 'resource-exhausted' | 'unavailable': la lectura falla como en Firebase.
+  if (window.__snapErr) { const c = window.__snapErr; setTimeout(() => err && err(Object.assign(new Error('simulado ' + c), { code: c })), 30); return () => {}; }
   const o = { path: ref.path, next }; oyentes.add(o);
   setTimeout(() => next(snapCol(ref.path)), 30);
   return () => oyentes.delete(o);

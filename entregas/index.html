@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=29">
+<link rel="stylesheet" href="../comun.css?v=31">
 <style>
 
 /* --- Entregas --- */
@@ -242,14 +242,14 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "29"};</script>
-<script src="../iconos.js?v=29"></script>
-<script src="../comun.js?v=29"></script>
-<script src="escaner.js?v=29"></script>
-<script src="lector.js?v=29"></script>
-<script src="../codigos.js?v=29"></script>
-<script src="../config.js?v=29"></script>
-<script src="../nube.js?v=29"></script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "31"};</script>
+<script src="../iconos.js?v=31"></script>
+<script src="../comun.js?v=31"></script>
+<script src="escaner.js?v=31"></script>
+<script src="lector.js?v=31"></script>
+<script src="../codigos.js?v=31"></script>
+<script src="../config.js?v=31"></script>
+<script src="../nube.js?v=31"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL = 'entregas', COL_A = 'archivos';
@@ -354,7 +354,7 @@ const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', '
 /* ================= ESTADO ================= */
 let ENT = new Map();
 let DB = null, USER = null, DL = null, miId = null, soloLectura = false;
-let listo = false, conexion = 'cargando', fechaCache = null;
+let listo = false, conexion = 'cargando', fechaCache = null, errorDb = '';   // errorDb: por qué Firebase no deja leer
 let pendientes = lsGet(PEND_KEY) || [];
 let vista = 'ent', filtro = 'todos', enActual = null, renderPendiente = false;
 let lote = [];          // páginas que se están subiendo
@@ -504,7 +504,7 @@ async function reintentarPendientes() {
   }
   lsSet(PEND_KEY, pendientes); pintarAvisos();
 }
-function marcarDesconectado() { conexion = 'off'; pintarConexion(); pintarAvisos(); }
+function marcarDesconectado() { conexion = 'off'; pintarConexion(); pintarAvisos(); pedirRender(); }
 let tCache = null;
 function guardarCacheLuego() { clearTimeout(tCache); tCache = setTimeout(() => { if (listo) lsSet(CACHE_KEY, { e: [...ENT].map(([id, x]) => [id, Object.assign({}, x, { miniatura: '' })]), t: Date.now() }); }, 1200); }
 let hojaPedida = new URLSearchParams(location.search).get('hoja');
@@ -513,10 +513,10 @@ function suscribir() {
   subs.splice(0).forEach(u => { try { u(); } catch (e) {} });
   subs.push(DB.collection(COL).limit(5000).onSnapshot(s => {
     ENT = new Map(s.docs.map(d => [d.id, Object.assign({}, d.data())])); listo = true;
-    pendientes.forEach(aplicarLocal); conexion = 'vivo'; guardarCacheLuego(); pintarConexion(); pintarAvisos(); pedirRender(); revisarLuego();
+    pendientes.forEach(aplicarLocal); conexion = 'vivo'; errorDb = ''; guardarCacheLuego(); pintarConexion(); pintarAvisos(); pedirRender(); revisarLuego();
     // Abierta desde la ficha de un equipo (Equipos): muestra esa hoja.
     if (hojaPedida && ENT.has(hojaPedida)) { const h = hojaPedida; hojaPedida = null; if (vista !== 'ent') ir('ent'); abrirEn(h); }
-  }, e => { marcarDesconectado(); if (e && e.code === 'unavailable') setTimeout(suscribir, 5000); }));
+  }, e => { errorDb = (e && e.code) || 'unavailable'; marcarDesconectado(); if (e && e.code === 'unavailable') setTimeout(suscribir, 5000); }));
 }
 
 /* ================= AVISOS ================= */
@@ -525,12 +525,15 @@ function pintarConexion() {
   el.querySelector('span').textContent = conexion === 'vivo' ? 'En vivo' : conexion === 'cargando' ? 'Conectando…' : 'Sin conexión';
   $('subtitulo').textContent = ENT.size ? `${ENT.size} ${ENT.size === 1 ? 'hoja guardada' : 'hojas guardadas'}` : 'Consulta Previa';
 }
+const causaDb = () => (window.nube && window.nube.causa ? window.nube.causa(errorDb) : 'Revisa tu internet y vuelve a abrir la app.');
+// Lista vacía porque Firebase no responde: nunca se dice "no hay hojas", que parece que se borró todo.
+const vacioRed = () => UI.vacio('sinRed', 'No se pudo leer la base de datos', esc(causaDb()));
 function pintarAvisos() {
   document.body.classList.toggle('ro', soloLectura);
   $('avisoRo').hidden = !soloLectura;
   const off = conexion === 'off' || (!DB && conexion !== 'cargando');
   $('avisoOff').hidden = !off;
-  if (off) $('avisoOffTxt').textContent = ENT.size ? `No hay conexión con la base de datos. Estás viendo la última copia guardada en este teléfono${fechaCache ? ' (' + hace(new Date(fechaCache).toISOString()) + ')' : ''}.` : 'No hay conexión con la base de datos. Revisa tu internet y vuelve a abrir la app.';
+  if (off) $('avisoOffTxt').textContent = (ENT.size ? `No se puede leer la base de datos. Estás viendo la última copia guardada en este teléfono${fechaCache ? ' (' + hace(new Date(fechaCache).toISOString()) + ')' : ''}.` : 'No se puede leer la base de datos.') + ' ' + causaDb();
   $('avisoPend').hidden = !pendientes.length;
   $('avisoPendTxt').textContent = pendientes.length === 1 ? '1 cambio todavía no se ha enviado.' : `${pendientes.length} cambios todavía no se han enviado.`;
 }
@@ -610,7 +613,7 @@ function renderEnt() {
   $('entCount').textContent = todos.length ? `Mostrando ${ver.length} de ${todos.length} hojas` : '';
   if (!todos.length) {
     $('entList').innerHTML = conexion === 'cargando' ? UI.esqueleto(3)
-      : !DB ? UI.vacio('sinRed', 'No se pudo abrir la base de datos', 'Revisa tu internet y vuelve a abrir la app.')
+      : !DB || conexion === 'off' ? vacioRed()
       : UI.vacio('hojaVacia', 'Todavía no hay hojas', 'Ve a <b>Subir</b> para escanear la primera hoja o cargar un PDF.');
     return;
   }

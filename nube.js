@@ -519,6 +519,11 @@
     },
     get nombre() { return nombre; }
   };
+  // Por qué Firebase no deja leer: se muestra en pantalla en vez de un "revisa tu internet" que no dice nada.
+  nube.causa = code => ({
+    permission_denied: 'Firebase rechazó la lectura: las reglas publicadas no son las de la app. En Firebase → Firestore Database → Reglas (Rules), pega el archivo firestore.rules completo y toca Publicar.',
+    resource_exhausted: 'Firebase llegó al límite gratis de hoy (50.000 lecturas al día). Se renueva solo cada madrugada, hora de Colombia; mira Firebase → Firestore Database → Uso (Usage), o pasa el proyecto al plan Blaze.'
+  }[code] || 'Revisa tu internet y vuelve a abrir la app. Si estás en una red del SENA o de una empresa, puede estar bloqueando Firebase: prueba con los datos del celular.');
   nube.sesionChat = sesionChat;
   nube.alSalir = f => { if (typeof f === 'function') alSalir.push(f); };
   nube.reportarError = reportarError;
