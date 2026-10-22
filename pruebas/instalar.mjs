@@ -11,7 +11,6 @@ const errores = [];
 async function abrir({ ua, app = 'equipos', conClave = true, standalone = false } = {}) {
   const sem = semillaEquipos();
   if (app === 'entregas') Object.assign(sem, { nube_entregas_espacio: huella('entregas', 'prueba123'), nube_entregas_nombre: 'Jeiler' });
-  if (app === 'evidencias') Object.assign(sem, { nube_evidencias_espacio: huella('evidencias', 'prueba123'), nube_evidencias_nombre: 'Jeiler' });
   if (!conClave) delete sem.nube_equipos_espacio;
   // Contexto propio para poder cambiar el navegador (userAgent); pagina() le pone el Firebase falso y los datos.
   const ctx = await br.newContext({ viewport: { width: 390, height: 844 }, locale: 'es-CO', userAgent: ua, isMobile: !!ua, hasTouch: !!ua });
@@ -99,11 +98,6 @@ log('instalada: el bloque lo dice y no muestra botón', /Estás usando la app in
 await ctx.close();
 ({ ctx, page } = await abrir({ ua: ANDROID, standalone: true, conClave: false }));
 log('instalada: la pantalla de la clave no ofrece instalar', !(await page.locator('#nubeInstClave').isVisible()));
-await ctx.close();
-
-console.log('Evidencias');
-({ ctx, page } = await abrir({ ua: IPHONE, app: 'evidencias' }));
-log('Evidencias: también tiene el bloque para instalar', (await page.locator('#nubeInstBloque').count()) === 1);
 await ctx.close();
 
 const raros = errores.filter(x => !/externo:|Failed to load resource: net::ERR_FAILED/.test(x));   // fuentes de Google bloqueadas a propósito en las pruebas

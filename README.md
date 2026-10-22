@@ -1,8 +1,7 @@
 # Apps Consulta Previa
 
-Tres apps web instalables (PWA) que funcionan en el teléfono y en el computador, sin cuenta de Claude:
+Dos apps web instalables (PWA) que funcionan en el teléfono y en el computador, sin cuenta de Claude:
 
-- **Evidencias** (`evidencias/`): fotos y videos por comunidad y etapa.
 - **Equipos** (`equipos/`): equipos recibidos, mantenimiento y backup.
 - **Entregas** (`entregas/`): hojas de entrega y devolución escaneadas (PDF o fotos).
 
@@ -52,7 +51,7 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - **Excel de Equipos con hoja Historial**: cada mantenimiento físico, remoto y backup hecho, de la Agenda (`mttos` del equipo: quién, disco y nota) y de Recibidos (`mttoFecha`, `backupFecha`). El más reciente primero. Sirve para el informe del mes.
 - **Borrar un equipo** con tareas en la Agenda ofrece quitarlas también (casilla marcada). Antes quedaban sueltas y no se podían editar. Si está en Recibidos lo dice; ese registro no se borra.
 - **Espacio en Firebase** (Entregas → Base de datos): cuánto ocupan las hojas del 1 GB del plan gratis y cuántas páginas más caben, contadas con las que ya hay. Es aproximado: cada página pesa un tercio más en Firebase (base64) y se suman unos 2 KB por trozo y por hoja. Desde el 80 % la barra se pone en aviso y Subir lo dice antes de escanear.
-- **Última copia** (las tres apps, en "Copia de seguridad y acceso"): dice cuándo se descargó la copia en ese teléfono; si nunca o hace 30 días o más, lo resalta. Se guarda en el teléfono (`nube_<app>_copia`): no sabe si otra persona hizo la copia.
+- **Última copia** (las dos apps, en "Copia de seguridad y acceso"): dice cuándo se descargó la copia en ese teléfono; si nunca o hace 30 días o más, lo resalta. Se guarda en el teléfono (`nube_<app>_copia`): no sabe si otra persona hizo la copia.
 - Prueba: `node pruebas/datos.mjs`.
 
 ## Soporte con las otras apps abiertas (v32)

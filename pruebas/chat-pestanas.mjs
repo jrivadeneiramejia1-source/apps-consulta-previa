@@ -1,5 +1,5 @@
 // Soporte (chat) con las otras apps abiertas en el mismo navegador, con los emuladores de Firebase y la caché activada.
-// Equipos, Entregas y Evidencias comparten almacenamiento y UNA conexión de Firestore entre pestañas (la lleva la que se abrió primero).
+// Equipos y Entregas comparten almacenamiento y UNA conexión de Firestore entre pestañas (la lleva la que se abrió primero).
 // Si esa no tenía el inicio de sesión del chat, Soporte mostraba "Falta pegar las reglas" aunque las reglas estaban bien, y se quitaba solo
 // al cerrar esa pestaña. Uso: npm run chat-real   (arranca los emuladores y corre esta prueba junto con chat-real)
 import fs from 'node:fs';
@@ -24,7 +24,7 @@ const BASE = 'http://127.0.0.1:8832';
 
 // Un navegador nuevo (con su nombre): se abre `primera` (la que lleva la conexión) y después Equipos con el chat.
 async function navegador(nombre) {
-  const semilla = {}; for (const app of ['equipos', 'entregas', 'evidencias']) { semilla[`nube_${app}_espacio`] = huella(app, CLAVE); semilla[`nube_${app}_nombre`] = nombre; }
+  const semilla = {}; for (const app of ['equipos', 'entregas']) { semilla[`nube_${app}_espacio`] = huella(app, CLAVE); semilla[`nube_${app}_nombre`] = nombre; }
   const t = await pagina(b, { errores: err, semilla });
   await t.ctx.route(/\/config\.js/, r => r.fulfill({ body: CONFIG, contentType: 'text/javascript' }));
   await t.ctx.route(/\/firebasejs\//, r => r.fulfill({ body: sdk(r.request().url().split('/').pop()), contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' } }));
@@ -38,7 +38,7 @@ async function abrirEquipos(ctx) {
   return q;
 }
 
-for (const primera of ['entregas', 'evidencias']) {
+for (const primera of ['entregas']) {
   console.log(`\n— ${primera} abierta primero (la que lleva la conexión)`);
   const { ctx, page } = await navegador(`Persona ${primera}`);   // un nombre por navegador: el mismo nombre en otro navegador pide vincular
   await page.goto(`${BASE}/${primera}/`); await page.waitForSelector('#conn'); await esp(2500);

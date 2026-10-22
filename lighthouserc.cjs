@@ -1,4 +1,4 @@
-// Lighthouse CI (npm run lighthouse): mide velocidad, accesibilidad y buenas prácticas de las tres apps.
+// Lighthouse CI (npm run lighthouse): mide velocidad, accesibilidad y buenas prácticas de las dos apps.
 // Solo avisa (warn): no frena la publicación. Los informes quedan en .lighthouseci/
 // Para correrlo en otro computador con Chromium propio: CHROME_PATH=/ruta/al/chromium npm run lighthouse
 const fs = require('node:fs');
@@ -9,7 +9,7 @@ module.exports = {
   ci: {
     collect: {
       staticDistDir: '.',
-      url: ['/equipos/index.html', '/entregas/index.html', '/evidencias/index.html'],
+      url: ['/equipos/index.html', '/entregas/index.html'],
       numberOfRuns: 1,
       chromePath,
       settings: {

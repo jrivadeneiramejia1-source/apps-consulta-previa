@@ -7,7 +7,7 @@ const { LinkChecker } = require('linkinator');
 let ok = 0, mal = 0; const t = (n, c, x) => { c ? ok++ : mal++; console.log((c ? 'OK   ' : 'FALLA') + ' ' + n + (c ? '' : ' ' + (x || ''))); };
 
 // 1) Lo que guarda cada service worker para usar sin internet tiene que existir (si falta, se pierde en silencio).
-for (const sw of ['sw.js', 'equipos/sw.js', 'entregas/sw.js', 'evidencias/sw.js']) {
+for (const sw of ['sw.js', 'equipos/sw.js', 'entregas/sw.js']) {
   const f = path.join(RAIZ, sw);
   if (!fs.existsSync(f)) continue;
   const lista = (fs.readFileSync(f, 'utf8').match(/const BASICOS = \[([^\]]*)\]/) || [])[1];
@@ -35,9 +35,9 @@ if (!externos) saltar.push('^https?://(?!127\\.0\\.0\\.1|localhost)');
 const rotos = [];
 const lc = new LinkChecker();
 lc.on('link', l => { if (l.state === 'BROKEN') rotos.push(`${l.url} (${l.status}) en ${l.parent}`); });
-const r = await lc.check({ path: ['index.html', 'equipos/index.html', 'entregas/index.html', 'evidencias/index.html'], recurse: true, linksToSkip: saltar, timeout: 15000, retry: true, concurrency: 20, serverRoot: RAIZ, directoryListing: false });
+const r = await lc.check({ path: ['index.html', 'equipos/index.html', 'entregas/index.html'], recurse: true, linksToSkip: saltar, timeout: 15000, retry: true, concurrency: 20, serverRoot: RAIZ, directoryListing: false });
 const revisados = r.links.filter(l => l.state !== 'SKIPPED').length;
 t(`páginas: ${revisados} enlaces revisados${externos ? ' (con los de internet)' : ''}, ninguno roto`, r.passed && !rotos.length, '\n  ' + rotos.join('\n  '));
-t('revisó las tres apps', ['equipos/', 'entregas/', 'evidencias/'].every(a => r.links.some(l => l.url.includes(a))));
+t('revisó las dos apps', ['equipos/', 'entregas/'].every(a => r.links.some(l => l.url.includes(a))));
 console.log(`\n${ok} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

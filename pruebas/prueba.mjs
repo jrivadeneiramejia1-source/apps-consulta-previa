@@ -315,19 +315,6 @@ for (const tema of ['light', 'dark']) {
   await ctx.close();
 }
 
-// Evidencias sigue funcionando con el nube.js nuevo
-console.log('\n=== EVIDENCIAS (humo) ===');
-const err3 = [];
-const p3 = await pagina(br, { semilla: { nube_evidencias_espacio: huella('evidencias', 'prueba123'), nube_evidencias_nombre: 'Jeiler' }, errores: err3 });
-await p3.page.goto(URL + '/evidencias/'); await espera(1200);
-chequear(await p3.page.locator('#nubeClave').count() === 0, 'evidencias abre');
-await p3.page.evaluate(() => { nube.cambiarNombre(); }); await p3.page.waitForSelector('.nube-dlg');
-chequear(true, 'evidencias usa el diálogo propio');
-await p3.page.screenshot({ path: `${OUT}/v1-evidencias-dialogo.png` });
-await p3.page.keyboard.press('Escape');
-chequear(!err3.filter(e => !e.startsWith('externo: https://fonts')).filter(e => !e.includes('ERR_FAILED')).length, 'evidencias sin errores: ' + err3.join(' | '));
-await p3.ctx.close();
-
 await br.close(); srv.close();
 console.log(`\n${ok} bien, ${mal} mal`);
 if (mal) { console.log(fallas.join('\n')); process.exit(1); }
