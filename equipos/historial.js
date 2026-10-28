@@ -2,8 +2,9 @@
    Cada cambio (equipo, recibido o tarea) deja una línea en actividad/{id}; varios cambios del mismo equipo hechos en unos
    segundos se juntan en una sola (por ejemplo, «Dio Listo a X» con sus detalles). Todos las ven, con filtro por persona.
    Lo que hace otra persona suma en la insignia de Soporte; lo propio queda en la lista pero no avisa.
+   Cada persona puede borrar sus propios movimientos (uno por uno o todos); los de otras personas no se pueden tocar ni editar.
    Se borran solas a los 30 días (cualquier teléfono que abra la app, máximo dos veces al día).
-   La app lo arranca con Historial.iniciar({ nombre, toast, insignia, abrirEquipo }) y le pasa cada cambio con Historial.registrar({ serial, prio, titulo, lineas }). */
+   La app lo arranca con Historial.iniciar({ nombre, toast, confirmar, insignia, abrirEquipo }) y le pasa cada cambio con Historial.registrar({ serial, prio, titulo, lineas }). */
 (function () {
   'use strict';
   const DIA = 864e5, DIAS = 30, LIMPIAR_CADA = DIA / 2, JUNTAR = 2500, MAX_LINEAS = 12, MAX_LEIDAS = 300;
@@ -32,6 +33,10 @@
     if (d.toDateString() === h.toDateString()) return 'Hoy';
     if (d.toDateString() === ay.toDateString()) return 'Ayer';
     return d.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
+  function razon(e) {
+    const c = (e && e.code) || '';
+    return /permission/.test(c) ? 'la base de datos no lo permitió (si usas otro teléfono con tu mismo nombre, vincúlalo en Soporte).' : /unavailable/.test(c) ? 'sin internet.' : (e && e.message) || 'error desconocido.';
   }
   // Un «permiso denegado» justo al arrancar suele ser pasajero (la sesión anónima todavía no llegó): se reintenta unas veces antes de culpar a las reglas.
   function fallo(e, reintentar) {
@@ -152,6 +157,7 @@
         <div class="chat-quien"><h2 id="histTitulo">Historial de movimientos</h2><p class="meta" id="histSub"></p></div>
       </div>
       <div class="hist-chips" id="histChips" role="group" aria-label="Filtrar por persona"></div>
+      <div class="hist-barra" id="histBarra" hidden></div>
       <div class="chat-lista" id="histLista" tabindex="0" aria-label="Movimientos"></div>`;
     document.body.appendChild(d);
     d.addEventListener('click', clicPantalla);
@@ -193,6 +199,9 @@
       ? chip('', 'Todos', todas.length) + [...personas.values()].sort((a, b) => b.n - a.n).map(p => chip(p.de, p.de === yo.clave ? 'Tú' : esc(p.nombre), p.n)).join('')
       : '';
     $('histChips').hidden = !$('histChips').innerHTML;
+    const mios = todas.filter(m => m.de === yo.clave).length;
+    $('histBarra').innerHTML = mios ? `<button type="button" class="btn small" data-hi="borrar-mios">${ico('borrar')}Borrar mis movimientos (${mios})</button>` : '';
+    $('histBarra').hidden = !mios;
     const ver = filtro ? todas.filter(m => m.de === filtro) : todas;
     if (!ver.length) { l.innerHTML = `<div class="chat-vacio">${ico('historial')}<p>Todavía no hay movimientos. Cuando alguien cree, edite o termine algo en Equipos, queda aquí con su nombre y la hora.</p></div>`; return; }
     let html = '', diaAnt = '';
@@ -206,14 +215,40 @@
           <p class="hist-cab"><b>${esc(mio ? 'Tú' : m.nombre || m.de)}</b><span class="meta">${esc(hora(t))}</span>${nuevo ? '<span class="pill s-listo">Nuevo</span>' : ''}</p>
           <p class="hist-titulo">${esc(m.titulo)}</p>
           ${lineas.length ? `<ul class="hist-lineas">${lineas.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}
-          ${m.serial ? `<button type="button" class="btn small" data-hi-eq="${esc(m.serial)}">${ico('equipos')}Ver ${esc(m.serial)}</button>` : ''}
+          ${m.serial || mio ? `<div class="hist-acciones">${m.serial ? `<button type="button" class="btn small" data-hi-eq="${esc(m.serial)}">${ico('equipos')}Ver ${esc(m.serial)}</button>` : ''}${mio ? `<button type="button" class="btn small ghost" data-hi-del="${esc(m.id)}" aria-label="Borrar este movimiento: ${esc(m.titulo)}">${ico('borrar')}Borrar</button>` : ''}</div>` : ''}
         </div></li>`;
     }
     l.innerHTML = html + '</ol>';
   }
+  /* ---------- borrar lo propio ---------- */
+  const enfocarLista = () => setTimeout(() => { const l = $('histLista'); if (abierta && l) l.focus({ preventScroll: true }); }, 80);
+  function borrarUno(id) {
+    const m = (lista || []).find(x => x.id === id);
+    if (!m || m.de !== yo.clave) return;
+    o.confirmar('¿Borrar este movimiento?', `«${m.titulo}» se borra del historial, para todos. No se puede deshacer.`, 'Borrar', () => {
+      S.F.deleteDoc(ref('actividad', id)).catch(e => o.toast('No se borró: ' + razon(e)));
+      enfocarLista();
+    });
+  }
+  function borrarMios() {
+    const n = (lista || []).filter(m => m.de === yo.clave).length;
+    if (!n) return;
+    o.confirmar('¿Borrar tus movimientos?', `Se borran tus ${n} ${n === 1 ? 'movimiento' : 'movimientos'} del historial, para todos. Los de otras personas no se tocan. No se puede deshacer.`, 'Borrar', async () => {
+      const s = await S.F.getDocs(S.F.query(col('actividad'), S.F.where('de', '==', yo.clave), S.F.limit(400))).catch(e => { o.toast('No se borró: ' + razon(e)); return null; });
+      if (!s) return;
+      const mios = s.docs.filter(d => d.data().de === yo.clave);
+      // De a 10 por lote: las reglas revisan que cada uno sea tuyo y Firestore limita cuánto pueden consultar por lote.
+      const lotes = [];
+      for (let i = 0; i < mios.length; i += 10) { const b = S.F.writeBatch(S.fs); mios.slice(i, i + 10).forEach(d => b.delete(d.ref)); lotes.push(b.commit()); }
+      Promise.all(lotes).then(() => o.toast(`Se borraron ${mios.length === 1 ? 'tu movimiento' : 'tus ' + mios.length + ' movimientos'}`), e => o.toast('No se borró todo: ' + razon(e)));
+      enfocarLista();
+    });
+  }
   function clicPantalla(e) {
-    const b = e.target.closest('[data-hi],[data-hi-f],[data-hi-eq]'); if (!b) return;
+    const b = e.target.closest('[data-hi],[data-hi-f],[data-hi-eq],[data-hi-del]'); if (!b) return;
     if (b.dataset.hi === 'cerrar') return cerrar();
+    if (b.dataset.hi === 'borrar-mios') return borrarMios();
+    if (b.dataset.hiDel) return borrarUno(b.dataset.hiDel);
     if (b.dataset.hiF !== undefined) { filtro = b.dataset.hiF; pintarPanel(); const c = $('histChips').querySelector(`[data-hi-f="${CSS.escape(filtro)}"]`); if (c) c.focus({ preventScroll: true }); return; }
     if (b.dataset.hiEq && o.abrirEquipo) o.abrirEquipo(b.dataset.hiEq);
   }

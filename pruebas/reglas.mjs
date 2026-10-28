@@ -170,10 +170,39 @@ await t('historial: más de 12 líneas, líneas que no son lista o campos de má
   await assertFails(J1.doc(`${ACT}/h8`).set(mov({ lineas: 'una sola' })));
   await assertFails(J1.doc(`${ACT}/h9`).set(mov({ extra: 1 })));
 })());
-await t('historial: no se edita ni se borra lo reciente (ni quien lo escribió)', (async () => {
+await t('historial: no se edita lo anotado (ni quien lo escribió)', (async () => {
   await assertFails(J1.doc(`${ACT}/h1`).update({ titulo: 'cambiado' }));
-  await assertFails(J1.doc(`${ACT}/h1`).delete());
+  await assertFails(J1.doc(`${ACT}/h1`).update({ de: 'ana' }));
+})());
+await t('historial: lo reciente solo lo borra quien lo anotó (no otra persona, ni alguien sin nombre en el chat, ni sin sesión)', (async () => {
   await assertFails(LUIS.doc(`${ACT}/h1`).delete());
+  await assertFails(ANA.doc(`${ACT}/h1`).delete());
+  await assertFails(como('tel-pedro').doc(`${ACT}/h1`).delete());
+  await assertFails(db.doc(`${ACT}/h1`).delete());
+})());
+await t('historial: quien lo anotó lo borra, también uno por uno y desde su otro teléfono vinculado', (async () => {
+  await assertSucceeds(J1.doc(`${ACT}/h1`).delete());
+  await assertSucceeds(J1.doc(`${ACT}/h2`).delete());
+  await assertSucceeds(J1.doc(`${ACT}/h10`).set(mov({ titulo: 'Para borrar desde otro teléfono' })));
+  await assertSucceeds(J1.doc(`${G}/jeiler`).update({ uids: FV.arrayUnion('tel-jeiler-3') }));
+  await assertSucceeds(como('tel-jeiler-3').doc(`${ACT}/h10`).delete());
+})());
+await t('historial: "Borrar mis movimientos" borra de a 10 por lote (lo que usa la app) y un lote con uno ajeno falla entero', (async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    const d = c.firestore();
+    for (let i = 0; i < 10; i++) await d.doc(`${ACT}/lote${i}`).set({ de: 'jeiler', nombre: 'Jeiler', en: dias(1), titulo: 'mío ' + i });
+    await d.doc(`${ACT}/ajeno`).set({ de: 'luis', nombre: 'Luis', en: dias(1), titulo: 'de Luis' });
+  });
+  const mezcla = J1.batch(); for (let i = 0; i < 9; i++) mezcla.delete(J1.doc(`${ACT}/lote${i}`)); mezcla.delete(J1.doc(`${ACT}/ajeno`));
+  await assertFails(mezcla.commit());
+  const lote = J1.batch(); for (let i = 0; i < 10; i++) lote.delete(J1.doc(`${ACT}/lote${i}`));
+  await assertSucceeds(lote.commit());
+  await assertSucceeds(LUIS.doc(`${ACT}/ajeno`).delete());
+})());
+await t('historial: cada quien borra lo suyo y no lo de otro', (async () => {
+  await assertSucceeds(ANA.doc(`${ACT}/h11`).set(mov({ de: 'ana', nombre: 'Ana', titulo: 'Lo de Ana' })));
+  await assertFails(J1.doc(`${ACT}/h11`).delete());
+  await assertSucceeds(ANA.doc(`${ACT}/h11`).delete());
 })());
 await t('historial: lo de más de 30 días lo borra cualquiera con sesión; lo de 29 no', (async () => {
   await env.withSecurityRulesDisabled(async c => {
