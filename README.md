@@ -55,6 +55,11 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - **Última copia** (las tres apps, en "Copia de seguridad y acceso"): dice cuándo se descargó la copia en ese teléfono; si nunca o hace 30 días o más, lo resalta. Se guarda en el teléfono (`nube_<app>_copia`): no sabe si otra persona hizo la copia.
 - Prueba: `node pruebas/datos.mjs`.
 
+## Bodega y Descargado en Entregas (v33)
+- **Bodega**: una entrega a nombre de "Bodega…" no le da el equipo a nadie, se queda aquí. Esa hoja ya no dice **Entrega**: la etiqueta, el título de la hoja abierta, el campo Tipo, el Excel, el nombre del PDF y la ficha del equipo en Equipos dicen **Bodega**. Hay un filtro **Bodega** aparte; **Entregas** cuenta solo las que se dieron a una persona. Es solo cómo se muestra: el tipo guardado sigue siendo `entrega`, así que las hojas de antes (como "Bodega Riohacha") cambian solas, sin tocar los datos.
+- **Descargado**: al bajar el PDF de una hoja se guarda `descargado: { por, fecha }` (la última descarga). La tarjeta muestra **Descargado**, quién y cuándo, y la hoja abierta dice "Descargada por…". Bajar el PDF no cambia `actualizado` ni `por`. En modo solo lectura no se anota.
+- Prueba: `node pruebas/bodega-descarga.mjs` (pdf-lib viene de internet, así que la prueba usa uno de mentira que arma un PDF vacío).
+
 ## Soporte con las otras apps abiertas (v32)
 - Equipos, Entregas y Evidencias comparten el almacenamiento del navegador y **una sola conexión de Firestore entre pestañas** (la lleva la que se abrió primero). Si esa no tenía el inicio de sesión anónimo del chat, Soporte mostraba **"Falta pegar las reglas"** aunque las reglas estuvieran bien, y se quitaba solo al cerrar esa pestaña. Por eso salía "a veces".
 - Ahora las tres apps abren Firebase Authentication antes de Firestore (`nube.js`, `abrirAuth`) y usan el mismo usuario anónimo. Además el chat reintenta unas veces un "permiso denegado" del arranque antes de culpar a las reglas.
@@ -90,7 +95,7 @@ npm run lighthouse  # velocidad, accesibilidad y buenas prácticas (solo avisa)
 
 ## Cómo se enlazan Entregas y Equipos
 - Hoja de **devolución**: crea un pendiente en Recibidos. La hoja guarda `recibidos: { SERIAL: id }` y el pendiente guarda `hoja` y `devueltoPor`.
-- Al dar **Listo** en Equipos se escoge a quién queda asignado (Bodega Riohacha, quien lo devolvió u otra persona). La hoja pasa a **Entrega** a ese nombre y guarda `devolucion: { nombre, cedula, fecha }`.
+- Al dar **Listo** en Equipos se escoge a quién queda asignado (Bodega Riohacha, quien lo devolvió u otra persona). La hoja pasa a **Entrega** a ese nombre y guarda `devolucion: { nombre, cedula, fecha }`. Si el equipo queda en **Bodega**, la hoja se ve como **Bodega** (v33).
 - Hoja de **entrega**: asigna el equipo y guarda `antes: { SERIAL: a quién estaba asignado }` para devolverlo si se borra la hoja.
 - **Borrar** en cualquiera de las dos apps ofrece borrar también en la otra.
 - Corregir una hoja solo cambia la diferencia: no repite pendientes y quita los que sobran.

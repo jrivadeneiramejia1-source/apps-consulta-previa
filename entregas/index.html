@@ -34,6 +34,8 @@ label.subir { cursor: pointer; }
 .pill.t-entrega { color: var(--listo); background: var(--listo-bg); }
 .pill.t-devolucion { color: var(--disco); background: var(--disco-bg); }
 .pill.t-otro { color: var(--pend); background: var(--pend-bg); }
+.pill.t-bodega { color: var(--org); background: var(--org-bg); }
+.descarga { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
 .card.pag { gap: 12px; }
 .card.pag.fuera { opacity: .55; }
 .card.pag.unida { box-shadow: inset 4px 0 0 var(--accent), var(--shadow-sm); padding-left: 18px; }
@@ -242,7 +244,7 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "32"};</script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "33"};</script>
 <script src="../iconos.js?v=32"></script>
 <script src="../comun.js?v=32"></script>
 <script src="escaner.js?v=32"></script>
@@ -441,6 +443,10 @@ function toast(msg) { const t = $('toast'); UI.tostada(t, msg); clearTimeout(toa
 function nuevoId(p) { return p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function sello() { return { actualizado: new Date().toISOString(), por: miId || '' }; }
 const tipoNombre = k => (TIPOS.find(t => t.k === k) || TIPOS[0]).n;
+// Una hoja a nombre de Bodega no le entrega el equipo a nadie: se queda aquí. Se muestra como Bodega, aunque el tipo guardado siga siendo 'entrega'.
+const esBodega = e => (e.tipo || 'entrega') === 'entrega' && /^bodega/.test(sinTildes(e.nombre).trim());
+const etiquetaTipo = e => esBodega(e) ? 'Bodega' : tipoNombre(e.tipo);
+const nombreOpcionTipo = (t, e) => t.k === 'entrega' && esBodega(e) ? 'Bodega' : t.n;
 const lista = () => [...ENT.entries()].map(([id, e]) => Object.assign({ id }, e));
 // Corre las tareas de a n a la vez. Si una falla, no empieza más, espera las que iban y lanza el primer error.
 async function enParalelo(tareas, n) {
@@ -586,9 +592,9 @@ function pintarEspacio() {
 }
 
 /* ================= HOJAS GUARDADAS ================= */
-const FILTROS = [{ k: 'todos', n: 'Todas' }, { k: 'mes', n: 'De este mes' }, { k: 'entrega', n: 'Entregas' }, { k: 'devolucion', n: 'Devoluciones' }, { k: 'otro', n: 'Otras' }, { k: 'sindatos', n: 'Sin nombre o fecha' }];
+const FILTROS = [{ k: 'todos', n: 'Todas' }, { k: 'mes', n: 'De este mes' }, { k: 'entrega', n: 'Entregas' }, { k: 'devolucion', n: 'Devoluciones' }, { k: 'bodega', n: 'Bodega' }, { k: 'otro', n: 'Otras' }, { k: 'sindatos', n: 'Sin nombre o fecha' }];
 const textoDe = e => sinTildes([e.nombre, e.cedula, e.seriales, e.proyecto, textoEquipos(equiposDe(e)), e.nota, e.origen].join(' '));
-function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'mes') return (e.fecha || '').startsWith(hoyIso().slice(0, 7)); if (f === 'sindatos') return !e.nombre || !e.fecha; return (e.tipo || 'entrega') === f; }
+function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'mes') return (e.fecha || '').startsWith(hoyIso().slice(0, 7)); if (f === 'sindatos') return !e.nombre || !e.fecha; if (f === 'bodega') return esBodega(e); return (e.tipo || 'entrega') === f && !esBodega(e); }
 // Qué pasa con la hoja en Equipos: devolución en espera, o entrega que antes fue devolución.
 function estadoHoja(e) {
   if (e.devolucion && e.tipo === 'entrega') return `<span class="meta">Antes: devolución de ${esc(e.devolucion.nombre || 'sin nombre')} (${fechaBonita(e.devolucion.fecha)})</span>`;
@@ -598,6 +604,12 @@ function estadoHoja(e) {
   const pend = rs.filter(x => !x.cerrado).length;
   return pend ? `<span><span class="pill s-org">${ico('reloj')}En Recibidos, sin terminar</span></span>` : `<span><span class="pill s-disco">${ico('checkCirculo')}Equipo ya listo en Equipos</span></span>`;
 }
+// Quién bajó el PDF de la hoja y cuándo (se guarda al descargarlo; la última descarga).
+function avisoDescarga(e) {
+  const d = e.descargado; if (!d || !d.fecha) return '';
+  return `<span class="descarga"><span class="pill s-pend">${ico('descargar')}Descargado</span><span class="meta">${d.por ? 'por ' + esc(d.por) + ' · ' : ''}${esc(hace(d.fecha))}</span></span>`;
+}
+const textoDescarga = e => e.descargado && e.descargado.fecha ? ` Descargada${e.descargado.por ? ' por ' + e.descargado.por : ''} ${hace(e.descargado.fecha)}.` : '';
 function renderEnt() {
   pintarAvisoEnlace();
   const todos = lista(), mes = hoyIso().slice(0, 7);
@@ -621,14 +633,15 @@ function renderEnt() {
   ver.forEach(e => {
     const g = mesDe(e.fecha);
     if (g !== grupo) { grupo = g; html += `<div class="month">${esc(g)}</div>`; }
-    const n = (e.paginas || []).length;
+    const n = (e.paginas || []).length, tp = esBodega(e) ? 'bodega' : (e.tipo || 'entrega');
     html += `<button type="button" class="card hoja" data-en="${esc(e.id)}">
       ${e.miniatura ? `<img class="mini-hoja" src="${esc(e.miniatura)}" alt="" loading="lazy">` : `<span class="mini-hoja vacia">${ico('hojaVacia')}</span>`}
       <span class="hoja-t">
-        <span class="card-head"><span class="card-title">${esc(e.nombre || 'Sin nombre')}</span><span class="pill t-${esc(e.tipo || 'entrega')}">${e.tipo === 'otro' ? '' : ico(e.tipo === 'devolucion' ? 'devolucion' : 'entrega')}${tipoNombre(e.tipo)}</span></span>
+        <span class="card-head"><span class="card-title">${esc(e.nombre || 'Sin nombre')}</span><span class="pill t-${esc(tp)}">${tp === 'otro' ? '' : ico(tp === 'devolucion' ? 'devolucion' : tp === 'bodega' ? 'otro' : 'entrega')}${etiquetaTipo(e)}</span></span>
         <span class="facts"><span class="mono">${fechaBonita(e.fecha)}</span>${e.cedula ? `<span>CC ${esc(e.cedula)}</span>` : ''}<span>${n} ${n === 1 ? 'página' : 'páginas'}</span></span>
         ${equiposDe(e).length ? `<span class="meta mono">${esc(textoSeriales(equiposDe(e)))}</span>` : ''}
         ${estadoHoja(e)}
+        ${avisoDescarga(e)}
         ${!e.nombre || !e.fecha ? `<span><span class="pill rev">${ico('aviso')}Falta completar datos</span></span>` : ''}
       </span>
     </button>`;
@@ -1098,22 +1111,23 @@ function abrirEn(id) {
   const e = ENT.get(id); if (!e) { toast('Esa hoja ya no existe.'); return; }
   enActual = id;
   $('enTitle').textContent = e.nombre || 'Sin nombre';
-  $('enSub').textContent = `${tipoNombre(e.tipo)} · ${fechaBonita(e.fecha)} · ${(e.paginas || []).length} ${(e.paginas || []).length === 1 ? 'página' : 'páginas'}`;
-  $('enTipo').innerHTML = TIPOS.map(t => `<option value="${t.k}">${t.n}</option>`).join('');
+  $('enSub').textContent = `${etiquetaTipo(e)} · ${fechaBonita(e.fecha)} · ${(e.paginas || []).length} ${(e.paginas || []).length === 1 ? 'página' : 'páginas'}`;
+  $('enTipo').innerHTML = TIPOS.map(t => `<option value="${t.k}">${nombreOpcionTipo(t, e)}</option>`).join('');
   $('enNombre').value = e.nombre || ''; $('enCedula').value = e.cedula || ''; $('enFecha').value = e.fecha || '';
   $('enTipo').value = e.tipo || 'entrega'; $('enProyecto').value = e.proyecto || ''; $('enEqs').innerHTML = filasEquipos(equiposDe(e), soloLectura); $('enNota').value = e.nota || '';
   $('enErr').hidden = true;
   pintarSync(e);
-  $('enEditado').textContent = e.actualizado ? `Subida ${hace(e.subido)}${e.por ? ' por ' + e.por : ''}. Origen: ${e.origen || 'sin dato'}.` : '';
+  pintarEditado(e);
   $('enForm').querySelectorAll('input, select, textarea').forEach(x => { x.disabled = soloLectura; });
   $('enMasEstado').textContent = '';
   pintarPaginasEn(id); pintarSugEn();
   $('enSheet').hidden = false;
   fotoEn = UI.foto($('enForm'));
 }
+function pintarEditado(e) { $('enEditado').textContent = (e.actualizado ? `Subida ${hace(e.subido)}${e.por ? ' por ' + e.por : ''}. Origen: ${e.origen || 'sin dato'}.` : '') + textoDescarga(e); }
 function pintarPaginasEn(id) {
   const e = ENT.get(id); if (!e) return;
-  $('enSub').textContent = `${tipoNombre(e.tipo)} · ${fechaBonita(e.fecha)} · ${(e.paginas || []).length} ${(e.paginas || []).length === 1 ? 'página' : 'páginas'}`;
+  $('enSub').textContent = `${etiquetaTipo(e)} ·${fechaBonita(e.fecha)} · ${(e.paginas || []).length} ${(e.paginas || []).length === 1 ? 'página' : 'páginas'}`;
   $('enPaginas').innerHTML = (e.paginas || []).map((p, i) => `<button type="button" class="pagina" data-pv="${i}"><img src="${esc(e.miniatura)}" alt="" class="borrosa" data-pi="${i}"><span class="meta">Cargando página ${i + 1}…</span></button>`).join('');
   (e.paginas || []).forEach(async (p, i) => {
     const caja = $('enPaginas').querySelector(`[data-pv="${i}"]`);
@@ -1222,8 +1236,13 @@ async function descargarPdf(id) {
       const img = await doc.embedJpg(bytes), w = 595.28, h = w * img.height / img.width;
       doc.addPage([w, h]).drawImage(img, { x: 0, y: 0, width: w, height: h });
     }
-    const nombre = `${tipoNombre(e.tipo)} ${e.nombre || 'sin nombre'} ${e.fecha || ''}`.trim().replace(/[\\/:*?"<>|]/g, '');
+    const nombre = `${esBodega(e) ? '' : tipoNombre(e.tipo) + ' '}${e.nombre || 'sin nombre'} ${e.fecha || ''}`.trim().replace(/[\\/:*?"<>|]/g, '');
     await DL.save({ filename: nombre + '.pdf', data: new Blob([await doc.save()], { type: 'application/pdf' }) });
+    // Queda anotado quién lo descargó y cuándo, para que en la lista se vea que esa hoja ya se bajó.
+    if (!soloLectura && ENT.has(id)) {
+      escribir({ tipo: 'update', col: COL, id, data: { descargado: { por: miId || '', fecha: new Date().toISOString() } } });
+      if (enActual === id) pintarEditado(ENT.get(id));
+    }
   } catch (err) { toast('No se pudo preparar el PDF: ' + (err.message || err)); }
   finally { btn.disabled = false; txt.textContent = 'Descargar PDF'; }
 }
@@ -1249,7 +1268,7 @@ function renderDb() {
   $('dbTable').innerHTML = `<table class="teq"><thead><tr><th class="stk1">Nombre</th><th>Cédula</th><th>Fecha</th><th>Tipo</th><th>Proyecto</th><th>Equipos</th><th>Nota</th><th>Páginas</th><th>Origen</th><th class="solo-editar"><span class="sr">Borrar</span></th></tr></thead><tbody>${ver.map(e => `<tr data-id="${esc(e.id)}">
     <td class="stk1"><input type="text" class="m" data-f="nombre" value="${esc(e.nombre)}" ${ro} aria-label="Nombre" list="dlNombres"></td>
     ${inp(e, 'cedula', 'm', 'Cédula')}${inp(e, 'fecha', '', 'Fecha', 'date')}
-    <td><select data-f="tipo" ${ro} aria-label="Tipo">${TIPOS.map(t => `<option value="${t.k}" ${(e.tipo || 'entrega') === t.k ? 'selected' : ''}>${t.n}</option>`).join('')}</select></td>
+    <td><select data-f="tipo" ${ro} aria-label="Tipo">${TIPOS.map(t => `<option value="${t.k}" ${(e.tipo || 'entrega') === t.k ? 'selected' : ''}>${nombreOpcionTipo(t, e)}</option>`).join('')}</select></td>
     ${inp(e, 'proyecto', 'm', 'Proyecto')}<td><div class="cell mono">${esc(textoEquipos(equiposDe(e))) || 'Sin equipos'}</div></td>${inp(e, 'nota', 'w', 'Nota')}
     <td class="num">${(e.paginas || []).length}</td><td><div class="cell">${esc(e.origen)}</div></td>
     <td class="solo-editar"><button type="button" class="icon-btn" data-del="${esc(e.id)}" aria-label="Borrar la hoja de ${esc(e.nombre || 'sin nombre')}">${ico('borrar')}Borrar</button></td>
@@ -1265,7 +1284,7 @@ function editarCelda(el) {
 async function descargarExcel() {
   if (!DL) return;
   const filas = [['NOMBRE', 'CÉDULA', 'FECHA', 'TIPO', 'PROYECTO', 'EQUIPOS', 'NOTA', 'PÁGINAS', 'ARCHIVO DE ORIGEN', 'SUBIDA POR', 'FECHA DE SUBIDA']]
-    .concat(lista().sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || ''))).map(e => [e.nombre || '', e.cedula || '', fechaBonita(e.fecha), tipoNombre(e.tipo), e.proyecto || '', textoEquipos(equiposDe(e)), e.nota || '', (e.paginas || []).length, e.origen || '', e.por || '', e.subido ? e.subido.slice(0, 10) : '']));
+    .concat(lista().sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || ''))).map(e => [e.nombre || '', e.cedula || '', fechaBonita(e.fecha), etiquetaTipo(e), e.proyecto || '', textoEquipos(equiposDe(e)), e.nota || '', (e.paginas || []).length, e.origen || '', e.por || '', e.subido ? e.subido.slice(0, 10) : '']));
   try {
     if (!window.XLSX) { try { await cargarScript(XLSX_URL); } catch (e) {} }
     let data, filename = `Entregas Consulta Previa ${hoyIso()}`;

@@ -285,7 +285,7 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "32"};</script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "33"};</script>
 <script src="../iconos.js?v=32"></script>
 <script src="../comun.js?v=32"></script>
 <script src="../codigos.js?v=32"></script>
@@ -890,7 +890,7 @@ async function borrarHojaEntregas(hid, ridYa) {
 function pintarEnlace() {
   const ok = !!ENTDB;
   $('enlaceInfo').textContent = ok
-    ? 'Conectada. Al dar Listo a una devolución, su hoja en Entregas pasa a Entrega con el nombre de quien quedó el equipo. Al borrar un registro puedes borrar también su hoja.'
+    ? 'Conectada. Al dar Listo a una devolución, su hoja en Entregas pasa a Entrega con el nombre de quien quedó el equipo (si queda en Bodega, la hoja dice Bodega). Al borrar un registro puedes borrar también su hoja.'
     : 'No conectada. Toca Conectar y escribe la clave de la app de Entregas.';
   $('enlaceBtn').innerHTML = ok ? `<button class="btn danger" type="button" data-enlace="quitar">${ico('desenlace')}Desconectar</button>` : `<button class="btn primary" type="button" data-enlace="poner">${ico('enlace')}Conectar con Entregas</button>`;
 }
@@ -1674,7 +1674,7 @@ function pintarHojasEq(id) {
   $('eqHojasTit').textContent = `Hojas en Entregas · ${l.length}`;
   $('eqHojas').innerHTML = l.length ? l.map(([hid, h]) => `<a class="hoja-ent" href="../entregas/?hoja=${encodeURIComponent(hid)}" target="_blank" rel="noopener">
       ${h.miniatura ? `<img src="${esc(h.miniatura)}" alt="" loading="lazy">` : `<span class="mini-vacia">${ico('hojaVacia')}</span>`}
-      <span class="t"><b>${esc(h.tipo === 'devolucion' ? 'Devolución' : h.tipo === 'otro' ? 'Otra hoja' : 'Entrega')} · ${esc(h.nombre || 'Sin nombre')}</b><span class="meta mono">${fechaBonita(h.fecha)} · ${(h.paginas || []).length} ${(h.paginas || []).length === 1 ? 'página' : 'páginas'}</span></span>
+      <span class="t"><b>${esc(h.tipo === 'devolucion' ? 'Devolución' : h.tipo === 'otro' ? 'Otra hoja' : /^bodega/.test(sinTildes(h.nombre).trim()) ? 'Bodega' : 'Entrega')} · ${esc(h.nombre || 'Sin nombre')}</b><span class="meta mono">${fechaBonita(h.fecha)} · ${(h.paginas || []).length} ${(h.paginas || []).length === 1 ? 'página' : 'páginas'}</span></span>
       <span class="flecha">${ico('flecha')}</span><span class="sr">(se abre en Entregas)</span></a>`).join('')
     : '<p class="meta">Este equipo no aparece en ninguna hoja de Entregas.</p>';
 }
