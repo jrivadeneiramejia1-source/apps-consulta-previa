@@ -192,6 +192,7 @@ select.search { padding-left: 14px; background: var(--surface) var(--flecha) no-
 .chip:hover { border-color: var(--line-2); }
 .chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .chip .n { font-family: var(--f-mono); font-size: .76rem; margin-left: 2px; opacity: .8; }
+.chip[aria-pressed="true"] .n { opacity: 1; }   /* sobre el color de acento, con .8 el contraste bajaba de 4,5:1 */
 .count { font-size: .82rem; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 /* Tarjetas */
@@ -614,4 +615,5 @@ body.con-chat { overflow: hidden; }
 .hist-cab b { font-family: var(--f-display); font-weight: 720; }
 .hist-titulo { font-weight: 650; overflow-wrap: anywhere; }
 .hist-lineas { margin: 0; padding-left: 18px; color: var(--muted); font-size: .88rem; overflow-wrap: anywhere; }
-.hist-cuerpo .btn { align-self: flex-start; margin-top: 4px; }
+.hist-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.hist-barra { width: 100%; max-width: 760px; margin: 0 auto; padding: 8px 12px 0; }

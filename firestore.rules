@@ -88,7 +88,8 @@ service cloud.firestore {
 
     // ---------- Historial de movimientos (app Equipos, pestaña Soporte) ----------
     // Cada cambio que alguien hace en Equipos deja una línea: quién, cuándo y qué. Cualquier teléfono con sesión las lee.
-    // Se escribe una vez y no se edita (no hay "update"). Lo de más de 30 días lo puede borrar cualquier teléfono (limpieza).
+    // Se escribe una vez y no se edita (no hay "update"). Cada persona borra solo los suyos (con un teléfono suyo, como en el chat);
+    // lo de más de 30 días lo puede borrar cualquier teléfono (limpieza).
     match /espacios/{espacio}/actividad/{id} {
       allow read: if espacio.size() == 40 && request.auth != null;
       allow create: if espacio.size() == 40 && request.auth != null
@@ -101,7 +102,8 @@ service cloud.firestore {
         && (!('serial' in request.resource.data) || (request.resource.data.serial is string && request.resource.data.serial.size() <= 60))
         && (!('lineas' in request.resource.data) || (request.resource.data.lineas is list && request.resource.data.lineas.size() <= 12));
       allow delete: if espacio.size() == 40 && request.auth != null
-        && resource.data.en is timestamp && resource.data.en < hace(30);
+        && ((resource.data.de is string && esDe(espacio, resource.data.de))
+          || (resource.data.en is timestamp && resource.data.en < hace(30)));
     }
   }
 }

@@ -119,6 +119,30 @@ try {
     const borradas = await page.evaluate(() => Historial.limpiar());
     const despues = await fsDe(page);
     log('V2. la limpieza borra lo de más de 30 días y deja lo demás', borradas === 1 && !despues[`${B}/actividad/a4`] && !!despues[`${B}/actividad/a1`] && Object.keys(despues).filter(k => k.includes('/actividad/')).length === antes - 1, `${borradas} / ${antes}`);
+
+    // ---------- borrar lo propio ----------
+    console.log('\nBorrar lo propio');
+    await page.click('#tabSo'); await page.click('#soHist .so-fila'); await page.waitForSelector('#histPantalla:not([hidden])');
+    const propios = await page.locator('#histLista [data-hi-del]').count(), items0 = await page.locator('#histLista .hist-item').count();
+    const ajenosAntes = Object.values(await fsDe(page)).filter(v => v && v.de && v.de !== 'jeiler' && v.titulo).length;
+    log('B1. solo lo mío tiene el botón Borrar (lo de Ana y Luis no)', propios > 5 && propios < items0 && await page.locator('#histLista .hist-item').filter({ has: page.locator('.hist-cab b', { hasText: /^Ana Gómez$/ }) }).locator('[data-hi-del]').count() === 0, `${propios} de ${items0}`);
+    log('B2. arriba dice "Borrar mis movimientos" con cuántos son', (await page.locator('#histBarra').innerText()).replace(/\s+/g, ' ').trim() === `Borrar mis movimientos (${propios})`, await page.locator('#histBarra').innerText());
+    await axe(page, 'historial con los botones de borrar');
+    const id1 = await page.locator('#histLista [data-hi-del]').first().getAttribute('data-hi-del');
+    await page.locator('#histLista [data-hi-del]').first().click(); await page.waitForSelector('#cfSheet:not([hidden])');
+    log('B3. pide confirmar y dice qué movimiento se borra', /¿Borrar este movimiento\?/.test(await page.textContent('#cfTitle')) && /se borra del historial, para todos/.test(await page.textContent('#cfText')));
+    await page.click('#cfNo'); await esp(250);
+    log('B4. si dices que no, no se borra nada', !!(await fsDe(page))[`${B}/actividad/${id1}`] && await page.locator('#histLista [data-hi-del]').count() === propios);
+    await page.locator('#histLista [data-hi-del]').first().click(); await page.waitForSelector('#cfSheet:not([hidden])'); await page.click('#cfYes'); await esp(500);
+    log('B5. al confirmar se borra ese movimiento y desaparece de la lista', !(await fsDe(page))[`${B}/actividad/${id1}`] && await page.locator('#histLista [data-hi-del]').count() === propios - 1 && (await page.locator('#histBarra').innerText()).includes(`(${propios - 1})`));
+    await page.click('#histBarra [data-hi="borrar-mios"]'); await page.waitForSelector('#cfSheet:not([hidden])');
+    log('B6. "Borrar mis movimientos" pide confirmar con el número', /¿Borrar tus movimientos\?/.test(await page.textContent('#cfTitle')) && new RegExp(`tus ${propios - 1} movimientos`).test(await page.textContent('#cfText')), await page.textContent('#cfText'));
+    await page.click('#cfYes'); await esp(800);
+    const quedan = await fsDe(page), mios = Object.entries(quedan).filter(([k, v]) => k.includes('/actividad/') && v.de === 'jeiler').length, ajenos = Object.values(quedan).filter(v => v && v.de && v.de !== 'jeiler' && v.titulo).length;
+    log('B7. se borran todos los míos y los de las otras personas quedan', mios === 0 && ajenos === ajenosAntes, `${mios} míos / ${ajenos} de otros (antes ${ajenosAntes})`);
+    log('B8. la lista queda solo con lo de otros: sin botón Borrar, sin barra y sin el filtro "Tú"', await page.locator('#histLista [data-hi-del]').count() === 0 && await page.locator('#histBarra').isHidden() && !(await page.locator('#histChips').innerText()).includes('Tú'), await page.locator('#histChips').innerText());
+    log('B9. avisa cuántos se borraron', /Se borraron tus \d+ movimientos/.test(await page.locator('#toast').textContent().catch(() => '')), await page.locator('#toast').textContent().catch(() => ''));
+    await page.keyboard.press('Escape'); await esp(200);
     log('sin errores en la página', errs.length === 0, errs.join('\n      '));
     await ctx.close();
   }

@@ -1,6 +1,6 @@
 {
   "name": "apps-consulta-previa",
-  "version": "34.0.0",
+  "version": "35.0.0",
   "private": true,
   "description": "Apps Equipos, Entregas y Evidencias de Consulta Previa. Este archivo solo sirve para las pruebas automáticas; las apps no necesitan compilarse.",
   "type": "module",
