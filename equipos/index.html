@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=32">
+<link rel="stylesheet" href="../comun.css?v=34">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -81,6 +81,7 @@
   <!-- SECCIÓN: SOPORTE (chat) -->
   <section class="view" id="vSo" aria-labelledby="tSo" hidden>
     <h2 class="titulo-vista" id="tSo">Soporte</h2>
+    <div class="list" id="soHist"></div>
     <div class="list" id="soLista"></div>
   </section>
 
@@ -285,13 +286,14 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "33"};</script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "34"};</script>
 <script src="../iconos.js?v=32"></script>
 <script src="../comun.js?v=32"></script>
 <script src="../codigos.js?v=32"></script>
 <script src="../config.js?v=32"></script>
 <script src="../nube.js?v=32"></script>
 <script src="chat.js?v=32"></script>
+<script src="historial.js?v=34"></script>
 <script>
 /* ================= CONSTANTES ================= */
 const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas';
@@ -324,6 +326,7 @@ const CAB_EXCEL = ['SERIAL', 'TIPO DE EQUIPO', 'MARCA', 'MODELO', 'ASIGNADO A', 
 let Q = new Map(), R = new Map(), T = new Map();   // equipos, recibidos y tareas: id -> datos
 let DB = null, USER = null, DL = null, miId = null, puedeEscribir = null, soloLectura = false;
 let ENTDB = null;   // conexión con la app de Entregas (para actualizar o borrar la hoja de una devolución)
+let sinLeerChat = 0, sinVerHistorial = 0;   // la insignia de Soporte suma los mensajes sin leer y los movimientos nuevos de otras personas
 let filtroMt = 'prog', mtActual = null, listoT = false, tareasBloqueadas = false;
 let filtroResp = '';   // '' = todas las personas; '-' = sin responsable; o el nombre (sin tildes) del responsable
 let AV = new Map(), avisosBloqueados = false;   // teléfonos con sesión: id -> { nombre, equipo, visto, sub }
@@ -448,6 +451,7 @@ async function ejecutar(op) {
 }
 async function escribir(op) {
   if (soloLectura) { toast('Solo lectura: tu cuenta no puede editar.'); return false; }
+  anotarHistorial(op);
   aplicarLocal(op); guardarCacheLuego(); pedirRender();
   if (!DB) { guardarPendiente(op); return false; }
   const clave = op.col + '/' + op.id;
@@ -483,6 +487,73 @@ async function reintentarPendientes() {
   }
   lsSet(PEND_KEY, pendientes); pintarAvisos();
 }
+/* ================= HISTORIAL DE MOVIMIENTOS (Soporte) ================= */
+// Cada cambio hecho aquí se le pasa a historial.js, que lo anota con el nombre de quien lo hizo y la hora. Se compara con lo que había
+// antes para decir solo lo que cambió. Los cambios automáticos (op.silencio) no se anotan. Si algo falla, el guardado sigue igual.
+const ROT_HIST = {
+  [COL_Q]: { serial: 'Serial', tipo: 'Tipo', marca: 'Marca', modelo: 'Modelo', asignado: 'Asignado a', mail: 'Correo', cliente: 'Cliente', proyecto: 'Proyecto', departamento: 'Departamento', municipio: 'Municipio', fechaMtto: 'Último mantenimiento', fechaBackup: 'Último backup', fechaRemoto: 'Último antivirus', discoBackup: 'Disco del backup', anydesk: 'AnyDesk', obs: 'Observaciones' },
+  [COL_R]: { serial: 'Serial', tipo: 'Tipo', marca: 'Marca', modelo: 'Modelo', persona: 'Persona', proyecto: 'Proyecto', fechaIngreso: 'Llegó el', mtto: 'Mantenimiento', mttoFecha: 'Fecha del mantenimiento', backup: 'Backup', backupFecha: 'Fecha del backup', acc: 'Accesorios', obs: 'Observaciones' },
+  [COL_T]: { tipo: 'Tipo de tarea', fecha: 'Fecha', resp: 'Responsable', nota: 'Nota' }
+};
+function valorHist(k, v) {
+  if (v === null || v === undefined || v === '') return '(vacío)';
+  if (Array.isArray(v)) return v.join(', ') || '(vacío)';
+  if (typeof v === 'object') return '(vacío)';
+  if (k === 'mtto' || k === 'backup') return (TAREAS.find(t => t.k === v) || { n: v }).n.toLowerCase();
+  if (k === 'tipo' && TIPOS_T[v]) return TIPOS_T[v].c;
+  v = String(v).replace(/\s+/g, ' ').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return fechaBonita(v);
+  return v.length > 80 ? v.slice(0, 77) + '…' : v;
+}
+function cambiosHist(rot, previo, datos) {
+  const l = [];
+  for (const k of Object.keys(rot)) {
+    if (!(k in datos) || JSON.stringify(previo ? previo[k] ?? '' : '') === JSON.stringify(datos[k] ?? '')) continue;
+    l.push(previo && previo[k] ? `${rot[k]}: ${valorHist(k, previo[k])} → ${valorHist(k, datos[k])}` : `${rot[k]}: ${valorHist(k, datos[k])}`);
+  }
+  return l;
+}
+function describirHist(op, previo) {
+  const d = op.data || {}, base = op.tipo === 'set' ? d : Object.assign({}, previo, d);
+  const serial = String(base.serial || (op.col === COL_Q ? op.id : '') || '').toUpperCase();
+  const mov = (prio, titulo, lineas) => ({ serial, prio, titulo, lineas: (lineas || []).filter(Boolean) });
+  if (op.col === COL_Q) {
+    if (op.tipo === 'set') return mov(3, `Agregó el equipo ${serial}`, [[d.tipo, d.marca, d.modelo].filter(Boolean).join(' '), d.asignado && `Asignado a: ${d.asignado}`]);
+    if (op.tipo === 'delete') return mov(3, `Borró el equipo ${serial}`, [previo && previo.asignado && `Lo tenía: ${previo.asignado}`]);
+    const l = cambiosHist(ROT_HIST[COL_Q], previo, d);
+    return l.length ? mov(1, `Editó el equipo ${serial}`, l) : null;
+  }
+  if (op.col === COL_R) {
+    if (op.tipo === 'set') return mov(3, `Registró ${serial} en Recibidos`, [d.persona && `Persona: ${d.persona}`, d.obs && `Observaciones: ${valorHist('obs', d.obs)}`]);
+    if (op.tipo === 'delete') return mov(3, `Borró el registro de ${serial} en Recibidos`, [previo && previo.persona && `Persona: ${previo.persona}`]);
+    if (d.cerrado === true && !(previo && previo.cerrado)) return mov(5, `Dio Listo a ${serial}`, [d.cerradoA && `Quedó asignado a ${d.cerradoA}`].concat(cambiosHist(ROT_HIST[COL_R], previo, d)));
+    if (d.cerrado === false && previo && previo.cerrado) return mov(3, `Reabrió ${serial} en Recibidos`, []);
+    const l = cambiosHist(ROT_HIST[COL_R], previo, d);
+    return l.length ? mov(2, `Actualizó ${serial} en Recibidos`, l) : null;
+  }
+  if (op.col !== COL_T) return null;
+  const t = tipoT(base);
+  if (op.tipo === 'set') return mov(3, `Programó ${t.n.toLowerCase()} de ${serial}`, [d.fecha && `Para el ${fechaBonita(d.fecha)}`, d.resp && `Responsable: ${d.resp}`, d.nota && `Nota: ${valorHist('nota', d.nota)}`]);
+  if (op.tipo === 'delete') return mov(3, `Quitó ${t.n.toLowerCase()} de ${serial}`, []);
+  if (d.estado && previo && d.estado !== previo.estado) {
+    const ult = (d.hist || [])[(d.hist || []).length - 1] || {};
+    if (d.estado === 'hecho') return mov(4, `Hizo ${t.n.toLowerCase()} de ${serial}`, [d.hecho && d.hecho.disco && `Disco: ${d.hecho.disco}`, d.hecho && d.hecho.nota && d.hecho.nota !== 'Hecho en Recibidos' && `Nota: ${valorHist('nota', d.hecho.nota)}`]);
+    if (d.estado === 'encender') return mov(3, `Pidió prender ${serial} (${t.c})`, []);
+    if (d.estado === 'encendido') return mov(3, `Marcó prendido ${serial} (${t.c})`, []);
+    if (d.estado === 'nopudo') return mov(3, `No pudo hacer ${t.n.toLowerCase()} de ${serial}`, [ult.nota && `Motivo: ${valorHist('nota', ult.nota)}`]);
+  }
+  const l = cambiosHist(ROT_HIST[COL_T], previo, d);
+  return l.length ? mov(1, `Cambió la tarea de ${serial}`, l) : null;
+}
+function anotarHistorial(op) {
+  if (op.silencio || !window.Historial) return;
+  try {
+    const mapa = op.col === COL_Q ? Q : op.col === COL_T ? T : R, m = describirHist(op, mapa.get(op.id));
+    if (m) Historial.registrar(m);
+  } catch (e) { /* el historial nunca frena un guardado */ }
+}
+function pintarInsigniaSo() { UI.insignia($('badgeSo'), sinLeerChat + sinVerHistorial); }
+
 function ponerSoloLectura() { soloLectura = true; document.body.classList.add('ro'); pintarAvisos(); pedirRender(); }
 function marcarDesconectado() { conexion = 'off'; pintarConexion(); pintarAvisos(); pedirRender(); }
 
@@ -1484,8 +1555,8 @@ function migrarProgramados() {
   for (const [id, e] of Q) {
     if (!e.prog || !e.prog.fecha) continue;
     const tid = 'mig-' + id, p = e.prog;
-    if (!T.has(tid)) escribir({ tipo: 'set', col: COL_T, id: tid, data: { serial: e.serial, tipo: 'fisico', fecha: p.fecha, nota: p.nota || '', resp: p.resp || '', creadoPor: p.por || '', por: p.por || '', creado: p.creado || new Date().toISOString(), estado: 'pendiente', hist: [{ t: p.creado || new Date().toISOString(), quien: p.por || '', que: 'programada', nota: '' }] } });
-    escribir({ tipo: 'update', col: COL_Q, id, data: { prog: null } });
+    if (!T.has(tid)) escribir({ silencio: true, tipo: 'set', col: COL_T, id: tid, data: { serial: e.serial, tipo: 'fisico', fecha: p.fecha, nota: p.nota || '', resp: p.resp || '', creadoPor: p.por || '', por: p.por || '', creado: p.creado || new Date().toISOString(), estado: 'pendiente', hist: [{ t: p.creado || new Date().toISOString(), quien: p.por || '', que: 'programada', nota: '' }] } });
+    escribir({ silencio: true, tipo: 'update', col: COL_Q, id, data: { prog: null } });
   }
 }
 
@@ -1839,9 +1910,11 @@ async function iniciar() {
   }
   // Soporte (chat): arranca aparte; si falta algo (inicio anónimo, reglas, internet) lo explica en su pestaña.
   if (window.ChatSoporte) {
-    ChatSoporte.iniciar({ nombre: () => miId, toast, confirmar, avisar: (n, a) => enviarAviso(n, a, true), insignia: n => UI.insignia($('badgeSo'), n) });
+    ChatSoporte.iniciar({ nombre: () => miId, toast, confirmar, avisar: (n, a) => enviarAviso(n, a, true), insignia: n => { sinLeerChat = n; pintarInsigniaSo(); } });
     if (chatPedido) ChatSoporte.abrir(chatPedido);
   }
+  // Historial de movimientos (Soporte): lo que cada persona hace en Equipos. Si falta algo, lo explica en su fila.
+  if (window.Historial) Historial.iniciar({ nombre: () => miId, toast, insignia: n => { sinVerHistorial = n; pintarInsigniaSo(); }, abrirEquipo: serial => { const id = idSerial(serial); if (Q.has(id)) abrirEq(id); else toast('Ese equipo ya no está en la lista.'); } });
   if (!DB) { conexion = 'off'; pintarConexion(); pintarAvisos(); render(); return; }
   pintarAvisos(); suscribir(); reintentarPendientes();
   ENTDB = window.nube && typeof window.nube.enlace === 'function' ? window.nube.enlace('entregas') : null;
