@@ -146,6 +146,47 @@ await t('limpieza: alguien de afuera no borra un privado viejo', (async () => {
   await assertFails(LUIS.doc(`${CONV}/otroViejo`).delete());
 })());
 
+// ---------- Historial de movimientos (v34) ----------
+const ACT = `espacios/${H}/actividad`;
+const mov = (extra) => Object.assign({ de: 'jeiler', nombre: 'Jeiler', en: ahora(), serial: 'VB009911', titulo: 'Dio Listo a VB009911', lineas: ['Asignado a: Bodega → Luis'] }, extra || {});
+await t('historial: sin sesión no se lee ni se escribe', (async () => {
+  await assertFails(db.collection(ACT).get());
+  await assertFails(db.doc(`${ACT}/h0`).set(mov()));
+})());
+await t('historial: Jeiler anota lo que hizo y Ana y Luis lo leen', (async () => {
+  await assertSucceeds(J1.doc(`${ACT}/h1`).set(mov()));
+  await assertSucceeds(ANA.collection(ACT).orderBy('en', 'desc').limit(300).get());
+  await assertSucceeds(LUIS.doc(`${ACT}/h1`).get());
+})());
+await t('historial: sin serial ni líneas también se puede (solo título, quién y cuándo)', assertSucceeds(J1.doc(`${ACT}/h2`).set({ de: 'jeiler', nombre: 'Jeiler', en: ahora(), titulo: 'Borró un registro' })));
+await t('historial: hora inventada no', assertFails(J1.doc(`${ACT}/h3`).set(mov({ en: new Date(0) }))));
+await t('historial: sin título, con título vacío o de más de 200 no', (async () => {
+  await assertFails(J1.doc(`${ACT}/h4`).set({ de: 'jeiler', nombre: 'Jeiler', en: ahora() }));
+  await assertFails(J1.doc(`${ACT}/h5`).set(mov({ titulo: '' })));
+  await assertFails(J1.doc(`${ACT}/h6`).set(mov({ titulo: 'a'.repeat(201) })));
+})());
+await t('historial: más de 12 líneas, líneas que no son lista o campos de más no', (async () => {
+  await assertFails(J1.doc(`${ACT}/h7`).set(mov({ lineas: Array.from({ length: 13 }, (_, i) => 'l' + i) })));
+  await assertFails(J1.doc(`${ACT}/h8`).set(mov({ lineas: 'una sola' })));
+  await assertFails(J1.doc(`${ACT}/h9`).set(mov({ extra: 1 })));
+})());
+await t('historial: no se edita ni se borra lo reciente (ni quien lo escribió)', (async () => {
+  await assertFails(J1.doc(`${ACT}/h1`).update({ titulo: 'cambiado' }));
+  await assertFails(J1.doc(`${ACT}/h1`).delete());
+  await assertFails(LUIS.doc(`${ACT}/h1`).delete());
+})());
+await t('historial: lo de más de 30 días lo borra cualquiera con sesión; lo de 29 no', (async () => {
+  await env.withSecurityRulesDisabled(async c => {
+    const d = c.firestore();
+    await d.doc(`${ACT}/viejo`).set({ de: 'jeiler', nombre: 'Jeiler', en: dias(31), titulo: 'viejo' });
+    await d.doc(`${ACT}/casi`).set({ de: 'jeiler', nombre: 'Jeiler', en: dias(29), titulo: 'casi' });
+  });
+  await assertFails(db.doc(`${ACT}/viejo`).delete());
+  await assertFails(LUIS.doc(`${ACT}/casi`).delete());
+  await assertSucceeds(LUIS.doc(`${ACT}/viejo`).delete());
+})());
+await t('historial: otro espacio no se mezcla (largo distinto no se permite)', assertFails(J1.doc(`espacios/${'a'.repeat(39)}/actividad/h1`).set(mov())));
+
 await env.cleanup();
 console.log(`\n${ok} bien, ${mal} mal`);
 process.exit(mal ? 1 : 0);

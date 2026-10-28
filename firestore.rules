@@ -85,5 +85,23 @@ service cloud.firestore {
       allow delete: if espacio.size() == 40 && request.auth != null
         && (resource.data.uid == request.auth.uid || esDe(espacio, resource.data.clave));
     }
+
+    // ---------- Historial de movimientos (app Equipos, pestaña Soporte) ----------
+    // Cada cambio que alguien hace en Equipos deja una línea: quién, cuándo y qué. Cualquier teléfono con sesión las lee.
+    // Se escribe una vez y no se edita (no hay "update"). Lo de más de 30 días lo puede borrar cualquier teléfono (limpieza).
+    match /espacios/{espacio}/actividad/{id} {
+      allow read: if espacio.size() == 40 && request.auth != null;
+      allow create: if espacio.size() == 40 && request.auth != null
+        && request.resource.data.keys().hasOnly(['de', 'nombre', 'en', 'serial', 'titulo', 'lineas'])
+        && request.resource.data.keys().hasAll(['de', 'nombre', 'en', 'titulo'])
+        && request.resource.data.de is string && request.resource.data.de.size() > 0 && request.resource.data.de.size() <= 60
+        && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 60
+        && request.resource.data.en == request.time
+        && request.resource.data.titulo is string && request.resource.data.titulo.size() > 0 && request.resource.data.titulo.size() <= 200
+        && (!('serial' in request.resource.data) || (request.resource.data.serial is string && request.resource.data.serial.size() <= 60))
+        && (!('lineas' in request.resource.data) || (request.resource.data.lineas is list && request.resource.data.lineas.size() <= 12));
+      allow delete: if espacio.size() == 40 && request.auth != null
+        && resource.data.en is timestamp && resource.data.en < hace(30);
+    }
   }
 }

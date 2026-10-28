@@ -1,7 +1,7 @@
 /* Guarda la app en el teléfono para que abra rápido y sin internet.
    Páginas propias: primero internet (para recibir actualizaciones) y si no hay, la copia guardada.
    Librerías y fuentes externas: primero la copia guardada. Firestore no pasa por aquí. */
-const VERSION = 'entregas-v33';
+const VERSION = 'entregas-v34';
 const BASICOS = ['./', './index.html', './manifest.webmanifest', './escaner.js', './lector.js', '../comun.css', '../comun.js', '../iconos.js', '../codigos.js', '../lib/confetti.js', '../fuentes/bricolage.woff2', '../fuentes/jetbrains-mono-500.woff2', '../nube.js', '../config.js', '../iconos/entregas-192.png', '../iconos/entregas-512.png'];
 const EXTERNOS = ['www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
 // Las librerías van en un cajón aparte que no se borra al actualizar la app (el detector pesa unos 10 MB).

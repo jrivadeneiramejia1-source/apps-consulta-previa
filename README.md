@@ -60,6 +60,15 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - **Descargado**: al bajar el PDF de una hoja se guarda `descargado: { por, fecha }` (la última descarga). La tarjeta muestra **Descargado**, quién y cuándo, y la hoja abierta dice "Descargada por…". Bajar el PDF no cambia `actualizado` ni `por`. En modo solo lectura no se anota.
 - Prueba: `node pruebas/bodega-descarga.mjs` (pdf-lib viene de internet, así que la prueba usa uno de mentira que arma un PDF vacío).
 
+## Historial de movimientos en Soporte (v34)
+- **Equipos → Soporte → Historial de movimientos** (`equipos/historial.js`): cada cambio que alguien hace queda como una línea con **su nombre, la hora y qué cambió**. Sirve para que quien esté encargado de revisar vea lo que se hizo mientras no estaba, y diga "corrige esto".
+- Se anota: agregar, editar o borrar un equipo; registrar, actualizar, dar **Listo** o borrar un recibido; programar, cambiar, hacer o quitar una tarea de la Agenda. Dice solo lo que cambió (`Marca: HP → Dell`). Varios cambios del mismo equipo hechos en unos segundos se juntan en una sola línea (por ejemplo, "Dio Listo a X" con sus detalles).
+- Lo que hace otra persona suma en la **insignia de Soporte** (junto con los mensajes sin leer) y sale un aviso si tienes la app abierta. Lo que haces tú queda en la lista ("Tú") pero no avisa. Hay filtro por persona y "Ver [serial]" abre la ficha del equipo.
+- No se anota: lo automático (migración de la Agenda), el Excel/copia que se importa, ni lo que se hace en Entregas.
+- Todos ven todo y nadie lo edita ni lo borra a mano. Se **borra solo a los 30 días** (cualquier teléfono que abra la app, máximo dos veces al día; la lista ya no muestra lo de más de 30 días).
+- Datos: colección `actividad` (`{ de, nombre, en, serial, titulo, lineas[] }`). **Hay que pegar las reglas nuevas** (`firestore.rules`) en Firebase → Firestore Database → Reglas; sin ellas, la app sigue igual y Soporte avisa "Falta pegar en Firebase las reglas nuevas". Necesita el inicio anónimo, igual que el chat.
+- Pruebas: `node pruebas/historial.mjs` (interfaz, qué se anota, juntar cambios, limpieza, reglas faltantes) y `npm run reglas` (9 pruebas de reglas nuevas).
+
 ## Soporte con las otras apps abiertas (v32)
 - Equipos, Entregas y Evidencias comparten el almacenamiento del navegador y **una sola conexión de Firestore entre pestañas** (la lleva la que se abrió primero). Si esa no tenía el inicio de sesión anónimo del chat, Soporte mostraba **"Falta pegar las reglas"** aunque las reglas estuvieran bien, y se quitaba solo al cerrar esa pestaña. Por eso salía "a veces".
 - Ahora las tres apps abren Firebase Authentication antes de Firestore (`nube.js`, `abrirAuth`) y usan el mismo usuario anónimo. Además el chat reintenta unas veces un "permiso denegado" del arranque antes de culpar a las reglas.
