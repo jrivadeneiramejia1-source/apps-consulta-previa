@@ -31,7 +31,8 @@ await ctx.route('https://avisos-equipos.jrivadeneiramejia1.workers.dev/**', asyn
   await r.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': URL }, body: JSON.stringify({ ok: true, resultados: d.subs.map(() => (vencer ? { estado: 410, vencida: true } : { estado: 201 })) }) });
 });
 const st = () => page.evaluate(() => JSON.parse(localStorage.getItem('__fs_falso')));
-const avisos = s => Object.entries(s).filter(([k]) => k.startsWith(B + '/avisos/'));
+// Un documento por teléfono; avisos/_novedades (la versión de la que ya se avisó) no es un teléfono.
+const avisos = s => Object.entries(s).filter(([k]) => k.startsWith(B + '/avisos/') && !k.endsWith('/_novedades'));
 const tareas = s => Object.entries(s).filter(([k]) => k.startsWith(B + '/tareas/'));
 // Cada persona en "su teléfono": otro nombre y otro identificador de teléfono.
 async function como(n, extra) {
