@@ -60,6 +60,14 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - **Descargado**: al bajar el PDF de una hoja se guarda `descargado: { por, fecha }` (la última descarga). La tarjeta muestra **Descargado**, quién y cuándo, y la hoja abierta dice "Descargada por…". Bajar el PDF no cambia `actualizado` ni `por`. En modo solo lectura no se anota.
 - Prueba: `node pruebas/bodega-descarga.mjs` (pdf-lib viene de internet, así que la prueba usa uno de mentira que arma un PDF vacío).
 
+## Aviso de «la app se actualizó» (v36)
+- Cuando se publica una versión con novedades, **la primera persona que abre Equipos** le manda a todos los teléfonos con notificaciones activadas un aviso: **"Se actualizaron las apps (versión N)"** y, en el texto, lo que cambió. No se le manda a quien abrió (ya lo sabe) ni a quien no activó notificaciones.
+- Las novedades salen de `version.json`: `{"v": "36", "notas": ["lo que cambió", "otra cosa"]}`. **Solo se avisa si hay `notas`**; sin ellas la actualización es en silencio. Cada nota debe ser corta (el aviso las une con " · " y se corta a 400 letras).
+- La versión ya avisada queda en `avisos/_novedades` (`{ v, por, en, notas }`), así que no se repite aunque abran la app muchas personas. No cambia las reglas de Firebase ni el Worker de Cloudflare: usa el servidor de avisos que ya existe (`avisos/worker.js`).
+- Si dos personas abren la app en el mismo segundo, el aviso puede llegar dos veces; en el teléfono se ve uno solo porque las dos tienen la misma etiqueta (`novedades`).
+- Prueba: `node pruebas/novedades.mjs`.
+- Firebase → Authentication: **Anónimo** (lo usa el chat) y **Google** (habilitado, todavía sin botón en las apps). Para usar Google en las apps hay que agregar `jrivadeneiramejia1-source.github.io` en Authentication → Configuración → Dominios autorizados.
+
 ## Historial de movimientos en Soporte (v34)
 - **Equipos → Soporte → Historial de movimientos** (`equipos/historial.js`): cada cambio que alguien hace queda como una línea con **su nombre, la hora y qué cambió**. Sirve para que quien esté encargado de revisar vea lo que se hizo mientras no estaba, y diga "corrige esto".
 - Se anota: agregar, editar o borrar un equipo; registrar, actualizar, dar **Listo** o borrar un recibido; programar, cambiar, hacer o quitar una tarea de la Agenda. Dice solo lo que cambió (`Marca: HP → Dell`). Varios cambios del mismo equipo hechos en unos segundos se juntan en una sola línea (por ejemplo, "Dio Listo a X" con sus detalles).

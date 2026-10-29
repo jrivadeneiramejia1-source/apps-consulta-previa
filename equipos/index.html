@@ -286,7 +286,7 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "35"};</script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "36"};</script>
 <script src="../iconos.js?v=32"></script>
 <script src="../comun.js?v=32"></script>
 <script src="../codigos.js?v=32"></script>
@@ -296,7 +296,7 @@
 <script src="historial.js?v=35"></script>
 <script>
 /* ================= CONSTANTES ================= */
-const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas';
+const COL_Q = 'equipos', COL_R = 'recibidos', COL_T = 'tareas', ID_NOVEDADES = '_novedades';
 const CACHE_KEY = 'eqcp_cache_v1', PEND_KEY = 'eqcp_pendientes_v1', UI_KEY = 'eqcp_ui_v1';
 const XLSX_URL = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 const TAREAS = [{ k: 'pend', n: 'Pendiente' }, { k: 'hecho', n: 'Hecho' }, { k: 'na', n: 'No aplica' }];
@@ -330,6 +330,7 @@ let sinLeerChat = 0, sinVerHistorial = 0;   // la insignia de Soporte suma los m
 let filtroMt = 'prog', mtActual = null, listoT = false, tareasBloqueadas = false;
 let filtroResp = '';   // '' = todas las personas; '-' = sin responsable; o el nombre (sin tildes) del responsable
 let AV = new Map(), avisosBloqueados = false;   // teléfonos con sesión: id -> { nombre, equipo, visto, sub }
+let NOVEDAD = null, anunciando = false;   // última versión de la que ya se avisó a todos (avisos/_novedades)
 let listoQ = false, listoR = false, conexion = 'cargando', fechaCache = null, errorDb = '';   // errorDb: por qué Firebase no deja leer
 let pendientes = lsGet(PEND_KEY) || [];
 let vista = 'rec', tablaDb = 'eq', filtroRec = 'pendientes', rcActual = null, eqActual = null;
@@ -576,7 +577,9 @@ function suscribir() {
     if (s.size >= 1000) toast('Hay 1000 equipos o más: avísale a quien mantiene la app.');
   }, alError));
   subs.push(DB.collection('avisos').limit(300).onSnapshot(s => {
-    AV = new Map(s.docs.map(d => [d.id, d.data()])); avisosBloqueados = false; pintarNotis(); registrarDispositivo(); if (vista === 'mt') renderMt();
+    NOVEDAD = (s.docs.find(d => d.id === ID_NOVEDADES) || { data: () => null }).data();
+    AV = new Map(s.docs.filter(d => d.id !== ID_NOVEDADES).map(d => [d.id, d.data()])); avisosBloqueados = false; pintarNotis(); registrarDispositivo(); if (vista === 'mt') renderMt();
+    anunciarNovedades();
   }, e => { avisosBloqueados = e && e.code === 'permission_denied'; pintarNotis(); }));
   // Si las reglas de Firestore todavía no tienen "tareas", la app sigue funcionando y lo avisa en la Agenda.
   subs.push(DB.collection(COL_T).limit(1000).onSnapshot(s => {
@@ -1336,6 +1339,28 @@ function personas() {
   return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
 }
 const subsDe = nombre => [...AV.entries()].filter(([, a]) => mismoNombre(a.nombre, nombre) && a.sub && a.sub.endpoint);
+/* ---------- aviso de «la app se actualizó» ---------- */
+// ../version.json trae `notas` (lo que cambió) solo en las versiones que se quieren avisar. La primera persona que abre Equipos
+// después de publicarla le manda a todos los teléfonos con notificaciones un aviso con esas notas. La versión ya avisada queda en
+// avisos/_novedades, así que no se repite. Sin `notas`, la actualización es en silencio.
+async function anunciarNovedades() {
+  if (anunciando || !DB || !miId || soloLectura || avisosBloqueados || !avisosListos()) return;
+  anunciarNovedades.info = anunciarNovedades.info || fetch('../version.json?t=' + Date.now(), { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
+  const info = await anunciarNovedades.info;
+  const v = Number(info && info.v), notas = info && Array.isArray(info.notas) ? info.notas.map(n => String(n).trim()).filter(Boolean) : [];
+  if (anunciando || !v || !notas.length || v <= Math.max(Number((NOVEDAD && NOVEDAD.v) || 0), anunciarNovedades.hecha || 0)) return;
+  anunciando = true; anunciarNovedades.hecha = v;
+  try {
+    // Se marca primero, para que otro teléfono que abra la app a la vez no repita el aviso.
+    NOVEDAD = { v: String(v), por: miId, en: new Date().toISOString(), notas };
+    await DB.collection('avisos').doc(ID_NOVEDADES).set(NOVEDAD);
+    const aviso = { titulo: `Se actualizaron las apps (versión ${v})`, cuerpo: notas.join(' · ').slice(0, 400), url: './', etiqueta: 'novedades' };
+    let llegaron = 0;
+    for (const p of personas().filter(x => x.avisos && !mismoNombre(x.nombre, miId))) if (await enviarAviso(p.nombre, aviso, true)) llegaron++;
+    if (llegaron) toast(`Aviso de la versión ${v} enviado a ${llegaron} ${llegaron === 1 ? 'persona' : 'personas'}`);
+  } catch (e) { /* si no se pudo marcar, no se manda nada: mejor ningún aviso que repetirlo */ }
+  finally { anunciando = false; }
+}
 function opcionesResp(valor) {
   const ps = personas(); let esta = !valor;
   const o = ['<option value="">Sin responsable (cualquiera)</option>'];
