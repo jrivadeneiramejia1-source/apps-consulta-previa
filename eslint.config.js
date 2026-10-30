@@ -41,7 +41,7 @@ export default [
   },
   {
     files: ['pruebas/**/*.mjs', 'eslint.config.js', 'lighthouserc.cjs'],
-    languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node, ...globals.browser, axe: 'readonly', nube: 'readonly', UI: 'readonly', Escaner: 'readonly', Lector: 'readonly', Codigos: 'readonly', cv: 'readonly', ChatSoporte: 'readonly', Historial: 'readonly' } },
+    languageOptions: { ecmaVersion: 2023, sourceType: 'module', globals: { ...globals.node, ...globals.browser, axe: 'readonly', nube: 'readonly', UI: 'readonly', Escaner: 'readonly', Lector: 'readonly', marcaIco: 'readonly', marcaDe: 'readonly', Codigos: 'readonly', cv: 'readonly', ChatSoporte: 'readonly', Historial: 'readonly' } },
     rules: { ...reglas, 'no-unused-vars': 'off' }
   }
 ];
