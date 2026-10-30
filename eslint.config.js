@@ -25,7 +25,7 @@ export default [
     rules: reglas
   },
   {
-    files: ['comun.js', 'nube.js', 'iconos.js', 'config.js', 'codigos.js', 'entregas/escaner.js', 'entregas/lector.js', 'equipos/chat.js', 'equipos/historial.js'],
+    files: ['comun.js', 'nube.js', 'iconos.js', 'config.js', 'codigos.js', 'marcas.js', 'entregas/escaner.js', 'entregas/lector.js', 'equipos/chat.js', 'equipos/historial.js'],
     languageOptions: { ecmaVersion: 2023, sourceType: 'script', globals: { ...globals.browser, ...compartidos } },
     rules: reglas
   },

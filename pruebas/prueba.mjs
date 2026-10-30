@@ -36,6 +36,12 @@ for (const tema of ['light', 'dark']) {
   const H = huella('equipos', 'prueba123'), B = `espacios/${H}`;
   await page.goto(URL + '/equipos/'); await page.waitForSelector('#recList .card.rec');
   chequear(await page.locator('#recList .card.rec').count() === 3, 'recibidos: 3 tarjetas');
+  const ordenRec = (await page.locator('#recList .card.rec').allTextContents()).map(t => ['NUEVO7788', 'R58N90AB', '5CD1234ABC'].find(x => t.includes(x)));
+  chequear(ordenRec.join() === 'NUEVO7788,R58N90AB,5CD1234ABC', `recibidos: el más nuevo arriba (${ordenRec})`);
+  const marcas = await page.evaluate(() => ['m-hp', 'm-samsung', 'm-dell'].map(k => document.querySelectorAll(`#recList .ico.con-marca .marca.${k} svg path`).length));
+  chequear(marcas.join() === '1,1,1', `recibidos: logo de la marca sobre el ícono (HP, Samsung, Dell: ${marcas})`);
+  const mx = await page.evaluate(() => ({ modelo: (marcaDe('', 'ThinkPad E14') || {}).k, ini: marcaIco('Starlink'), dos: marcaIco('Western Digital'), vacia: marcaIco(''), lg: (marcaDe('Algo') || {}).k }));
+  chequear(mx.modelo === 'lenovo' && mx.ini.includes('>ST<') && mx.dos.includes('>WD<') && mx.vacia === '' && !mx.lg, `marcas: por el modelo, iniciales si no hay logo y nada si no hay marca (${JSON.stringify(mx)})`);
   chequear((await page.textContent('#subtitulo')).includes('8 equipos · 3 en espera'), 'subtítulo con cifras');
   chequear(await page.locator('#badgeRec').textContent() === '3', 'insignia de recibidos = 3');
   chequear(await page.locator('.tab svg.ph').count() >= 6, 'iconos Phosphor en la barra');

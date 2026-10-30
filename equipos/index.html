@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=35">
+<link rel="stylesheet" href="../comun.css?v=37">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -286,10 +286,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "36"};</script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "37"};</script>
 <script src="../iconos.js?v=32"></script>
 <script src="../comun.js?v=32"></script>
 <script src="../codigos.js?v=32"></script>
+<script src="../marcas.js?v=37"></script>
 <script src="../config.js?v=32"></script>
 <script src="../nube.js?v=32"></script>
 <script src="chat.js?v=32"></script>
@@ -303,12 +304,14 @@ const TAREAS = [{ k: 'pend', n: 'Pendiente' }, { k: 'hecho', n: 'Hecho' }, { k: 
 const MESES_ALERTA = 6;
 const DIAS_ALERTA = 3;   // días en espera para marcarlo en rojo
 const ACCESORIOS = ['Cargador', 'Mouse', 'Morral', 'Base portátil', 'Teclado', 'Disco duro', 'Diadema', 'Estuche'];
-function iconoDe(tipo) {
+// Placa del tipo de equipo; con la marca escrita le pone encima la insignia de la marca (marcas.js).
+function iconoDe(tipo, marca, modelo) {
   const t = sinTildes(tipo);
   const k = /gps/.test(t) ? 'gps' : /celular|telefono|movil/.test(t) ? 'cel' : /tablet/.test(t) ? 'tablet' : /impresora/.test(t) ? 'imp'
     : /video|beam|proyector/.test(t) ? 'vb' : /antena|starlink|router/.test(t) ? 'ant' : /escaner|scanner/.test(t) ? 'esc'
     : /pc|portatil|computador|laptop|monitor/.test(t) ? 'pc' : 'otro';
-  return `<span class="ico i-${k}" aria-hidden="true">${ico(k)}</span>`;
+  const m = marca || modelo ? (window.marcaIco ? window.marcaIco(marca, modelo) : '') : '';
+  return `<span class="ico i-${k}${m ? ' con-marca' : ''}" aria-hidden="true">${ico(k)}${m}</span>`;
 }
 function diasDesde(f) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(f || '')) return null;
@@ -400,6 +403,8 @@ function grupoDe(e, orden) {
   if (orden === 'mtto') { const m = mesesDesde(e.fechaMtto); return m === null ? 'Sin fecha de mantenimiento' : m >= MESES_ALERTA ? `Hace ${MESES_ALERTA} meses o más` : `Hace menos de ${MESES_ALERTA} meses`; }
   return '';
 }
+// Última vez que se agregó o cambió un recibido (los viejos sin ese dato usan la fecha de ingreso): los más nuevos van arriba.
+const modRec = r => r.actualizado || r.fechaIngreso || '';
 function recibidosLista() { return [...R.entries()].map(([id, r]) => Object.assign({ id }, r)); }
 function pendienteDe(serial) { const k = idSerial(serial); return recibidosLista().find(r => !r.cerrado && idSerial(r.serial) === k); }
 function esBodega(e) { return sinTildes(e.asignado).includes('bodega'); }
@@ -687,7 +692,7 @@ function renderRec() {
   $('chipsRec').innerHTML = FILTROS_REC.map(f => `<button type="button" class="chip" data-f="${f.k}" aria-pressed="${filtroRec === f.k}">${f.n} <span class="n">${nF(f.k)}</span></button>`).join('');
   const q = sinTildes($('qRec').value.trim());
   const lista = todos.filter(r => filtraRec(r, filtroRec) && (!q || textoRec(r).includes(q)))
-    .sort((a, b) => (a.cerrado ? 1 : 0) - (b.cerrado ? 1 : 0) || (a.cerrado ? String(b.cerradoEn).localeCompare(String(a.cerradoEn)) : String(a.fechaIngreso || '').localeCompare(String(b.fechaIngreso || ''))));
+    .sort((a, b) => (a.cerrado ? 1 : 0) - (b.cerrado ? 1 : 0) || (a.cerrado ? String(b.cerradoEn).localeCompare(String(a.cerradoEn)) : String(modRec(b)).localeCompare(String(modRec(a)))));
   $('recCount').textContent = todos.length ? `Mostrando ${lista.length} de ${todos.length} registros` : '';
   if (!todos.length) {
     $('recList').innerHTML = conexion === 'cargando'
@@ -702,7 +707,7 @@ function renderRec() {
     const hechas = ['mtto', 'backup'].filter(t => (r[t] || 'pend') !== 'pend').length;
     return `<div class="card rec st-${e.k}">
       <button type="button" class="card-top" data-rec="${esc(r.id)}">
-        <div class="card-head"><div class="cab">${iconoDe(r.tipo)}<div class="cab-t"><div class="card-title serial">${esc(r.serial)}</div><div class="meta">${esc([r.tipo, r.marca, r.modelo].filter(Boolean).join(' · ') || 'Sin datos del equipo')}</div></div></div><span class="pill ${e.clase}">${e.n}</span></div>
+        <div class="card-head"><div class="cab">${iconoDe(r.tipo, r.marca, r.modelo)}<div class="cab-t"><div class="card-title serial">${esc(r.serial)}</div><div class="meta">${esc([r.tipo, r.marca, r.modelo].filter(Boolean).join(' · ') || 'Sin datos del equipo')}</div></div></div><span class="pill ${e.clase}">${e.n}</span></div>
         <div class="facts"><span><b>${esc(r.persona || 'Sin persona')}</b></span><span class="mono">Llegó ${fechaBonita(r.fechaIngreso)}</span>${r.cerrado ? '' : textoEspera(r)}${!eq && !r.cerrado ? '<span class="tag-shared">Equipo nuevo</span>' : ''}${r.origen === 'entregas' ? `<span class="tag-shared">Devolución${devueltoPor(r) ? ' de ' + esc(devueltoPor(r)) : ''}</span>` : ''}</div>
         ${(r.acc || []).length ? `<div class="acc-mini">${ico('bolsa')}Trajo: ${esc(r.acc.join(', '))}</div>` : ''}
         ${r.cerrado ? '' : `<div class="prog" aria-label="${hechas} de 2 tareas resueltas"><span style="width:${hechas * 50}%"></span></div>`}
@@ -1022,9 +1027,9 @@ function renderEq() {
   $('eqList').innerHTML = lista.length ? lista.map(e => {
     const rec = pendienteDe(e.serial), g = grupoDe(e, orden);
     let cab = '';
-    if (g && g !== grupo) { grupo = g; const n = cuantos.get(g); cab = `<div class="grupo"><span class="cab">${orden === 'tipo' ? iconoDe(e.tipo) : ''}${esc(g)}</span><span class="num">${n} ${n === 1 ? 'equipo' : 'equipos'}</span></div>`; }
+    if (g && g !== grupo) { grupo = g; const n = cuantos.get(g); cab = `<div class="grupo"><span class="cab">${orden === 'tipo' ? iconoDe(e.tipo) : orden === 'marca' && e.marca && window.marcaIco ? `<span class="marca-sola" aria-hidden="true">${window.marcaIco(e.marca)}</span>` : ''}${esc(g)}</span><span class="num">${n} ${n === 1 ? 'equipo' : 'equipos'}</span></div>`; }
     return cab + `<button type="button" class="card" data-eq="${esc(e.id)}">
-      <div class="card-head"><div class="cab">${iconoDe(e.tipo)}<div class="cab-t"><div class="card-title serial">${esc(e.serial)}</div><div class="meta">${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · '))}</div></div></div></div>
+      <div class="card-head"><div class="cab">${iconoDe(e.tipo, e.marca, e.modelo)}<div class="cab-t"><div class="card-title serial">${esc(e.serial)}</div><div class="meta">${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · '))}</div></div></div></div>
       <div class="facts"><span>${esc(e.asignado || 'Sin asignar')}</span>${e.proyecto ? `<span class="meta">${esc(e.proyecto)}</span>` : ''}</div>
       <div class="facts">${textoMtto(e)}</div>
       ${rec ? `<div><span class="pill s-org">${ico('recibidos')}En Recibidos · ${estadoRec(rec).n}</span></div>` : ''}
@@ -1183,7 +1188,7 @@ function tarjetaTarea(t) {
   const atras = n !== null && n < 0;
   return `<div class="card mt t-${esc(t.tipo || 'fisico')} ${atras ? 'atras' : ''} ${paraMi(t) ? 'mia' : ''}">
     <button type="button" class="card-top" data-t-abrir="${esc(t.id)}">
-      <div class="card-head"><div class="cab">${iconoDe(e.tipo)}<div class="cab-t"><div class="card-title serial">${esc(e.serial || t.serial)}</div><div class="meta">${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div></div></div>
+      <div class="card-head"><div class="cab">${iconoDe(e.tipo, e.marca, e.modelo)}<div class="cab-t"><div class="card-title serial">${esc(e.serial || t.serial)}</div><div class="meta">${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · ') || 'Equipo')}</div></div></div>
         <span class="pill ${atras ? 's-rojo' : n !== null && n <= 1 ? 's-org' : 's-listo'}">${textoCuando(t.fecha)}</span></div>
       <div class="para-t ${mismoNombre(t.resp, miId) ? 'mio' : ''}"><span class="pill tp-${esc(t.tipo || 'fisico')}">${ico(tt.ico)}${tt.n}</span><span>programado para <b>${!t.resp ? 'cualquiera' : mismoNombre(t.resp, miId) ? 'ti' : esc(t.resp)}</b>${t.creadoPor ? ` <span class="meta">· lo programó ${mismoNombre(t.creadoPor, miId) ? 'tú' : esc(t.creadoPor)}</span>` : ''}</span></div>
       <div class="facts"><span>Para el <span class="mono">${fechaBonita(t.fecha)}</span></span><span>Lo tiene <b>${esc(e.asignado || 'nadie')}</b></span></div>
@@ -1198,7 +1203,7 @@ function tarjetaTarea(t) {
 function tarjetaSugerido(e) {
   return `<div class="card mt sug">
     <button type="button" class="card-top" data-eq-abrir="${esc(e.id)}">
-      <div class="card-head"><div class="cab">${iconoDe(e.tipo)}<div class="cab-t"><div class="card-title serial">${esc(e.serial)}</div><div class="meta">${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · '))}</div></div></div><span class="pill s-org">Sugerido</span></div>
+      <div class="card-head"><div class="cab">${iconoDe(e.tipo, e.marca, e.modelo)}<div class="cab-t"><div class="card-title serial">${esc(e.serial)}</div><div class="meta">${esc([e.tipo, e.marca, e.modelo].filter(Boolean).join(' · '))}</div></div></div><span class="pill s-org">Sugerido</span></div>
       <div class="facts"><span>Lo tiene <b>${esc(e.asignado || 'nadie')}</b></span></div>
       <div class="facts">${textoMtto(e)}</div>
     </button>
