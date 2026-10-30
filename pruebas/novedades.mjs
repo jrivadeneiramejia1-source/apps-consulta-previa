@@ -1,4 +1,5 @@
 // Versión 36: aviso de «la app se actualizó». Uso: node pruebas/novedades.mjs
+/* global personas, AV */   // funciones de la app de Equipos, usadas dentro de page.evaluate
 // ../version.json trae `notas` solo en las versiones que se quieren avisar. La primera persona que abre Equipos después de publicarla
 // le manda a todos los teléfonos con notificaciones (menos al suyo) un aviso con esas notas; la versión ya avisada queda en avisos/_novedades.
 import fs from 'node:fs';

@@ -46,6 +46,7 @@ await eqp.click('#tabDb'); await esp(100);
 log('A5. Equipos quedó conectada sola con Entregas (misma clave)', (await eqp.textContent('#enlaceInfo')).startsWith('Conectada'));
 await eqp.click('#tabRec');
 const ridA = rec[0][0].split('/').pop();
+log('A5b. el pendiente que llegó de Entregas sale primero en Recibidos', (await eqp.locator('#recList .card.rec').first().locator(`[data-listo="${ridA}"]`).count()) === 1);
 await eqp.click(`[data-listo="${ridA}"]`); await eqp.waitForSelector('#cfSheet:not([hidden])');
 const opciones = await eqp.locator('#cfOpc [name=cfDest]').evaluateAll(xs => xs.map(x => x.value + (x.checked ? '*' : '')));
 log('A6. al dar Listo pregunta a quién: Bodega (marcado), quien lo devolvió u otra', opciones.join('|') === 'Bodega Riohacha*|Luis Pérez|__otro', opciones.join('|'));
