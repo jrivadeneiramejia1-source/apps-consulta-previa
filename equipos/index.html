@@ -15,7 +15,7 @@
 <title>Equipos Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=38">
+<link rel="stylesheet" href="../comun.css?v=39">
 
 <a class="saltar" href="#contenido">Saltar al contenido</a>
 <header class="top">
@@ -286,11 +286,11 @@
 
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "38"};</script>
+<script>window.APP = {"id": "equipos", "nombre": "Equipos Consulta Previa", "colecciones": ["equipos", "recibidos", "tareas"], "icono": "../iconos/equipos-192.png", "enlaces": [{"id": "entregas", "col": "entregas", "nombre": "Entregas"}], "v": "39"};</script>
 <script src="../iconos.js?v=32"></script>
 <script src="../comun.js?v=32"></script>
 <script src="../codigos.js?v=32"></script>
-<script src="../marcas.js?v=38"></script>
+<script src="../marcas.js?v=39"></script>
 <script src="../config.js?v=32"></script>
 <script src="../nube.js?v=32"></script>
 <script src="chat.js?v=32"></script>
@@ -1348,6 +1348,22 @@ const subsDe = nombre => [...AV.entries()].filter(([, a]) => mismoNombre(a.nombr
 // ../version.json trae `notas` (lo que cambió) solo en las versiones que se quieren avisar. La primera persona que abre Equipos
 // después de publicarla le manda a todos los teléfonos con notificaciones un aviso con esas notas. La versión ya avisada queda en
 // avisos/_novedades, así que no se repite. Sin `notas`, la actualización es en silencio.
+// Qué app(s) nombran las notas ("Entregas: …"). Soporte, Agenda y Recibidos son partes de Equipos. Una nota sin app es general.
+const APPS_NOVEDAD = [
+  { n: 'Equipos', rx: /^(equipos|soporte|agenda|recibidos)\s*:/i, url: './' },
+  { n: 'Entregas', rx: /^entregas\s*:/i, url: '../entregas/' },
+  { n: 'Evidencias', rx: /^evidencias\s*:/i, url: '../evidencias/' }
+];
+// El aviso dice qué app se actualizó y, al tocarlo, abre esa app (si son varias, Equipos).
+function avisoNovedad(v, notas) {
+  const apps = APPS_NOVEDAD.filter(a => notas.some(n => a.rx.test(n))), nombres = apps.map(a => a.n);
+  const lista = nombres.length > 1 ? nombres.slice(0, -1).join(', ') + ' y ' + nombres[nombres.length - 1] : nombres[0];
+  const titulo = !apps.length ? `Se actualizaron las apps (versión ${v})` : apps.length === 1 ? `Se actualizó ${lista} (versión ${v})` : `Se actualizaron ${lista} (versión ${v})`;
+  // Con una sola app el título ya la dice: se quita "Entregas:" de cada nota.
+  const sola = apps.length === 1 && notas.every(n => apps[0].rx.test(n));
+  const sin = sola ? notas.map(n => n.replace(apps[0].rx, '').trim()).filter(Boolean).map(n => n.charAt(0).toUpperCase() + n.slice(1)) : [];
+  return { titulo, cuerpo: (sin.length ? sin : notas).join(' · ').slice(0, 400), url: apps.length === 1 ? apps[0].url : './', etiqueta: 'novedades' };
+}
 async function anunciarNovedades() {
   if (anunciando || !DB || !miId || soloLectura || avisosBloqueados || !avisosListos()) return;
   anunciarNovedades.info = anunciarNovedades.info || fetch('../version.json?t=' + Date.now(), { cache: 'no-store' }).then(r => (r.ok ? r.json() : null)).catch(() => null);
@@ -1359,9 +1375,9 @@ async function anunciarNovedades() {
     // Se marca primero, para que otro teléfono que abra la app a la vez no repita el aviso.
     NOVEDAD = { v: String(v), por: miId, en: new Date().toISOString(), notas };
     await DB.collection('avisos').doc(ID_NOVEDADES).set(NOVEDAD);
-    const aviso = { titulo: `Se actualizaron las apps (versión ${v})`, cuerpo: notas.join(' · ').slice(0, 400), url: './', etiqueta: 'novedades' };
+    const aviso = avisoNovedad(v, notas);
     let llegaron = 0;
-    for (const p of personas().filter(x => x.avisos && !mismoNombre(x.nombre, miId))) if (await enviarAviso(p.nombre, aviso, true)) llegaron++;
+    for (const p of personas().filter(x => x.avisos)) if (await enviarAviso(p.nombre, aviso, true)) llegaron++;   // a todas las personas con notificaciones, también a quien abrió
     if (llegaron) toast(`Aviso de la versión ${v} enviado a ${llegaron} ${llegaron === 1 ? 'persona' : 'personas'}`);
   } catch (e) { /* si no se pudo marcar, no se manda nada: mejor ningún aviso que repetirlo */ }
   finally { anunciando = false; }

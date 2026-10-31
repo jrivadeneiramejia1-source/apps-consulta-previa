@@ -1,7 +1,7 @@
-// Versión 36: aviso de «la app se actualizó». Uso: node pruebas/novedades.mjs
+// Versión 36 (y 39: dice qué app cambió): aviso de «la app se actualizó». Uso: node pruebas/novedades.mjs
 /* global personas, AV */   // funciones de la app de Equipos, usadas dentro de page.evaluate
 // ../version.json trae `notas` solo en las versiones que se quieren avisar. La primera persona que abre Equipos después de publicarla
-// le manda a todos los teléfonos con notificaciones (menos al suyo) un aviso con esas notas; la versión ya avisada queda en avisos/_novedades.
+// le manda a todas las personas con notificaciones (también a ella) un aviso que dice qué app se actualizó y trae esas notas; la versión ya avisada queda en avisos/_novedades.
 import fs from 'node:fs';
 import { lanzar, servir, pagina, semillaEquipos, huella, RAIZ } from './banco.mjs';
 const URL = 'http://127.0.0.1:8835/equipos/', esp = ms => new Promise(r => setTimeout(r, ms));
@@ -42,22 +42,37 @@ try {
   {
     const { ctx, page, envios, errs, cambiar } = await abrirCon({ version: { v: String(VERSION), notas: NOTAS } });
     const s = await fsDe(page), marca = s[`${B}/avisos/_novedades`];
-    log('N1. avisa a las personas con notificaciones, no a Jeiler (quien abrió) ni a Pedro (sin notificaciones)', destinos(envios).join() === 'ana,luis', destinos(envios).join());
+    log('N1. avisa a todas las personas con notificaciones (también a Jeiler, quien abrió), no a Pedro (sin notificaciones)', destinos(envios).join() === 'ana,jeiler,luis', destinos(envios).join());
     const aviso = envios[0] || {};
-    log('N2. el aviso dice la versión y las novedades', aviso.titulo === `Se actualizaron las apps (versión ${VERSION})` && aviso.cuerpo === NOTAS.join(' · ') && aviso.etiqueta === 'novedades' && aviso.url === './', JSON.stringify(aviso));
+    log('N2. el aviso dice qué apps se actualizaron, la versión y las novedades', aviso.titulo === `Se actualizaron Equipos y Entregas (versión ${VERSION})` && aviso.cuerpo === NOTAS.join(' · ') && aviso.etiqueta === 'novedades' && aviso.url === './', JSON.stringify(aviso));
     log('N3. queda anotada la versión avisada, quién la avisó y las notas', !!marca && marca.v === String(VERSION) && marca.por === 'Jeiler' && JSON.stringify(marca.notas) === JSON.stringify(NOTAS) && !!marca.en, JSON.stringify(marca));
-    log('N4. quien abrió ve a cuántas personas le llegó', /Aviso de la versión \d+ enviado a 2 personas/.test(await page.locator('#toast').textContent().catch(() => '')), await page.locator('#toast').textContent().catch(() => ''));
+    log('N4. quien abrió ve a cuántas personas le llegó', /Aviso de la versión \d+ enviado a 3 personas/.test(await page.locator('#toast').textContent().catch(() => '')), await page.locator('#toast').textContent().catch(() => ''));
     const nombres = await page.evaluate(() => personas().map(p => p.nombre));
     log('N5. la nota de la versión no aparece como una persona ni como teléfono', nombres.join() === 'Ana Gómez,Jeiler,Luis,Pedro' && !(await page.evaluate(() => [...AV.keys()].includes('_novedades'))), nombres.join());
     await page.reload(); await page.waitForSelector('#recList .card.rec'); await esp(1200);
-    log('N6. al volver a abrir la app no se repite el aviso', envios.length === 2, `${envios.length} envíos`);
+    log('N6. al volver a abrir la app no se repite el aviso', envios.length === 3, `${envios.length} envíos`);
     await page.click('#tabMt'); await esp(200);
     log('N7. la pestaña Agenda y las personas siguen bien con la nota guardada', (await page.locator('#vMt').count()) === 1 && errs.length === 0, errs.join('\n      '));
     // Sale una versión nueva con novedades: vuelve a avisar
     cambiar({ v: String(VERSION + 1), notas: ['Otra novedad'] });
     await page.reload(); await page.waitForSelector('#recList .card.rec'); await esp(3000);
-    log('N8. una versión nueva con novedades vuelve a avisar, con su propio texto', envios.length === 4 && envios[3].cuerpo === 'Otra novedad' && envios[3].titulo.includes(`versión ${VERSION + 1}`), envios.map(e => e.titulo + '|' + e.cuerpo).join('\n      '));
+    log('N8. una versión nueva con novedades vuelve a avisar, con su propio texto', envios.length === 6 && envios.slice(3).every(e => e.cuerpo === 'Otra novedad' && e.titulo === `Se actualizaron las apps (versión ${VERSION + 1})`), envios.map(e => e.titulo + '|' + e.cuerpo).join('\n      '));
     await ctx.close();
+  }
+
+  console.log('\nEl aviso dice qué app se actualizó');
+  {
+    const caso = async notas => { const { ctx, envios } = await abrirCon({ version: { v: String(VERSION), notas } }); const e = envios[0] || {}; await ctx.close(); return e; };
+    let e = await caso(['Entregas: las hojas de devolución muestran cuándo se terminó el backup', 'Entregas: Bodega en el filtro']);
+    log('T1. si solo cambió Entregas, lo dice, quita el "Entregas:" de las notas y abre Entregas al tocarlo', e.titulo === `Se actualizó Entregas (versión ${VERSION})` && e.cuerpo === 'Las hojas de devolución muestran cuándo se terminó el backup · Bodega en el filtro' && e.url === '../entregas/', JSON.stringify(e));
+    e = await caso(['Soporte: Historial de movimientos', 'Equipos: Recibidos ordenados por fecha']);
+    log('T2. Soporte y Recibidos cuentan como Equipos, que se abre con "./"', e.titulo === `Se actualizó Equipos (versión ${VERSION})` && e.url === './' && e.cuerpo.startsWith('Historial de movimientos'), JSON.stringify(e));
+    e = await caso(['Equipos: algo', 'Entregas: otra cosa', 'Evidencias: una más']);
+    log('T3. con tres apps las nombra a todas y abre Equipos; las notas quedan como están', e.titulo === `Se actualizaron Equipos, Entregas y Evidencias (versión ${VERSION})` && e.url === './' && e.cuerpo === 'Equipos: algo · Entregas: otra cosa · Evidencias: una más', JSON.stringify(e));
+    e = await caso(['Entregas: algo', 'Mejoras generales de velocidad']);
+    log('T4. una nota general junto a una de Entregas: el título dice Entregas y las notas no se tocan', e.titulo === `Se actualizó Entregas (versión ${VERSION})` && e.cuerpo === 'Entregas: algo · Mejoras generales de velocidad' && e.url === '../entregas/', JSON.stringify(e));
+    e = await caso(['entregas: en minúscula']);
+    log('T5. el nombre de la app se reconoce sin importar mayúsculas', e.titulo === `Se actualizó Entregas (versión ${VERSION})` && e.cuerpo === 'En minúscula', JSON.stringify(e));
   }
 
   console.log('\nCuando no hay que avisar');
@@ -77,13 +92,13 @@ try {
     const F = semilla().__fs_falso;
     F[`${B}/avisos/_novedades`] = { v: String(VERSION - 1), por: 'Ana Gómez', en: ahora, notas: ['Algo anterior'] };
     const { ctx, envios } = await abrirCon({ version: { v: String(VERSION), notas: NOTAS }, extra: { __fs_falso: F } });
-    log('S3. si lo avisado fue una versión anterior, avisa la nueva', destinos(envios).join() === 'ana,luis', destinos(envios).join());
+    log('S3. si lo avisado fue una versión anterior, avisa la nueva', destinos(envios).join() === 'ana,jeiler,luis', destinos(envios).join());
     await ctx.close();
   }
   {
-    const { ctx, page, envios, errs } = await abrirCon({ version: { v: String(VERSION), notas: NOTAS }, quienes: ['pedro', 'jeiler'] });
+    const { ctx, page, envios, errs } = await abrirCon({ version: { v: String(VERSION), notas: NOTAS }, quienes: ['pedro'] });
     const toast = await page.locator('#toast').textContent().catch(() => '');
-    log('S4. si nadie más tiene notificaciones, queda anotada la versión y no se manda ni se muestra nada raro', envios.length === 0 && !!(await fsDe(page))[`${B}/avisos/_novedades`] && !/Aviso de la versión/.test(toast) && errs.length === 0, `${envios.length} / ${toast} / ${errs.join()}`);
+    log('S4. si nadie tiene notificaciones, queda anotada la versión y no se manda ni se muestra nada raro', envios.length === 0 && !!(await fsDe(page))[`${B}/avisos/_novedades`] && !/Aviso de la versión/.test(toast) && errs.length === 0, `${envios.length} / ${toast} / ${errs.join()}`);
     await ctx.close();
   }
   {
