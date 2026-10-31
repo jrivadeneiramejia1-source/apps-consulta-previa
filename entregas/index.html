@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=37">
+<link rel="stylesheet" href="../comun.css?v=38">
 <style>
 
 /* --- Entregas --- */
@@ -31,6 +31,8 @@ label.subir { cursor: pointer; }
 .mini-hoja.vacia { display: grid; place-items: center; background: var(--surface-2); color: var(--muted); }
 .mini-hoja.vacia .ph { width: 26px; height: 26px; }
 .hoja-t { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+.meta.term { display: flex; flex-direction: column; gap: 2px; }
+.meta.term span { overflow-wrap: anywhere; }
 .pill.t-entrega { color: var(--listo); background: var(--listo-bg); }
 .pill.t-devolucion { color: var(--disco); background: var(--disco-bg); }
 .pill.t-otro { color: var(--pend); background: var(--pend-bg); }
@@ -244,7 +246,7 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "37"};</script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "38"};</script>
 <script src="../iconos.js?v=32"></script>
 <script src="../comun.js?v=32"></script>
 <script src="escaner.js?v=32"></script>
@@ -595,14 +597,34 @@ function pintarEspacio() {
 const FILTROS = [{ k: 'todos', n: 'Todas' }, { k: 'mes', n: 'De este mes' }, { k: 'entrega', n: 'Entregas' }, { k: 'devolucion', n: 'Devoluciones' }, { k: 'bodega', n: 'Bodega' }, { k: 'otro', n: 'Otras' }, { k: 'sindatos', n: 'Sin nombre o fecha' }];
 const textoDe = e => sinTildes([e.nombre, e.cedula, e.seriales, e.proyecto, textoEquipos(equiposDe(e)), e.nota, e.origen].join(' '));
 function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'mes') return (e.fecha || '').startsWith(hoyIso().slice(0, 7)); if (f === 'sindatos') return !e.nombre || !e.fecha; if (f === 'bodega') return esBodega(e); return (e.tipo || 'entrega') === f && !esBodega(e); }
+// Cuándo se terminaron el mantenimiento y el backup de una devolución. Las fechas salen EN VIVO de los registros de Recibidos
+// de Equipos (no se copian a la hoja): si allá se desmarca o se borra el registro, aquí también se quitan.
+function fechaLocal(iso) { const d = new Date(iso); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+// Una tarea (mtto o backup) de uno o varios equipos: "terminado 29/10/2026", "pendiente", "no aplica" o "1 de 2 listos".
+function tareaTerminada(rs, k) {
+  const act = rs.filter(r => (r[k] || 'pend') !== 'na');
+  if (!act.length) return 'no aplica';
+  const hechas = act.filter(r => (r[k] || 'pend') === 'hecho');
+  if (hechas.length < act.length) return act.length === 1 ? 'pendiente' : `${hechas.length} de ${act.length} listos`;
+  const f = hechas.map(r => r[k + 'Fecha'] || '').sort().pop();   // con varios equipos, cuando se terminó el último
+  return f ? 'terminado ' + fechaBonita(f) : 'terminado';
+}
+function lineaTerminacion(e) {
+  if (!EQDB) return '';
+  const rs = Object.values(e.recibidos || {}).map(rid => EQR.get(rid)).filter(Boolean);
+  if (!rs.length) return '';
+  const partes = [`Mantenimiento ${tareaTerminada(rs, 'mtto')}`, `Backup ${tareaTerminada(rs, 'backup')}`];
+  if (rs.every(r => r.cerrado)) { const f = rs.map(r => fechaLocal(r.cerradoEn)).filter(Boolean).sort().pop(); if (f) partes.push('Todo terminado ' + fechaBonita(f)); }
+  return `<span class="meta term">${partes.map(t => `<span>${esc(t)}</span>`).join('')}</span>`;
+}
 // Qué pasa con la hoja en Equipos: devolución en espera, o entrega que antes fue devolución.
 function estadoHoja(e) {
-  if (e.devolucion && e.tipo === 'entrega') return `<span class="meta">Antes: devolución de ${esc(e.devolucion.nombre || 'sin nombre')} (${fechaBonita(e.devolucion.fecha)})</span>`;
+  if (e.devolucion && e.tipo === 'entrega') return `<span class="meta">Antes: devolución de ${esc(e.devolucion.nombre || 'sin nombre')} (${fechaBonita(e.devolucion.fecha)})</span>${lineaTerminacion(e)}`;
   if (e.tipo !== 'devolucion' || !EQDB) return '';
   const rs = Object.values(e.recibidos || {}).map(rid => EQR.get(rid)).filter(Boolean);
   if (!rs.length) return '';
   const pend = rs.filter(x => !x.cerrado).length;
-  return pend ? `<span><span class="pill s-org">${ico('reloj')}En Recibidos, sin terminar</span></span>` : `<span><span class="pill s-disco">${ico('checkCirculo')}Equipo ya listo en Equipos</span></span>`;
+  return (pend ? `<span><span class="pill s-org">${ico('reloj')}En Recibidos, sin terminar</span></span>` : `<span><span class="pill s-disco">${ico('checkCirculo')}Equipo ya listo en Equipos</span></span>`) + lineaTerminacion(e);
 }
 // Quién bajó el PDF de la hoja y cuándo (se guarda al descargarlo; la última descarga).
 function avisoDescarga(e) {

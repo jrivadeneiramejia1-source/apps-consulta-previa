@@ -113,6 +113,7 @@ npm run lighthouse  # velocidad, accesibilidad y buenas prácticas (solo avisa)
 ## Cómo se enlazan Entregas y Equipos
 - Hoja de **devolución**: crea un pendiente en Recibidos. La hoja guarda `recibidos: { SERIAL: id }` y el pendiente guarda `hoja` y `devueltoPor`.
 - Al dar **Listo** en Equipos se escoge a quién queda asignado (Bodega Riohacha, quien lo devolvió u otra persona). La hoja pasa a **Entrega** a ese nombre y guarda `devolucion: { nombre, cedula, fecha }`. Si el equipo queda en **Bodega**, la hoja se ve como **Bodega** (v33).
+- La tarjeta de la hoja muestra **cuándo se terminaron** el mantenimiento y el backup, y "Todo terminado" (el día del Listo). Esas fechas **no se copian a la hoja**: salen en vivo de `mtto`/`mttoFecha`, `backup`/`backupFecha` y `cerradoEn` del registro de Recibidos. Por eso, si en Equipos se desmarca una tarea o se borra el registro, desaparecen también en Entregas (con varios equipos en la hoja sale la fecha del último; "1 de 2 listos" si faltan).
 - Hoja de **entrega**: asigna el equipo y guarda `antes: { SERIAL: a quién estaba asignado }` para devolverlo si se borra la hoja.
 - **Borrar** en cualquiera de las dos apps ofrece borrar también en la otra.
 - Corregir una hoja solo cambia la diferencia: no repite pendientes y quita los que sobran.
