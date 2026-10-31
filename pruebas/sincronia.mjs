@@ -1,4 +1,5 @@
 // Sincronía Entregas ↔ Equipos y mantenimiento programado. Uso: node pruebas/sincronia.mjs
+/* global setTarea, tareaTerminada, fechaLocal, EQR, eqListos */   // funciones de las páginas de Equipos y Entregas, usadas dentro de page.evaluate
 import { chromium, lanzar, AXE_JS, FOTOS, SALIDA, servir, pagina, semillaEquipos, huella } from './banco.mjs';
 const URL = 'http://127.0.0.1:8814', esp = ms => new Promise(r => setTimeout(r, ms));
 const srv = await servir(8814); const br = await lanzar();
@@ -19,7 +20,10 @@ async function subir(nombre, tipo, serial, archivo = 'hoja1.jpg') {
   await en.click('#tabSub'); await en.setInputFiles('#archivo', [FOTOS + '/' + archivo]); await en.waitForSelector('#l0n');
   await en.fill('#l0n', nombre); await en.fill('#l0f', '2026-10-14'); await en.selectOption('#l0t', tipo);
   await en.locator('[data-i="0"] [data-eq-k="serial"]').fill(serial);
-  await en.click('#subGuardar'); await en.waitForSelector('#cfSheet:not([hidden])'); await en.click('#cfYes'); await esp(500);
+  await en.click('#subGuardar'); await en.waitForSelector('#cfSheet:not([hidden])'); await en.click('#cfYes');
+  // Se espera la señal real (la app anota "equiposSync" en la hoja cuando termina de enviarla a Equipos) y no un tiempo fijo.
+  for (let i = 0; i < 100; i++) { const h = hojaDe(await st(en), nombre); if (h && h[1].equiposSync) break; await esp(100); }
+  await esp(200);
 }
 async function abrirHoja(nombre) { await en.click('#tabEnt'); await en.locator('#entList .card.hoja', { hasText: nombre }).first().click(); await en.waitForSelector('#enSheet:not([hidden])'); }
 
@@ -93,9 +97,12 @@ log('C3. si se desmarca, solo se borra en Equipos', !s[`${B}/recibidos/${ridC3}`
 
 console.log('\n— D. Borrar desde Entregas');
 await abrirHoja('Rosa Pushaina'); await en.click('#enDel'); await en.waitForSelector('#cfSheet:not([hidden])'); await en.click('#cfYes'); await esp(500);
+// Equipos (otra pestaña) borró pendientes de este serial y el Firebase falso no avisa entre pestañas (el real sí): se recarga para no enlazar con uno viejo.
+await en.reload(); await en.waitForSelector('#entList .card.hoja'); await en.waitForFunction(() => eqListos >= 2, null, { timeout: 15000 });
 await subir('Pedro Gómez', 'devolucion', 'GPS778812');
 s = await st(en); const ridD = pendDe(s, 'GPS778812')[0][0].split('/').pop();
-await en.reload(); await en.waitForSelector('#entList .card.hoja'); await esp(300);
+await en.reload(); await en.waitForSelector('#entList .card.hoja');
+await en.waitForFunction(() => [...EQR.values()].some(x => x.serial === 'GPS778812' && !x.cerrado), null, { timeout: 15000 });   // Entregas ya cargó los recibidos de Equipos
 await abrirHoja('Pedro Gómez'); await en.click('#enDel'); await en.waitForSelector('#cfSheet:not([hidden])');
 log('D1. ofrece quitar el pendiente de Recibidos (marcado)', await en.locator('#cfBorrarPend').isChecked());
 await en.click('#cfYes'); await esp(600);
@@ -139,6 +146,52 @@ await en.reload(); await en.waitForSelector('#entList .card.hoja'); await esp(12
 s = await st(en);
 log('F2. una hoja vieja ya terminada NO se cambia sola a Entrega', s[`${BE}/entregas/e-vieja`].tipo === 'devolucion');
 log('F3. pero muestra que el equipo ya está listo', (await en.locator('#entList .card.hoja', { hasText: 'Hoja Vieja' }).innerText()).includes('ya listo'));
+
+console.log('\n— F2. Entregas muestra cuándo se terminaron el mantenimiento y el backup (en vivo desde Equipos)');
+const fb = f => f.split('-').reverse().join('/');   // 2026-10-30 → 30/10/2026
+const tarjetaDe = async nombre => { await en.reload(); await en.waitForSelector('#entList .card.hoja'); await esp(500); return (await en.locator('#entList .card.hoja', { hasText: nombre }).innerText()).replace(/\n/g, ' | '); };
+// Equipos pinta desde su copia guardada antes de conectarse: un cambio hecho en ese instante queda en la cola "sin conexión" y se envía al conectar.
+// Por eso se espera a que el cambio llegue de verdad al Firebase antes de seguir.
+const marcar = async (rid, t, v) => {
+  await eqp.reload(); await eqp.waitForSelector(`[data-rec="${rid}"]`);
+  await eqp.evaluate(([r, t, v]) => setTarea(r, t, v), [rid, t, v]);
+  for (let i = 0; i < 100; i++) { const x = (await st(eqp))[`${B}/recibidos/${rid}`]; if (x && (x[t] || 'pend') === v) return; await esp(100); }
+  throw new Error(`el cambio ${t}=${v} no llegó al Firebase`);
+};
+await subir('Diego Rojas', 'devolucion', 'NUEVO9911');
+s = await st(en); const ridF2 = pendDe(s, 'NUEVO9911')[0][0].split('/').pop();
+let t = await tarjetaDe('Diego Rojas');
+log('F2a. sin terminar: mantenimiento y backup pendientes, sin "Todo terminado"', t.includes('Mantenimiento pendiente') && t.includes('Backup pendiente') && !t.includes('Todo terminado'), t);
+await marcar(ridF2, 'mtto', 'hecho');
+t = await tarjetaDe('Diego Rojas');
+log('F2b. al terminar el mantenimiento en Equipos sale su fecha', t.includes(`Mantenimiento terminado ${fb(HOY)}`) && t.includes('Backup pendiente'), t);
+await marcar(ridF2, 'mtto', 'pend');
+t = await tarjetaDe('Diego Rojas');
+log('F2c. si se desmarca en Equipos, aquí se quita la fecha', t.includes('Mantenimiento pendiente') && !t.includes('Mantenimiento terminado'), t);
+await marcar(ridF2, 'mtto', 'hecho'); await marcar(ridF2, 'backup', 'hecho');
+t = await tarjetaDe('Diego Rojas');
+log('F2d. con los dos hechos salen las dos fechas y todavía no "Todo terminado"', t.includes(`Mantenimiento terminado ${fb(HOY)}`) && t.includes(`Backup terminado ${fb(HOY)}`) && !t.includes('Todo terminado'), t);
+await eqp.reload(); await eqp.waitForSelector(`[data-pasar="${ridF2}"]`);   // con los dos hechos el botón es "pasar", no "listo"
+await eqp.click(`[data-pasar="${ridF2}"]`); await eqp.waitForSelector('#cfSheet:not([hidden])'); await eqp.click('#cfYes'); await esp(700);
+t = await tarjetaDe('Diego Rojas');
+log('F2e. ya como Entrega: "Antes: devolución de Diego Rojas" con las tres fechas', t.includes('Antes: devolución de Diego Rojas') && t.includes(`Mantenimiento terminado ${fb(HOY)}`) && t.includes(`Backup terminado ${fb(HOY)}`) && t.includes(`Todo terminado ${fb(HOY)}`), t);
+await eqp.reload(); await eqp.waitForSelector('#recList .card.rec'); await eqp.click('#chipsRec [data-f="pasados"]');   // los ya pasados a Equipos no salen en "En espera"
+await eqp.waitForSelector(`[data-rec="${ridF2}"]`);
+await eqp.click(`[data-rec="${ridF2}"]`); await eqp.click('#rcDel'); await eqp.waitForSelector('#cfSheet:not([hidden])');
+if (await eqp.locator('#cfBorrarHoja').count()) await eqp.uncheck('#cfBorrarHoja');
+await eqp.click('#cfYes'); await esp(600);
+t = await tarjetaDe('Diego Rojas');
+log('F2f. si se borra el registro en Equipos, las fechas desaparecen y queda "Antes: devolución"', t.includes('Antes: devolución de Diego Rojas') && !t.includes('Mantenimiento') && !t.includes('Todo terminado'), t);
+const mx = await en.evaluate(() => ({
+  dos: tareaTerminada([{ mtto: 'hecho', mttoFecha: '2026-10-20' }, { mtto: 'hecho', mttoFecha: '2026-10-25' }], 'mtto'),
+  uno: tareaTerminada([{ mtto: 'hecho', mttoFecha: '2026-10-20' }, { mtto: 'pend' }], 'mtto'),
+  na: tareaTerminada([{ backup: 'na' }, { backup: 'na' }], 'backup'),
+  mixta: tareaTerminada([{ backup: 'na' }, { backup: 'hecho', backupFecha: '2026-10-21' }], 'backup'),
+  vieja: tareaTerminada([{ mtto: 'hecho' }], 'mtto'),
+  tarde: fechaLocal('2026-10-31T03:30:00.000Z')
+}));
+log('F2g. varios equipos: la fecha es la del último; "1 de 2 listos"; "no aplica"; hecho sin fecha', mx.dos === 'terminado 25/10/2026' && mx.uno === '1 de 2 listos' && mx.na === 'no aplica' && mx.mixta === 'terminado 21/10/2026' && mx.vieja === 'terminado', JSON.stringify(mx));
+await eqp.reload(); await eqp.waitForSelector('#recList .card.rec');
 
 console.log('\n— G. Agenda: tareas físicas, remotas y backup');
 await eqp.evaluate(B => { const d = JSON.parse(localStorage.getItem('__fs_falso')); d[`${B}/equipos/VB009911`].fechaMtto = '2025-01-01'; localStorage.setItem('__fs_falso', JSON.stringify(d)); }, B);
