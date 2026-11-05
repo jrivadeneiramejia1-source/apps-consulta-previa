@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=39">
+<link rel="stylesheet" href="../comun.css?v=40">
 <style>
 
 /* --- Entregas --- */
@@ -246,7 +246,7 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "39"};</script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "40"};</script>
 <script src="../iconos.js?v=32"></script>
 <script src="../comun.js?v=32"></script>
 <script src="escaner.js?v=32"></script>
@@ -447,7 +447,19 @@ function sello() { return { actualizado: new Date().toISOString(), por: miId || 
 const tipoNombre = k => (TIPOS.find(t => t.k === k) || TIPOS[0]).n;
 // Una hoja a nombre de Bodega no le entrega el equipo a nadie: se queda aquí. Se muestra como Bodega, aunque el tipo guardado siga siendo 'entrega'.
 const esBodega = e => (e.tipo || 'entrega') === 'entrega' && /^bodega/.test(sinTildes(e.nombre).trim());
-const etiquetaTipo = e => esBodega(e) ? 'Bodega' : tipoNombre(e.tipo);
+// Una devolución ya está en la bodega desde que la traen: la tarjeta dice Bodega (y quién la devolvió), no el nombre de esa persona.
+// La etiqueta sigue diciendo Devolución hasta que el mantenimiento y el backup terminan en Recibidos; entonces dice Bodega.
+// Todo esto es solo cómo se muestra: el tipo y el nombre guardados no cambian.
+const BODEGA = 'Bodega Riohacha';
+const esDevolucion = e => e.tipo === 'devolucion';
+const tituloHoja = e => esDevolucion(e) ? BODEGA : (e.nombre || 'Sin nombre');
+function devolucionTerminada(e) {
+  const ids = Object.values(e.recibidos || {});
+  if (!esDevolucion(e) || !EQDB || !ids.length) return false;
+  return ids.every(rid => { const r = EQR.get(rid); return r && (r.cerrado || ((r.mtto || 'pend') !== 'pend' && (r.backup || 'pend') !== 'pend')); });
+}
+const enBodega = e => esBodega(e) || devolucionTerminada(e);
+const etiquetaTipo = e => enBodega(e) ? 'Bodega' : tipoNombre(e.tipo);
 const nombreOpcionTipo = (t, e) => t.k === 'entrega' && esBodega(e) ? 'Bodega' : t.n;
 const lista = () => [...ENT.entries()].map(([id, e]) => Object.assign({ id }, e));
 // Corre las tareas de a n a la vez. Si una falla, no empieza más, espera las que iban y lanza el primer error.
@@ -596,7 +608,7 @@ function pintarEspacio() {
 /* ================= HOJAS GUARDADAS ================= */
 const FILTROS = [{ k: 'todos', n: 'Todas' }, { k: 'mes', n: 'De este mes' }, { k: 'entrega', n: 'Entregas' }, { k: 'devolucion', n: 'Devoluciones' }, { k: 'bodega', n: 'Bodega' }, { k: 'otro', n: 'Otras' }, { k: 'sindatos', n: 'Sin nombre o fecha' }];
 const textoDe = e => sinTildes([e.nombre, e.cedula, e.seriales, e.proyecto, textoEquipos(equiposDe(e)), e.nota, e.origen].join(' '));
-function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'mes') return (e.fecha || '').startsWith(hoyIso().slice(0, 7)); if (f === 'sindatos') return !e.nombre || !e.fecha; if (f === 'bodega') return esBodega(e); return (e.tipo || 'entrega') === f && !esBodega(e); }
+function pasaFiltro(e, f) { if (f === 'todos') return true; if (f === 'mes') return (e.fecha || '').startsWith(hoyIso().slice(0, 7)); if (f === 'sindatos') return !e.nombre || !e.fecha; if (f === 'bodega') return enBodega(e); return (e.tipo || 'entrega') === f && !enBodega(e); }
 // Cuándo se terminaron el mantenimiento y el backup de una devolución. Las fechas salen EN VIVO de los registros de Recibidos
 // de Equipos (no se copian a la hoja): si allá se desmarca o se borra el registro, aquí también se quitan.
 function fechaLocal(iso) { const d = new Date(iso); return isNaN(d) ? '' : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -620,11 +632,17 @@ function lineaTerminacion(e) {
 // Qué pasa con la hoja en Equipos: devolución en espera, o entrega que antes fue devolución.
 function estadoHoja(e) {
   if (e.devolucion && e.tipo === 'entrega') return `<span class="meta">Antes: devolución de ${esc(e.devolucion.nombre || 'sin nombre')} (${fechaBonita(e.devolucion.fecha)})</span>${lineaTerminacion(e)}`;
-  if (e.tipo !== 'devolucion' || !EQDB) return '';
+  if (!esDevolucion(e)) return '';
+  // El nombre de la hoja es de quien lo devolvió; el título de la tarjeta dice Bodega.
+  const quien = e.nombre ? `<span class="meta">Devuelto por ${esc(e.nombre)}</span>` : '';
+  if (!EQDB) return quien;
   const rs = Object.values(e.recibidos || {}).map(rid => EQR.get(rid)).filter(Boolean);
-  if (!rs.length) return '';
+  if (!rs.length) return quien;
   const pend = rs.filter(x => !x.cerrado).length;
-  return (pend ? `<span><span class="pill s-org">${ico('reloj')}En Recibidos, sin terminar</span></span>` : `<span><span class="pill s-disco">${ico('checkCirculo')}Equipo ya listo en Equipos</span></span>`) + lineaTerminacion(e);
+  const estado = !pend ? `<span class="pill s-disco">${ico('checkCirculo')}Equipo ya listo en Equipos</span>`
+    : devolucionTerminada(e) ? `<span class="pill s-disco">${ico('checkCirculo')}Listo para pasar a Equipos</span>`
+    : `<span class="pill s-org">${ico('reloj')}En Recibidos, sin terminar</span>`;
+  return quien + `<span>${estado}</span>` + lineaTerminacion(e);
 }
 // Quién bajó el PDF de la hoja y cuándo (se guarda al descargarlo; la última descarga).
 function avisoDescarga(e) {
@@ -655,11 +673,11 @@ function renderEnt() {
   ver.forEach(e => {
     const g = mesDe(e.fecha);
     if (g !== grupo) { grupo = g; html += `<div class="month">${esc(g)}</div>`; }
-    const n = (e.paginas || []).length, tp = esBodega(e) ? 'bodega' : (e.tipo || 'entrega');
+    const n = (e.paginas || []).length, tp = enBodega(e) ? 'bodega' : (e.tipo || 'entrega');
     html += `<button type="button" class="card hoja" data-en="${esc(e.id)}">
       ${e.miniatura ? `<img class="mini-hoja" src="${esc(e.miniatura)}" alt="" loading="lazy">` : `<span class="mini-hoja vacia">${ico('hojaVacia')}</span>`}
       <span class="hoja-t">
-        <span class="card-head"><span class="card-title">${esc(e.nombre || 'Sin nombre')}</span><span class="pill t-${esc(tp)}">${tp === 'otro' ? '' : ico(tp === 'devolucion' ? 'devolucion' : tp === 'bodega' ? 'otro' : 'entrega')}${etiquetaTipo(e)}</span></span>
+        <span class="card-head"><span class="card-title">${esc(tituloHoja(e))}</span><span class="pill t-${esc(tp)}">${tp === 'otro' ? '' : ico(tp === 'devolucion' ? 'devolucion' : tp === 'bodega' ? 'otro' : 'entrega')}${etiquetaTipo(e)}</span></span>
         <span class="facts"><span class="mono">${fechaBonita(e.fecha)}</span>${e.cedula ? `<span>CC ${esc(e.cedula)}</span>` : ''}<span>${n} ${n === 1 ? 'página' : 'páginas'}</span></span>
         ${equiposDe(e).length ? `<span class="meta mono">${esc(textoSeriales(equiposDe(e)))}</span>` : ''}
         ${estadoHoja(e)}
@@ -1132,7 +1150,7 @@ async function imagenDe(id, pi) {
 function abrirEn(id) {
   const e = ENT.get(id); if (!e) { toast('Esa hoja ya no existe.'); return; }
   enActual = id;
-  $('enTitle').textContent = e.nombre || 'Sin nombre';
+  $('enTitle').textContent = tituloHoja(e);
   $('enSub').textContent = `${etiquetaTipo(e)} · ${fechaBonita(e.fecha)} · ${(e.paginas || []).length} ${(e.paginas || []).length === 1 ? 'página' : 'páginas'}`;
   $('enTipo').innerHTML = TIPOS.map(t => `<option value="${t.k}">${nombreOpcionTipo(t, e)}</option>`).join('');
   $('enNombre').value = e.nombre || ''; $('enCedula').value = e.cedula || ''; $('enFecha').value = e.fecha || '';

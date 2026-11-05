@@ -37,10 +37,10 @@ for (const tema of ['light', 'dark']) {
 
   // ---- Bodega ----
   const pill = async n => ({ texto: (await card(n).locator('.card-head .pill').innerText()).trim(), clase: await card(n).locator('.card-head .pill').getAttribute('class') });
-  const pb = await pill('Bodega Riohacha'), pe = await pill('Luis Pérez'), pd = await pill('Ginna');
+  const pb = await pill('MERCEDES'), pe = await pill('Luis Pérez'), pd = await pill('Ginna');
   log('B1. la hoja a nombre de Bodega dice Bodega, no Entrega' + sufijo, pb.texto === 'Bodega' && /\bt-bodega\b/.test(pb.clase), JSON.stringify(pb));
   log('B2. la entrega a una persona sigue diciendo Entrega y la devolución Devolución' + sufijo, pe.texto === 'Entrega' && pd.texto === 'Devolución', JSON.stringify([pe, pd]));
-  log('B3. la hoja de Bodega conserva "Antes: devolución de…"' + sufijo, (await card('Bodega Riohacha').innerText()).includes('Antes: devolución de MERCEDES ARPUSHAINA PUSHAINA'));
+  log('B3. la hoja de Bodega conserva "Antes: devolución de…"' + sufijo, (await card('MERCEDES').innerText()).includes('Antes: devolución de MERCEDES ARPUSHAINA PUSHAINA'));
   const chips = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#chipsEnt .chip')].map(c => [c.dataset.f, Number(c.querySelector('.n').textContent)])));
   log('B4. los filtros cuentan aparte: Entregas 1, Devoluciones 1, Bodega 1' + sufijo, chips.entrega === 1 && chips.devolucion === 1 && chips.bodega === 1 && chips.todos === 3, JSON.stringify(chips));
   await page.click('#chipsEnt [data-f="bodega"]'); await esp(150);
@@ -50,7 +50,7 @@ for (const tema of ['light', 'dark']) {
   await page.click('#chipsEnt [data-f="todos"]'); await esp(150);
 
   // ---- La hoja abierta ----
-  await card('Bodega Riohacha').click(); await page.waitForSelector('#enSheet:not([hidden])');
+  await card('MERCEDES').click(); await page.waitForSelector('#enSheet:not([hidden])');
   const sub = (await page.textContent('#enSub')).trim();
   const opt = await page.evaluate(() => { const s = document.getElementById('enTipo'); return { valor: s.value, texto: s.selectedOptions[0].textContent.trim() }; });
   log('B7. el título de la hoja abierta dice Bodega' + sufijo, sub.startsWith('Bodega ·'), sub);
@@ -70,14 +70,14 @@ for (const tema of ['light', 'dark']) {
   log('D6. la hoja abierta dice quién la descargó' + sufijo, /Descargada por Jeiler/.test(ed), ed);
   await page.keyboard.press('Escape'); await esp(200);
   await esp(200);
-  const tj = await card('Bodega Riohacha').locator('.descarga').innerText().catch(() => '');
+  const tj = await card('MERCEDES').locator('.descarga').innerText().catch(() => '');
   log('D7. la tarjeta muestra Descargado, quién y cuándo' + sufijo, /Descargado/.test(tj) && /por Jeiler/.test(tj) && /hace un momento/.test(tj), JSON.stringify(tj));
   log('D8. las otras hojas no muestran Descargado' + sufijo, await page.locator('#entList .descarga').count() === 1);
   await page.evaluate(() => document.querySelectorAll('a[download]').forEach(a => a.remove()));   // el enlace vacío con que nube.js baja el archivo dura 5 s
   await axe(page, 'lista de hojas con Bodega y Descargado' + sufijo);
   if (tema === 'light') await page.screenshot({ path: SALIDA + '/bodega-descarga.png' });
   await page.reload(); await page.waitForSelector('#entList .card.hoja'); await esp(500);
-  log('D9. al recargar sigue marcada como descargada' + sufijo, (await card('Bodega Riohacha').locator('.descarga').count()) === 1);
+  log('D9. al recargar sigue marcada como descargada' + sufijo, (await card('MERCEDES').locator('.descarga').count()) === 1);
 
   // ---- Excel y Base de datos ----
   if (tema === 'light') {
