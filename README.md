@@ -75,6 +75,11 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - Solo cambia cómo se muestra: no se toca el tipo ni el nombre guardados, ni la app Equipos (allá una impresora vieja sigue pidiendo backup hasta que se marque «No aplica»). El filtro **Devoluciones**, el **Excel** y el subtítulo de la hoja siguen diciendo Devolución o Bodega.
 - Prueba: `node pruebas/devolucion-bodega.mjs`.
 
+## «Devuelto por» y «Entrega a» (v42)
+- En una devolución, la línea **Devuelto por [nombre]** ahora se ve con texto de tamaño normal y el nombre en negrita (antes era texto pequeño y gris), para saber de un vistazo quién la devolvió.
+- Una entrega a una persona dice **Entrega a [nombre]** en la tarjeta y en el título de la hoja abierta. Una entrega a Bodega, una hoja «Otro» o una sin nombre se ven como antes. El nombre guardado no cambia (el campo Nombre sigue siendo solo el nombre) y la búsqueda sigue funcionando por nombre.
+- Prueba: `node pruebas/devolucion-bodega.mjs`.
+
 ## Aviso de «la app se actualizó» (v36)
 - Cuando se publica una versión con novedades, **la primera persona que abre Equipos** le manda a todas las personas con notificaciones activadas un aviso que **dice qué app se actualizó** ("Se actualizó Entregas (versión N)", "Se actualizaron Equipos y Entregas (versión N)") y, en el texto, lo que cambió. Le llega también a quien abrió. No le llega a quien no activó notificaciones en Equipos (sin eso el teléfono no puede recibirlas); esa persona ve los cambios al abrir la app. Si nadie abre Equipos, el aviso no sale (abrir solo Entregas no lo manda).
 - Las novedades salen de `version.json`: `{"v": "39", "notas": ["Entregas: lo que cambió", "Equipos: otra cosa"]}`. **Solo se avisa si hay `notas`**; sin ellas la actualización es en silencio. Cada nota debe ser corta (el aviso las une con " · " y se corta a 400 letras).

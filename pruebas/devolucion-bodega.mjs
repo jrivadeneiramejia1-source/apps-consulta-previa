@@ -1,6 +1,7 @@
 // Versión 40: una devolución se ve en Bodega desde que la traen (no con el nombre de quien la devolvió).
 // Versión 41: mientras espera, el título dice "Devolución · Bodega Riohacha" y la etiqueta dice qué está pendiente
 // (mantenimiento, backup o los dos; el backup no se pide a impresoras ni a otros equipos sin backup). Al terminar dice Bodega.
+// Versión 42: "Devuelto por [nombre]" se ve más (tamaño normal, nombre en negrita) y una entrega a una persona dice "Entrega a [nombre]".
 // Uso: node pruebas/devolucion-bodega.mjs
 /* global EQR, renderEnt */   // variables y funciones de la página de Entregas, usadas dentro de page.evaluate
 import fs from 'node:fs';
@@ -32,6 +33,7 @@ const HOJAS = {
   'e-ent': hoja('Luis Pérez', 'entrega', 'GPS778812', { fecha: '2026-10-26' }),
   'e-bod': hoja('Bodega Riohacha', 'entrega', 'BOD00001', { fecha: '2026-10-25' }),
   'e-otro': hoja('Hoja Otra', 'otro', '', { fecha: '2026-10-24' }),
+  'e-sn': hoja('', 'entrega', 'SN000001', { fecha: '2026-10-13' }),
   // v41: equipos que no llevan backup (impresora) y uno que sí (tablet)
   'e-imp': hoja('Iván Impresora', 'devolucion', 'IMP00001', { recibidos: { IMP00001: 'r-imp' }, equipos: [{ tipo: 'Impresora', serial: 'IMP00001' }], fecha: '2026-10-16' }),
   'e-imp2': hoja('Irene Impresora', 'devolucion', 'IMP00002', { recibidos: { IMP00002: 'r-imp2' }, equipos: [{ tipo: 'Impresora', serial: 'IMP00002' }], fecha: '2026-10-15' }),
@@ -88,13 +90,17 @@ for (const tema of ['light', 'dark']) {
   log('V16. ninguna etiqueta de espera dice "en proceso"' + sufijo, !Object.values(V).some(x => /en proceso/i.test(x.pill) || /en proceso/i.test(x.texto)), JSON.stringify(Object.values(V).map(x => x.pill)));
 
   // ---- Lo que no cambia ----
-  log('V10. una entrega a una persona sigue con su nombre y Entrega' + sufijo, es('e-ent', 'Luis Pérez', 'Entrega', 't-entrega') && !V['e-ent'].texto.includes('Devuelto por'), JSON.stringify(V['e-ent']));
+  log('V10. una entrega a una persona dice "Entrega a [nombre]" y la etiqueta Entrega' + sufijo, es('e-ent', 'Entrega a Luis Pérez', 'Entrega', 't-entrega') && !V['e-ent'].texto.includes('Devuelto por'), JSON.stringify(V['e-ent']));
   log('V11. una entrega a Bodega dice Bodega enseguida, sin pasar por Devolución' + sufijo, es('e-bod', 'Bodega Riohacha', 'Bodega', 't-bodega') && !V['e-bod'].texto.includes('Devuelto por'), JSON.stringify(V['e-bod']));
   log('V12. una hoja "Otro" no cambia' + sufijo, V['e-otro'].titulo === 'Hoja Otra' && V['e-otro'].pill === 'Otro', JSON.stringify(V['e-otro']));
+  log('V17. una entrega sin nombre sigue diciendo "Sin nombre" (no "Entrega a ")' + sufijo, V['e-sn'].titulo === 'Sin nombre', JSON.stringify(V['e-sn']));
+  // "Devuelto por [nombre]" tiene que verse: tamaño de texto normal, nombre en negrita y más oscuro que el texto de apoyo.
+  const quien = await card('e-pend').evaluate(c => { const q = c.querySelector('.quien'), m = c.querySelector('.meta'), n = q && q.querySelector('b'); return q && n ? { texto: q.textContent.trim(), px: parseFloat(getComputedStyle(q).fontSize), peso: Number(getComputedStyle(n).fontWeight), color: getComputedStyle(q).color, colorMeta: m ? getComputedStyle(m).color : '' } : null; });
+  log('V18. "Devuelto por [nombre]" se ve: texto de 16 px, nombre en negrita y color más oscuro que el texto de apoyo' + sufijo, !!quien && quien.texto === 'Devuelto por Ginna Marcela Calvo Ocampo' && quien.px >= 15.5 && quien.peso >= 700 && quien.color !== quien.colorMeta, JSON.stringify(quien));
 
   // ---- Filtros y búsqueda ----
   const chips = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#chipsEnt .chip')].map(c => [c.dataset.f, Number(c.querySelector('.n').textContent)])));
-  log('F1. los filtros cuentan lo que se ve: Devoluciones 6, Bodega 5, Entregas 1, Otras 1, Todas 13' + sufijo, chips.devolucion === 6 && chips.bodega === 5 && chips.entrega === 1 && chips.otro === 1 && chips.todos === 13, JSON.stringify(chips));
+  log('F1. los filtros cuentan lo que se ve: Devoluciones 6, Bodega 5, Entregas 2, Otras 1, Todas 14' + sufijo, chips.devolucion === 6 && chips.bodega === 5 && chips.entrega === 2 && chips.otro === 1 && chips.todos === 14, JSON.stringify(chips));
   const ids = async () => page.evaluate(() => [...document.querySelectorAll('#entList .card.hoja')].map(c => c.dataset.en).sort());
   await page.click('#chipsEnt [data-f="devolucion"]'); await esp(150);
   log('F2. el filtro Devoluciones muestra solo las que siguen sin terminar' + sufijo, JSON.stringify(await ids()) === JSON.stringify(['e-dos', 'e-imp', 'e-parc', 'e-pend', 'e-sin', 'e-tab']), JSON.stringify(await ids()));
@@ -120,6 +126,10 @@ for (const tema of ['light', 'dark']) {
   const ab = await page.evaluate(() => ({ titulo: document.getElementById('enTitle').textContent.trim(), sub: document.getElementById('enSub').textContent.trim(), nombre: document.getElementById('enNombre').value, tipo: document.getElementById('enTipo').value }));
   log('H1. la hoja abierta dice Devolución · Bodega Riohacha arriba y Devolución como etiqueta' + sufijo, ab.titulo === 'Devolución · Bodega Riohacha' && ab.sub.startsWith('Devolución ·'), JSON.stringify(ab));
   log('H2. el campo Nombre conserva a quien devolvió y el Tipo sigue siendo devolución' + sufijo, ab.nombre === 'Ginna Marcela Calvo Ocampo' && ab.tipo === 'devolucion', JSON.stringify(ab));
+  await page.keyboard.press('Escape'); await esp(200);
+  await card('e-ent').click(); await page.waitForSelector('#enSheet:not([hidden])');
+  const ab4 = await page.evaluate(() => ({ titulo: document.getElementById('enTitle').textContent.trim(), nombre: document.getElementById('enNombre').value }));
+  log('H4. la hoja abierta de una entrega dice "Entrega a [nombre]" arriba y el campo Nombre conserva solo el nombre' + sufijo, ab4.titulo === 'Entrega a Luis Pérez' && ab4.nombre === 'Luis Pérez', JSON.stringify(ab4));
   await page.keyboard.press('Escape'); await esp(200);
   await card('e-listo').click(); await page.waitForSelector('#enSheet:not([hidden])');
   const ab2 = await page.evaluate(() => ({ titulo: document.getElementById('enTitle').textContent.trim(), sub: document.getElementById('enSub').textContent.trim(), nombre: document.getElementById('enNombre').value }));
