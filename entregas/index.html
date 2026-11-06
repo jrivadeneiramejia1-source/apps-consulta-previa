@@ -34,6 +34,8 @@ label.subir { cursor: pointer; }
 /* La etiqueta de una devolución puede decir "Mantenimiento y backup pendientes": si no cabe junto al título, baja a su línea en vez de cortarse. */
 .card.hoja .card-head { flex-wrap: wrap; }
 .card.hoja .card-head .pill { white-space: normal; text-align: left; }
+.quien { font-size: 1rem; color: var(--fg); line-height: 1.3; overflow-wrap: anywhere; }
+.quien b { font-weight: 700; }
 .meta.term { display: flex; flex-direction: column; gap: 2px; }
 .meta.term span { overflow-wrap: anywhere; }
 .pill.t-entrega { color: var(--listo); background: var(--listo-bg); }
@@ -465,7 +467,9 @@ function devolucionTerminada(e) {
   if (!esDevolucion(e) || !EQDB || !ids.length) return false;
   return ids.every(rid => { const r = EQR.get(rid); return r && (r.cerrado || !faltaRec(r).length); });
 }
-const tituloHoja = e => esDevolucion(e) ? (devolucionTerminada(e) ? BODEGA : 'Devolución · ' + BODEGA) : (e.nombre || 'Sin nombre');
+// Una entrega a una persona dice "Entrega a [nombre]" (no solo el nombre); una a Bodega, una "Otro" o una sin nombre se quedan como estaban.
+const tituloHoja = e => esDevolucion(e) ? (devolucionTerminada(e) ? BODEGA : 'Devolución · ' + BODEGA)
+  : (e.tipo || 'entrega') === 'entrega' && e.nombre && !esBodega(e) ? 'Entrega a ' + e.nombre : (e.nombre || 'Sin nombre');
 const enBodega = e => esBodega(e) || devolucionTerminada(e);
 const etiquetaTipo = e => enBodega(e) ? 'Bodega' : tipoNombre(e.tipo);
 // Etiqueta de la tarjeta: una devolución sin terminar dice qué está pendiente (si no se sabe, dice Devolución).
@@ -654,7 +658,7 @@ function estadoHoja(e) {
   if (e.devolucion && e.tipo === 'entrega') return `<span class="meta">Antes: devolución de ${esc(e.devolucion.nombre || 'sin nombre')} (${fechaBonita(e.devolucion.fecha)})</span>${lineaTerminacion(e)}`;
   if (!esDevolucion(e)) return '';
   // El nombre de la hoja es de quien lo devolvió; el título de la tarjeta dice Bodega.
-  const quien = e.nombre ? `<span class="meta">Devuelto por ${esc(e.nombre)}</span>` : '';
+  const quien = e.nombre ? `<span class="quien">Devuelto por <b>${esc(e.nombre)}</b></span>` : '';
   if (!EQDB) return quien;
   const rs = Object.values(e.recibidos || {}).map(rid => EQR.get(rid)).filter(Boolean);
   if (!rs.length) return quien;
