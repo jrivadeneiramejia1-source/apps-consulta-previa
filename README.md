@@ -67,6 +67,14 @@ Los datos viven en Firebase (Firestore). Cada app pide una **clave de acceso** l
 - Una entrega a "Bodega…" sigue diciendo Bodega desde el primer momento.
 - Prueba: `node pruebas/devolucion-bodega.mjs`.
 
+## Devolución en espera vs. Bodega (v41)
+- Una devolución en espera ya no se llama igual que una terminada. Mientras falte algo, la tarjeta y la hoja abierta dicen **Devolución · Bodega Riohacha**; cuando termina pasa a **Bodega Riohacha**.
+- La etiqueta de color dice **qué está pendiente**: *Mantenimiento pendiente*, *Backup pendiente* o *Mantenimiento y backup pendientes* (se mira en Recibidos de Equipos; «Hecho» y «No aplica» ya no faltan). Si la hoja no está conectada con Equipos, dice solo *Devolución*. Nunca dice «en proceso».
+- **El backup solo se pide a equipos que lo llevan.** No se les pide a: impresora, monitor, video beam o proyector, bafle, radio, escáner, antena, Starlink y router (lista `SIN_BACKUP` en `entregas/index.html`). Portátil, PC, tablet, celular, GPS, cámaras, disco duro, «Otro» y equipos sin tipo sí llevan backup. Si el equipo no lleva backup, tampoco aparece «Backup …» en la tarjeta y basta con el mantenimiento para pasar a Bodega.
+- El **PDF** que se descarga se llama como se ve la hoja: «Devolución Bodega Riohacha - Quien 2026-10-23.pdf» mientras espera y «Bodega Riohacha - Quien 2026-10-23.pdf» al terminar.
+- Solo cambia cómo se muestra: no se toca el tipo ni el nombre guardados, ni la app Equipos (allá una impresora vieja sigue pidiendo backup hasta que se marque «No aplica»). El filtro **Devoluciones**, el **Excel** y el subtítulo de la hoja siguen diciendo Devolución o Bodega.
+- Prueba: `node pruebas/devolucion-bodega.mjs`.
+
 ## Aviso de «la app se actualizó» (v36)
 - Cuando se publica una versión con novedades, **la primera persona que abre Equipos** le manda a todas las personas con notificaciones activadas un aviso que **dice qué app se actualizó** ("Se actualizó Entregas (versión N)", "Se actualizaron Equipos y Entregas (versión N)") y, en el texto, lo que cambió. Le llega también a quien abrió. No le llega a quien no activó notificaciones en Equipos (sin eso el teléfono no puede recibirlas); esa persona ve los cambios al abrir la app. Si nadie abre Equipos, el aviso no sale (abrir solo Entregas no lo manda).
 - Las novedades salen de `version.json`: `{"v": "39", "notas": ["Entregas: lo que cambió", "Equipos: otra cosa"]}`. **Solo se avisa si hay `notas`**; sin ellas la actualización es en silencio. Cada nota debe ser corta (el aviso las une con " · " y se corta a 400 letras).
