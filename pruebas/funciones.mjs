@@ -181,7 +181,7 @@ await page.click('#rcCancel');
 // Abrir la hoja desde Equipos: Entregas la muestra
 await page.goto(URL + '/entregas/?hoja=e-semilla');
 await page.waitForSelector('#enSheet:not([hidden])', { timeout: 10000 }).catch(() => {});
-log('H1. Entregas abre directo la hoja que se tocó en Equipos', await page.locator('#enSheet').isVisible() && (await page.textContent('#enTitle')) === 'Ana Gómez');
+log('H1. Entregas abre directo la hoja que se tocó en Equipos', await page.locator('#enSheet').isVisible() && (await page.textContent('#enTitle')) === 'Entrega a Ana Gómez');
 await page.click('#enCancel'); await esp(150);
 
 // ======================= ENTREGAS =======================
