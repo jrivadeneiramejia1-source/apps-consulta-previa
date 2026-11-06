@@ -1,5 +1,6 @@
 // Versión 40: una devolución se ve en Bodega desde que la traen (no con el nombre de quien la devolvió).
-// La etiqueta dice Devolución hasta que el mantenimiento y el backup terminan; entonces dice Bodega.
+// Versión 41: mientras espera, el título dice "Devolución · Bodega Riohacha" y la etiqueta dice qué está pendiente
+// (mantenimiento, backup o los dos; el backup no se pide a impresoras ni a otros equipos sin backup). Al terminar dice Bodega.
 // Uso: node pruebas/devolucion-bodega.mjs
 /* global EQR, renderEnt */   // variables y funciones de la página de Entregas, usadas dentro de page.evaluate
 import fs from 'node:fs';
@@ -30,7 +31,11 @@ const HOJAS = {
   'e-sin': hoja('Sofía Sinenlace', 'devolucion', 'SIN00001', { fecha: '2026-10-17' }),
   'e-ent': hoja('Luis Pérez', 'entrega', 'GPS778812', { fecha: '2026-10-26' }),
   'e-bod': hoja('Bodega Riohacha', 'entrega', 'BOD00001', { fecha: '2026-10-25' }),
-  'e-otro': hoja('Hoja Otra', 'otro', '', { fecha: '2026-10-24' })
+  'e-otro': hoja('Hoja Otra', 'otro', '', { fecha: '2026-10-24' }),
+  // v41: equipos que no llevan backup (impresora) y uno que sí (tablet)
+  'e-imp': hoja('Iván Impresora', 'devolucion', 'IMP00001', { recibidos: { IMP00001: 'r-imp' }, equipos: [{ tipo: 'Impresora', serial: 'IMP00001' }], fecha: '2026-10-16' }),
+  'e-imp2': hoja('Irene Impresora', 'devolucion', 'IMP00002', { recibidos: { IMP00002: 'r-imp2' }, equipos: [{ tipo: 'Impresora', serial: 'IMP00002' }], fecha: '2026-10-15' }),
+  'e-tab': hoja('Tomás Tablet', 'devolucion', 'TAB00001', { recibidos: { TAB00001: 'r-tab' }, equipos: [{ tipo: 'Tablet', serial: 'TAB00001' }], fecha: '2026-10-14' })
 };
 for (const [id, h] of Object.entries(HOJAS)) { F[`${BE}/entregas/${id}`] = h; F[`${BE}/archivos/${id}_0_0`] = { d: 'AAAA' }; }
 F[`${B}/recibidos/r-pend`] = recibido('PEND0001', 'e-pend', 'pend', 'pend');
@@ -40,14 +45,20 @@ F[`${B}/recibidos/r-na`] = recibido('NOAP0001', 'e-na', 'hecho', 'na');
 F[`${B}/recibidos/r-cerr`] = recibido('CERR0001', 'e-cerr', 'hecho', 'hecho', { cerrado: true, cerradoEn: '2026-10-30T15:00:00.000Z' });   // de antes: sin "cerradoA", la hoja no se convierte sola
 F[`${B}/recibidos/r-dos1`] = recibido('DOS00001', 'e-dos', 'hecho', 'hecho');
 F[`${B}/recibidos/r-dos2`] = recibido('DOS00002', 'e-dos', 'hecho', 'pend');
+F[`${B}/recibidos/r-imp`] = recibido('IMP00001', 'e-imp', 'pend', 'pend', { tipo: 'Impresora Portátil' });   // el backup no se le pide a una impresora
+F[`${B}/recibidos/r-imp2`] = recibido('IMP00002', 'e-imp2', 'hecho', 'pend', { tipo: 'Impresora Portátil' });   // mantenimiento hecho: ya está lista aunque el backup siga en pendiente
+F[`${B}/recibidos/r-tab`] = recibido('TAB00001', 'e-tab', 'hecho', 'pend', { tipo: 'Tablet' });
 Object.assign(sem, { nube_entregas_espacio: huella('entregas', CLAVE), nube_entregas_nombre: 'Jeiler', nube_equipos_enlace_entregas: huella('entregas', CLAVE), nube_entregas_enlace_equipos: huella('equipos', CLAVE) });
 
 const srv = await servir(8834); const br = await lanzar();
+// pdf-lib viene de internet y las pruebas no lo tienen: se pone uno de mentira que solo arma un PDF vacío.
+const PDFLIB_FALSO = () => { window.PDFLib = { PDFDocument: { create: async () => ({ embedJpg: async () => ({ width: 100, height: 140 }), addPage: () => ({ drawImage() {} }), save: async () => new Uint8Array([37, 80, 68, 70]) }) } }; };
 const err = [];
 for (const tema of ['light', 'dark']) {
   const sufijo = tema === 'dark' ? ' (oscuro)' : '';
   console.log(`\n— Entregas${sufijo}`);
   const { ctx, page } = await pagina(br, { tema, semilla: sem, errores: err });
+  await ctx.addInitScript(PDFLIB_FALSO);
   await page.goto(URL + '/entregas/'); await page.waitForSelector('#entList .card.hoja'); await esp(800);   // da tiempo a que lleguen los registros de Equipos
   const card = id => page.locator(`#entList .card.hoja[data-en="${id}"]`);
   const vista = async id => {
@@ -58,17 +69,23 @@ for (const tema of ['light', 'dark']) {
   const es = (id, titulo, pill, clase) => V[id].titulo === titulo && V[id].pill === pill && new RegExp('\\b' + clase + '\\b').test(V[id].clase);
 
   // ---- Devolución sin terminar: Bodega con la etiqueta Devolución ----
-  log('V1. devolución recién traída: el título dice Bodega Riohacha (no el nombre) y la etiqueta Devolución' + sufijo, es('e-pend', 'Bodega Riohacha', 'Devolución', 't-devolucion'), JSON.stringify(V['e-pend']));
+  log('V1. devolución recién traída: el título dice Devolución · Bodega Riohacha (no el nombre) y la etiqueta dice que falta mantenimiento y backup' + sufijo, es('e-pend', 'Devolución · Bodega Riohacha', 'Mantenimiento y backup pendientes', 't-devolucion'), JSON.stringify(V['e-pend']));
   log('V2. sigue diciendo quién la devolvió y que está en Recibidos' + sufijo, V['e-pend'].texto.includes('Devuelto por Ginna Marcela Calvo Ocampo') && V['e-pend'].texto.includes('En Recibidos, sin terminar'), V['e-pend'].texto);
-  log('V3. con solo el mantenimiento hecho sigue en Devolución' + sufijo, es('e-parc', 'Bodega Riohacha', 'Devolución', 't-devolucion') && V['e-parc'].texto.includes('En Recibidos, sin terminar'), JSON.stringify(V['e-parc']));
-  log('V4. con dos equipos, si a uno le falta el backup sigue en Devolución' + sufijo, es('e-dos', 'Bodega Riohacha', 'Devolución', 't-devolucion'), JSON.stringify(V['e-dos']));
-  log('V5. sin enlace con Equipos también dice Bodega, Devolución y quién la devolvió' + sufijo, es('e-sin', 'Bodega Riohacha', 'Devolución', 't-devolucion') && V['e-sin'].texto.includes('Devuelto por Sofía Sinenlace') && !V['e-sin'].texto.includes('Recibidos'), JSON.stringify(V['e-sin']));
+  log('V3. con solo el mantenimiento hecho, la etiqueta dice Backup pendiente' + sufijo, es('e-parc', 'Devolución · Bodega Riohacha', 'Backup pendiente', 't-devolucion') && V['e-parc'].texto.includes('En Recibidos, sin terminar'), JSON.stringify(V['e-parc']));
+  log('V4. con dos equipos, si a uno le falta el backup dice Backup pendiente' + sufijo, es('e-dos', 'Devolución · Bodega Riohacha', 'Backup pendiente', 't-devolucion'), JSON.stringify(V['e-dos']));
+  log('V5. sin enlace con Equipos dice Devolución · Bodega Riohacha, etiqueta Devolución (no se sabe qué falta) y quién la devolvió' + sufijo, es('e-sin', 'Devolución · Bodega Riohacha', 'Devolución', 't-devolucion') && V['e-sin'].texto.includes('Devuelto por Sofía Sinenlace') && !V['e-sin'].texto.includes('Recibidos'), JSON.stringify(V['e-sin']));
 
   // ---- Mantenimiento y backup terminados: etiqueta Bodega ----
   log('V6. mantenimiento y backup hechos (sin dar Listo todavía): la etiqueta pasa a Bodega' + sufijo, es('e-listo', 'Bodega Riohacha', 'Bodega', 't-bodega'), JSON.stringify(V['e-listo']));
   log('V7. y dice "Listo para pasar a Equipos" y quién la devolvió' + sufijo, V['e-listo'].texto.includes('Listo para pasar a Equipos') && V['e-listo'].texto.includes('Devuelto por Laura Lista') && !V['e-listo'].texto.includes('En Recibidos, sin terminar'), V['e-listo'].texto);
   log('V8. backup "No aplica" también cuenta como terminado' + sufijo, es('e-na', 'Bodega Riohacha', 'Bodega', 't-bodega'), JSON.stringify(V['e-na']));
   log('V9. una devolución de antes ya cerrada en Equipos dice Bodega y "Equipo ya listo en Equipos"' + sufijo, es('e-cerr', 'Bodega Riohacha', 'Bodega', 't-bodega') && V['e-cerr'].texto.includes('Equipo ya listo en Equipos'), JSON.stringify(V['e-cerr']));
+
+  // ---- Equipos que no llevan backup ----
+  log('V13. una impresora recién traída solo dice Mantenimiento pendiente: nunca pide backup' + sufijo, es('e-imp', 'Devolución · Bodega Riohacha', 'Mantenimiento pendiente', 't-devolucion') && !/backup/i.test(V['e-imp'].texto), JSON.stringify(V['e-imp']));
+  log('V14. una impresora con el mantenimiento hecho ya está lista (Bodega) aunque el backup siga en pendiente, y no menciona backup' + sufijo, es('e-imp2', 'Bodega Riohacha', 'Bodega', 't-bodega') && V['e-imp2'].texto.includes('Listo para pasar a Equipos') && !/backup/i.test(V['e-imp2'].texto), JSON.stringify(V['e-imp2']));
+  log('V15. una tablet con el mantenimiento hecho sí pide el backup' + sufijo, es('e-tab', 'Devolución · Bodega Riohacha', 'Backup pendiente', 't-devolucion') && V['e-tab'].texto.includes('Backup pendiente'), JSON.stringify(V['e-tab']));
+  log('V16. ninguna etiqueta de espera dice "en proceso"' + sufijo, !Object.values(V).some(x => /en proceso/i.test(x.pill) || /en proceso/i.test(x.texto)), JSON.stringify(Object.values(V).map(x => x.pill)));
 
   // ---- Lo que no cambia ----
   log('V10. una entrega a una persona sigue con su nombre y Entrega' + sufijo, es('e-ent', 'Luis Pérez', 'Entrega', 't-entrega') && !V['e-ent'].texto.includes('Devuelto por'), JSON.stringify(V['e-ent']));
@@ -77,12 +94,12 @@ for (const tema of ['light', 'dark']) {
 
   // ---- Filtros y búsqueda ----
   const chips = await page.evaluate(() => Object.fromEntries([...document.querySelectorAll('#chipsEnt .chip')].map(c => [c.dataset.f, Number(c.querySelector('.n').textContent)])));
-  log('F1. los filtros cuentan lo que se ve: Devoluciones 4, Bodega 4, Entregas 1, Otras 1, Todas 10' + sufijo, chips.devolucion === 4 && chips.bodega === 4 && chips.entrega === 1 && chips.otro === 1 && chips.todos === 10, JSON.stringify(chips));
+  log('F1. los filtros cuentan lo que se ve: Devoluciones 6, Bodega 5, Entregas 1, Otras 1, Todas 13' + sufijo, chips.devolucion === 6 && chips.bodega === 5 && chips.entrega === 1 && chips.otro === 1 && chips.todos === 13, JSON.stringify(chips));
   const ids = async () => page.evaluate(() => [...document.querySelectorAll('#entList .card.hoja')].map(c => c.dataset.en).sort());
   await page.click('#chipsEnt [data-f="devolucion"]'); await esp(150);
-  log('F2. el filtro Devoluciones muestra solo las que siguen sin terminar' + sufijo, JSON.stringify(await ids()) === JSON.stringify(['e-dos', 'e-parc', 'e-pend', 'e-sin']), JSON.stringify(await ids()));
+  log('F2. el filtro Devoluciones muestra solo las que siguen sin terminar' + sufijo, JSON.stringify(await ids()) === JSON.stringify(['e-dos', 'e-imp', 'e-parc', 'e-pend', 'e-sin', 'e-tab']), JSON.stringify(await ids()));
   await page.click('#chipsEnt [data-f="bodega"]'); await esp(150);
-  log('F3. el filtro Bodega muestra las terminadas y las entregas a Bodega' + sufijo, JSON.stringify(await ids()) === JSON.stringify(['e-bod', 'e-cerr', 'e-listo', 'e-na']), JSON.stringify(await ids()));
+  log('F3. el filtro Bodega muestra las terminadas y las entregas a Bodega' + sufijo, JSON.stringify(await ids()) === JSON.stringify(['e-bod', 'e-cerr', 'e-imp2', 'e-listo', 'e-na']), JSON.stringify(await ids()));
   await page.click('#chipsEnt [data-f="todos"]'); await esp(150);
   await page.fill('#qEnt', 'Ginna'); await esp(200);
   log('F4. se sigue encontrando por el nombre de quien devolvió' + sufijo, JSON.stringify(await ids()) === JSON.stringify(['e-pend']), JSON.stringify(await ids()));
@@ -95,19 +112,32 @@ for (const tema of ['light', 'dark']) {
   log('L1. al terminar mantenimiento y backup en Equipos, la tarjeta pasa de Devolución a Bodega' + sufijo, v.pill === 'Bodega' && /\bt-bodega\b/.test(v.clase) && v.titulo === 'Bodega Riohacha', JSON.stringify(v));
   await poner('r-pend', { backup: 'pend' }); await esp(100);
   v = await vista('e-pend');
-  log('L2. si se desmarca el backup en Equipos, vuelve a Devolución' + sufijo, v.pill === 'Devolución' && /\bt-devolucion\b/.test(v.clase), JSON.stringify(v));
+  log('L2. si se desmarca el backup en Equipos, vuelve a Devolución · Bodega Riohacha con Backup pendiente' + sufijo, v.pill === 'Backup pendiente' && v.titulo === 'Devolución · Bodega Riohacha' && /\bt-devolucion\b/.test(v.clase), JSON.stringify(v));
   await poner('r-pend', { mtto: 'pend' });
 
   // ---- La hoja abierta ----
   await card('e-pend').click(); await page.waitForSelector('#enSheet:not([hidden])');
   const ab = await page.evaluate(() => ({ titulo: document.getElementById('enTitle').textContent.trim(), sub: document.getElementById('enSub').textContent.trim(), nombre: document.getElementById('enNombre').value, tipo: document.getElementById('enTipo').value }));
-  log('H1. la hoja abierta dice Bodega Riohacha arriba y Devolución como etiqueta' + sufijo, ab.titulo === 'Bodega Riohacha' && ab.sub.startsWith('Devolución ·'), JSON.stringify(ab));
+  log('H1. la hoja abierta dice Devolución · Bodega Riohacha arriba y Devolución como etiqueta' + sufijo, ab.titulo === 'Devolución · Bodega Riohacha' && ab.sub.startsWith('Devolución ·'), JSON.stringify(ab));
   log('H2. el campo Nombre conserva a quien devolvió y el Tipo sigue siendo devolución' + sufijo, ab.nombre === 'Ginna Marcela Calvo Ocampo' && ab.tipo === 'devolucion', JSON.stringify(ab));
   await page.keyboard.press('Escape'); await esp(200);
   await card('e-listo').click(); await page.waitForSelector('#enSheet:not([hidden])');
   const ab2 = await page.evaluate(() => ({ titulo: document.getElementById('enTitle').textContent.trim(), sub: document.getElementById('enSub').textContent.trim(), nombre: document.getElementById('enNombre').value }));
   log('H3. la hoja ya terminada dice Bodega arriba y conserva el nombre en el campo' + sufijo, ab2.titulo === 'Bodega Riohacha' && ab2.sub.startsWith('Bodega ·') && ab2.nombre === 'Laura Lista', JSON.stringify(ab2));
   await page.keyboard.press('Escape'); await esp(200);
+
+  // ---- Nombre del PDF: igual que se ve en la app ----
+  // Se lee el nombre que arma la app (atributo download del enlace): el Chromium de prueba cambia por "download" cualquier nombre con tilde.
+  const pdfDe = async id => {
+    await card(id).click(); await page.waitForSelector('#enSheet:not([hidden])');
+    await page.evaluate(() => { window.__nombres = []; if (!window.__clickOrig) { window.__clickOrig = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { window.__nombres.push(this.download); return window.__clickOrig.call(this); }; } });
+    await page.click('#enPdf'); await esp(400);
+    const n = await page.evaluate(() => { document.querySelectorAll('a[download]').forEach(x => x.remove()); return window.__nombres[0]; });
+    await page.keyboard.press('Escape'); await esp(200); return n;
+  };
+  const pdfEspera = await pdfDe('e-pend'), pdfLista = await pdfDe('e-listo');
+  log('P1. el PDF de una devolución en espera se llama "Devolución Bodega Riohacha - Quien fecha.pdf"' + sufijo, pdfEspera === 'Devolución Bodega Riohacha - Ginna Marcela Calvo Ocampo 2026-10-23.pdf', pdfEspera);
+  log('P2. el PDF de una devolución ya terminada se llama "Bodega Riohacha - Quien fecha.pdf"' + sufijo, pdfLista === 'Bodega Riohacha - Laura Lista 2026-10-21.pdf', pdfLista);
 
   // ---- Los datos guardados no se tocan ----
   const g = await fsDe(page);

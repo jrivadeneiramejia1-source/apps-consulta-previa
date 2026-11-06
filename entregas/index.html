@@ -15,7 +15,7 @@
 <title>Entregas Consulta Previa</title>
 <link rel="preload" href="../fuentes/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <script>try { var t = localStorage.getItem('cp_tema'); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); } catch (e) {}</script>
-<link rel="stylesheet" href="../comun.css?v=40">
+<link rel="stylesheet" href="../comun.css?v=41">
 <style>
 
 /* --- Entregas --- */
@@ -31,6 +31,9 @@ label.subir { cursor: pointer; }
 .mini-hoja.vacia { display: grid; place-items: center; background: var(--surface-2); color: var(--muted); }
 .mini-hoja.vacia .ph { width: 26px; height: 26px; }
 .hoja-t { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
+/* La etiqueta de una devolución puede decir "Mantenimiento y backup pendientes": si no cabe junto al título, baja a su línea en vez de cortarse. */
+.card.hoja .card-head { flex-wrap: wrap; }
+.card.hoja .card-head .pill { white-space: normal; text-align: left; }
 .meta.term { display: flex; flex-direction: column; gap: 2px; }
 .meta.term span { overflow-wrap: anywhere; }
 .pill.t-entrega { color: var(--listo); background: var(--listo-bg); }
@@ -246,7 +249,7 @@ label.subir { cursor: pointer; }
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <datalist id="dlNombres"></datalist><datalist id="dlProyectos"></datalist><datalist id="dlMarcas"></datalist><datalist id="dlSerEq"></datalist>
 
-<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "40"};</script>
+<script>window.APP = {"id": "entregas", "nombre": "Entregas Consulta Previa", "colecciones": ["entregas", "archivos"], "icono": "../iconos/entregas-192.png", "enlaces": [{"id": "equipos", "col": "equipos", "nombre": "Equipos"}], "v": "41"};</script>
 <script src="../iconos.js?v=32"></script>
 <script src="../comun.js?v=32"></script>
 <script src="escaner.js?v=32"></script>
@@ -447,19 +450,34 @@ function sello() { return { actualizado: new Date().toISOString(), por: miId || 
 const tipoNombre = k => (TIPOS.find(t => t.k === k) || TIPOS[0]).n;
 // Una hoja a nombre de Bodega no le entrega el equipo a nadie: se queda aquí. Se muestra como Bodega, aunque el tipo guardado siga siendo 'entrega'.
 const esBodega = e => (e.tipo || 'entrega') === 'entrega' && /^bodega/.test(sinTildes(e.nombre).trim());
-// Una devolución ya está en la bodega desde que la traen: la tarjeta dice Bodega (y quién la devolvió), no el nombre de esa persona.
-// La etiqueta sigue diciendo Devolución hasta que el mantenimiento y el backup terminan en Recibidos; entonces dice Bodega.
+// Una devolución ya está en la bodega desde que la traen. Mientras falte el mantenimiento o el backup, el título dice
+// "Devolución · Bodega Riohacha" y la etiqueta dice qué está pendiente; cuando terminan en Recibidos pasa a "Bodega Riohacha" y Bodega.
 // Todo esto es solo cómo se muestra: el tipo y el nombre guardados no cambian.
 const BODEGA = 'Bodega Riohacha';
+// A estos equipos no se les hace backup (no guardan archivos de nadie). Todo lo demás (portátil, PC, tablet, celular, sin tipo…) sí lleva.
+const SIN_BACKUP = /impresora|monitor|video|beam|proyector|bafle|parlante|radio|escaner|scanner|antena|starlink|router/;
+const llevaBackup = tipo => !SIN_BACKUP.test(sinTildes(tipo));
 const esDevolucion = e => e.tipo === 'devolucion';
-const tituloHoja = e => esDevolucion(e) ? BODEGA : (e.nombre || 'Sin nombre');
+// Qué falta por hacer en un equipo recibido: 'mantenimiento' y, solo si el equipo lleva backup, 'backup'. "No aplica" y "Hecho" no faltan.
+const faltaRec = r => [(r.mtto || 'pend') === 'pend' ? 'mantenimiento' : '', (r.backup || 'pend') === 'pend' && llevaBackup(r.tipo) ? 'backup' : ''].filter(Boolean);
 function devolucionTerminada(e) {
   const ids = Object.values(e.recibidos || {});
   if (!esDevolucion(e) || !EQDB || !ids.length) return false;
-  return ids.every(rid => { const r = EQR.get(rid); return r && (r.cerrado || ((r.mtto || 'pend') !== 'pend' && (r.backup || 'pend') !== 'pend')); });
+  return ids.every(rid => { const r = EQR.get(rid); return r && (r.cerrado || !faltaRec(r).length); });
 }
+const tituloHoja = e => esDevolucion(e) ? (devolucionTerminada(e) ? BODEGA : 'Devolución · ' + BODEGA) : (e.nombre || 'Sin nombre');
 const enBodega = e => esBodega(e) || devolucionTerminada(e);
 const etiquetaTipo = e => enBodega(e) ? 'Bodega' : tipoNombre(e.tipo);
+// Etiqueta de la tarjeta: una devolución sin terminar dice qué está pendiente (si no se sabe, dice Devolución).
+function etiquetaTarjeta(e) {
+  if (!enBodega(e) && esDevolucion(e) && EQDB) {
+    const f = new Set(Object.values(e.recibidos || {}).map(rid => EQR.get(rid)).filter(r => r && !r.cerrado).flatMap(faltaRec));
+    if (f.has('mantenimiento') && f.has('backup')) return 'Mantenimiento y backup pendientes';
+    if (f.has('mantenimiento')) return 'Mantenimiento pendiente';
+    if (f.has('backup')) return 'Backup pendiente';
+  }
+  return etiquetaTipo(e);
+}
 const nombreOpcionTipo = (t, e) => t.k === 'entrega' && esBodega(e) ? 'Bodega' : t.n;
 const lista = () => [...ENT.entries()].map(([id, e]) => Object.assign({ id }, e));
 // Corre las tareas de a n a la vez. Si una falla, no empieza más, espera las que iban y lanza el primer error.
@@ -625,7 +643,9 @@ function lineaTerminacion(e) {
   if (!EQDB) return '';
   const rs = Object.values(e.recibidos || {}).map(rid => EQR.get(rid)).filter(Boolean);
   if (!rs.length) return '';
-  const partes = [`Mantenimiento ${tareaTerminada(rs, 'mtto')}`, `Backup ${tareaTerminada(rs, 'backup')}`];
+  // El backup solo se cuenta en los equipos que lo llevan (una impresora no tiene backup).
+  const conBackup = rs.filter(r => llevaBackup(r.tipo)), partes = [`Mantenimiento ${tareaTerminada(rs, 'mtto')}`];
+  if (conBackup.length) partes.push(`Backup ${tareaTerminada(conBackup, 'backup')}`);
   if (rs.every(r => r.cerrado)) { const f = rs.map(r => fechaLocal(r.cerradoEn)).filter(Boolean).sort().pop(); if (f) partes.push('Todo terminado ' + fechaBonita(f)); }
   return `<span class="meta term">${partes.map(t => `<span>${esc(t)}</span>`).join('')}</span>`;
 }
@@ -677,7 +697,7 @@ function renderEnt() {
     html += `<button type="button" class="card hoja" data-en="${esc(e.id)}">
       ${e.miniatura ? `<img class="mini-hoja" src="${esc(e.miniatura)}" alt="" loading="lazy">` : `<span class="mini-hoja vacia">${ico('hojaVacia')}</span>`}
       <span class="hoja-t">
-        <span class="card-head"><span class="card-title">${esc(tituloHoja(e))}</span><span class="pill t-${esc(tp)}">${tp === 'otro' ? '' : ico(tp === 'devolucion' ? 'devolucion' : tp === 'bodega' ? 'otro' : 'entrega')}${etiquetaTipo(e)}</span></span>
+        <span class="card-head"><span class="card-title">${esc(tituloHoja(e))}</span><span class="pill t-${esc(tp)}">${tp === 'otro' ? '' : ico(tp === 'devolucion' ? 'devolucion' : tp === 'bodega' ? 'otro' : 'entrega')}${etiquetaTarjeta(e)}</span></span>
         <span class="facts"><span class="mono">${fechaBonita(e.fecha)}</span>${e.cedula ? `<span>CC ${esc(e.cedula)}</span>` : ''}<span>${n} ${n === 1 ? 'página' : 'páginas'}</span></span>
         ${equiposDe(e).length ? `<span class="meta mono">${esc(textoSeriales(equiposDe(e)))}</span>` : ''}
         ${estadoHoja(e)}
@@ -1276,7 +1296,9 @@ async function descargarPdf(id) {
       const img = await doc.embedJpg(bytes), w = 595.28, h = w * img.height / img.width;
       doc.addPage([w, h]).drawImage(img, { x: 0, y: 0, width: w, height: h });
     }
-    const nombre = `${esBodega(e) ? '' : tipoNombre(e.tipo) + ' '}${e.nombre || 'sin nombre'} ${e.fecha || ''}`.trim().replace(/[\\/:*?"<>|]/g, '');
+    // Una devolución se llama como se ve en la app: "Devolución Bodega Riohacha - Quien 2026-11-05" mientras espera, "Bodega Riohacha - Quien …" ya terminada.
+    const quien = e.nombre || 'sin nombre';
+    const nombre = `${esDevolucion(e) ? tituloHoja(e).replace(' · ', ' ') + ' - ' + quien : (esBodega(e) ? '' : tipoNombre(e.tipo) + ' ') + quien} ${e.fecha || ''}`.trim().replace(/[\\/:*?"<>|]/g, '');
     await DL.save({ filename: nombre + '.pdf', data: new Blob([await doc.save()], { type: 'application/pdf' }) });
     // Queda anotado quién lo descargó y cuándo, para que en la lista se vea que esa hoja ya se bajó.
     if (!soloLectura && ENT.has(id)) {

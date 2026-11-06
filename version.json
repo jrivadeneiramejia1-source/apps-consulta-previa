@@ -1,1 +1,1 @@
-{"v": "40", "notas": ["Entregas: una devolución ahora dice Bodega (y quién la devolvió) en vez del nombre de la persona; la etiqueta dice Devolución hasta que terminen el mantenimiento y el backup, y entonces dice Bodega"]}
+{"v": "41", "notas": ["Entregas: una devolución en espera ahora dice «Devolución · Bodega Riohacha» y la etiqueta dice qué está pendiente (mantenimiento y/o backup; a impresoras y equipos sin backup no se les pide backup). Al terminar pasa a «Bodega Riohacha». El PDF se llama igual que se ve en la app"]}
